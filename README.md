@@ -1,4 +1,3 @@
-@"
 # Operación Garavito
 
 Juego cooperativo de decisión bajo presión, ambientado en la ECI — Proyecto ARSW 2026-2.
@@ -10,6 +9,5 @@ Juego cooperativo de decisión bajo presión, ambientado en la ECI — Proyecto 
 
 ## Estructura
 
-- ``backend/`` — Spring Boot · Java 21 · WebSocket/STOMP
-- ``frontend/`` — React · Vite
-"@ | Out-File -FilePath README.md -Encoding utf8
+- backend/ — Spring Boot · Java 21 · WebSocket/STOMP
+- frontend/ — React · Vite
