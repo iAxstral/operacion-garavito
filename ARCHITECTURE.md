@@ -74,15 +74,13 @@ andamiaje STOMP. El flujo previsto para sprints siguientes:
    todavía entre jugadores — eso es explícitamente fuera de alcance de este
    sprint.
 
-## Pendiente para que el backend arranque out-of-the-box
+## Datasource: PostgreSQL (default) + H2 en desarrollo local
 
-El `pom.xml` ya trae `spring-boot-starter-data-jpa` y el driver de PostgreSQL,
-pero `application.properties` no define `spring.datasource.url` (ni hay una
-base local/embebida). Con la configuración actual, `./mvnw spring-boot:run`
-falla en el arranque (`Failed to configure a DataSource`). Esto es anterior a
-este cambio de arquitectura — no lo introduce el andamiaje de WebSocket — pero
-hay que resolverlo (Postgres local, Docker Compose, o un profile `dev` con
-H2) antes de que cualquiera pueda levantar el backend sin pasos manuales.
+`application.properties` (default) apunta a PostgreSQL vía variables de
+entorno (`SPRING_DATASOURCE_URL`, etc.), pensado para despliegue (Railway o
+similar). Para desarrollo local sin Postgres instalado, hay un perfil `dev`
+(`application-dev.properties`) respaldado por H2 en memoria — se activa con
+`--spring.profiles.active=dev` (ver `backend/README.md` para el detalle).
 
 ## Fuera de alcance en este sprint (explícito)
 
