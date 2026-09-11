@@ -4,6 +4,7 @@ import { USE_REAL_SPRITESHEET, SEGURIDAD_SPRITE } from './spriteConfig';
 const WORLD_WIDTH = 800;
 const WORLD_HEIGHT = 600;
 const PLAYER_SPEED = 160;
+const WALL_THICKNESS = 16;
 
 export default class MainScene extends Phaser.Scene {
   constructor() {
@@ -33,7 +34,14 @@ export default class MainScene extends Phaser.Scene {
 
     this.player = this.physics.add.sprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, SEGURIDAD_SPRITE.key, 0);
     this.player.setCollideWorldBounds(true);
-    this.physics.world.setBounds(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+    // Bounds sit on the inner edge of the painted walls so the player
+    // collides with them instead of walking over them.
+    this.physics.world.setBounds(
+      WALL_THICKNESS,
+      WALL_THICKNESS,
+      WORLD_WIDTH - WALL_THICKNESS * 2,
+      WORLD_HEIGHT - WALL_THICKNESS * 2,
+    );
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.wasd = this.input.keyboard.addKeys({
@@ -100,10 +108,10 @@ export default class MainScene extends Phaser.Scene {
 
     const walls = this.add.graphics();
     walls.fillStyle(0x5b4636, 1);
-    walls.fillRect(0, 0, WORLD_WIDTH, 16);
-    walls.fillRect(0, WORLD_HEIGHT - 16, WORLD_WIDTH, 16);
-    walls.fillRect(0, 0, 16, WORLD_HEIGHT);
-    walls.fillRect(WORLD_WIDTH - 16, 0, 16, WORLD_HEIGHT);
+    walls.fillRect(0, 0, WORLD_WIDTH, WALL_THICKNESS);
+    walls.fillRect(0, WORLD_HEIGHT - WALL_THICKNESS, WORLD_WIDTH, WALL_THICKNESS);
+    walls.fillRect(0, 0, WALL_THICKNESS, WORLD_HEIGHT);
+    walls.fillRect(WORLD_WIDTH - WALL_THICKNESS, 0, WALL_THICKNESS, WORLD_HEIGHT);
 
     this.add.text(24, 24, 'Edificio F — Zona de prueba (Sprint 1)', {
       fontFamily: 'sans-serif',
