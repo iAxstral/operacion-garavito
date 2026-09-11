@@ -24,8 +24,14 @@ const TILE_TEXTURE_FILES = {
   v2_baranda: 'v2_baranda_64.png',
   v2_columna: 'v2_columna_64x128.png',
   v2_door_madera: 'v2_door_madera_64x96.png',
+  v2_door_madera_open: 'v2_door_madera_open_64x96.png',
   v2_banca: 'v2_banca_64x32.png',
 };
+
+// Distancia (px) del jugador al centro de una puerta para considerarla
+// "abierta" — un poco mas de un tile, para que el cambio de textura no se
+// sienta pegado al umbral exacto.
+const DOOR_PROXIMITY_PX = 90;
 
 // Tipos de celda del grid que bloquean el paso del jugador. 'floor'/'stair'/
 // 'landing' son caminables; puertas y baranda se resuelven en 'decorations'
@@ -70,6 +76,7 @@ export default class MainScene extends Phaser.Scene {
     this.currentDirection = 'down';
     this.solids = null;
     this.stairsZones = [];
+    this.doors = [];
   }
 
   preload() {
@@ -168,6 +175,31 @@ export default class MainScene extends Phaser.Scene {
     }
 
     this.updateStairsZones();
+    this.updateDoorProximity();
+  }
+
+  /**
+   * Cambia la textura de cada puerta a abierta/cerrada segun la distancia
+   * al jugador — sin fisica ni overlap, es puramente visual (las puertas ya
+   * son caminables en ambos estados).
+   */
+  updateDoorProximity() {
+    const px = this.player.x;
+    const py = this.player.y;
+
+    this.doors.forEach((door) => {
+      const dx = px - door.x;
+      const dy = py - door.y;
+      const withinRange = dx * dx + dy * dy <= DOOR_PROXIMITY_PX * DOOR_PROXIMITY_PX;
+
+      if (withinRange && !door.open) {
+        door.open = true;
+        door.image.setTexture('v2_door_madera_open');
+      } else if (!withinRange && door.open) {
+        door.open = false;
+        door.image.setTexture('v2_door_madera');
+      }
+    });
   }
 
   /**
@@ -202,6 +234,7 @@ export default class MainScene extends Phaser.Scene {
   createMap(layout) {
     this.solids = this.physics.add.staticGroup();
     this.stairsZones = [];
+    this.doors = [];
 
     this.renderGridTiles(layout.grid);
     this.renderDecorations(layout.decorations);
@@ -306,8 +339,11 @@ export default class MainScene extends Phaser.Scene {
           deco.orientation === 'down'
             ? deco.y * TILE + 48 // top alineado con el techo de la fila de pared
             : (deco.y + 1) * TILE - 48; // bottom alineado con el piso de la fila de pared
-        this.add.image(cx, cy, 'v2_door_madera').setDepth(8);
-        // Las puertas son caminables: no se agregan a `solids`.
+        const image = this.add.image(cx, cy, 'v2_door_madera').setDepth(8);
+        // Las puertas son caminables: no se agregan a `solids`. Se guarda la
+        // referencia para actualizar textura abierta/cerrada por proximidad
+        // (ver updateDoorProximity).
+        this.doors.push({ image, x: cx, y: cy, open: false });
       }
     });
   }
@@ -349,21 +385,27 @@ export default class MainScene extends Phaser.Scene {
       frameRate: 4,
       repeat: -1,
     });
+    // Ciclos reducidos a 6 frames: la lamina fuente es una hoja de
+    // referencia de personaje (multiples angulos), no un ciclo de caminata
+    // diseñado — algunos indices de cada bloque de 8 muestran un angulo
+    // distinto (de frente/de espaldas colado en el ciclo) y rompian la
+    // fluidez. Diagnostico completo y frames descartados documentados en
+    // ARCHITECTURE.md.
     this.anims.create({
       key: 'right',
-      frames: this.anims.generateFrameNames(key, { prefix: 'right_', start: 0, end: 7 }),
+      frames: this.anims.generateFrameNames(key, { prefix: 'right_', start: 2, end: 7 }),
       frameRate: 10,
       repeat: -1,
     });
     this.anims.create({
       key: 'down',
-      frames: this.anims.generateFrameNames(key, { prefix: 'down_', start: 0, end: 7 }),
+      frames: this.anims.generateFrameNames(key, { prefix: 'down_', frames: [0, 1, 2, 3, 5, 6] }),
       frameRate: 10,
       repeat: -1,
     });
     this.anims.create({
       key: 'up',
-      frames: this.anims.generateFrameNames(key, { prefix: 'up_', start: 0, end: 7 }),
+      frames: this.anims.generateFrameNames(key, { prefix: 'up_', start: 2, end: 7 }),
       frameRate: 10,
       repeat: -1,
     });
