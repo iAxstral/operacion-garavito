@@ -19,6 +19,7 @@ public class Player {
     private final String playerId;
     private final String role;
     private volatile int health = 100;
+    private volatile int garavitos = 0; // se gana con misiones, no arranca con saldo
     private final List<InventorySlot> inventory = new ArrayList<>();
 
     public Player(String role) {
@@ -38,6 +39,10 @@ public class Player {
         return health;
     }
 
+    public int getGaravitos() {
+        return garavitos;
+    }
+
     public synchronized boolean tryAddItem(InventorySlot slot) {
         if (inventory.size() >= MAX_INVENTORY_SLOTS) {
             return false;
@@ -48,6 +53,36 @@ public class Player {
 
     public synchronized void heal(int amount) {
         health = Math.min(100, health + amount);
+    }
+
+    public synchronized void addGaravitos(int amount) {
+        garavitos += amount;
+    }
+
+    /**
+     * Compra atomica: chequea saldo + cupo de inventario, descuenta, agrega
+     * el item y (si aplica) cura, todo en una sola seccion critica. Los
+     * Garavitos y el inventario son estado *individual* de este jugador —
+     * no compiten con otros jugadores como si pasa con los items del mapa
+     * (ver GameSession.attemptPickup) — asi que alcanza con el lock
+     * intrinseco de este objeto: dos compras casi simultaneas del MISMO
+     * jugador se serializan aca, sin bloquear a los demas jugadores (cada
+     * uno tiene su propio Player, su propio lock).
+     */
+    public synchronized PurchaseResult purchase(int price, InventorySlot slot, int healAmount) {
+        if (garavitos < price) {
+            return PurchaseResult.rejected("insufficient_garavitos");
+        }
+        if (inventory.size() >= MAX_INVENTORY_SLOTS) {
+            return PurchaseResult.rejected("inventory_full");
+        }
+
+        garavitos -= price;
+        inventory.add(slot);
+        if (healAmount > 0) {
+            health = Math.min(100, health + healAmount);
+        }
+        return PurchaseResult.ok();
     }
 
     public synchronized List<InventorySlot> inventorySnapshot() {

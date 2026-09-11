@@ -54,6 +54,30 @@ public class GameController {
         broadcast(gameId, session, event);
     }
 
+    @MessageMapping("/game/{gameId}/purchase")
+    public void purchase(@DestinationVariable String gameId, PurchaseRequest request) {
+        GameSession session = sessionService.getOrCreate(gameId);
+        PurchaseResult result = session.attemptPurchase(request.playerId(), request.itemId(), request.x(), request.y());
+
+        LastEvent event = result.success()
+                ? LastEvent.purchaseSuccess(request.playerId(), request.itemId())
+                : LastEvent.purchaseRejected(request.playerId(), request.itemId(), result.reason());
+
+        broadcast(gameId, session, event);
+    }
+
+    @MessageMapping("/game/{gameId}/mission/complete")
+    public void completeMission(@DestinationVariable String gameId, MissionCompleteRequest request) {
+        GameSession session = sessionService.getOrCreate(gameId);
+        MissionResult result = session.attemptCompleteMission(request.playerId(), request.missionId(), request.x(), request.y());
+
+        LastEvent event = result.success()
+                ? LastEvent.missionSuccess(request.playerId(), request.missionId())
+                : LastEvent.missionRejected(request.playerId(), request.missionId(), result.reason());
+
+        broadcast(gameId, session, event);
+    }
+
     @MessageMapping("/game/{gameId}/decide")
     public void decide(@DestinationVariable String gameId, DecideRequest request) {
         GameSession session = sessionService.getOrCreate(gameId);

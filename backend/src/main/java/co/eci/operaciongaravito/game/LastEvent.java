@@ -24,4 +24,22 @@ public record LastEvent(String type, String playerId, String itemId, String reas
     public static LastEvent pickupRejected(String playerId, String itemId, String reason) {
         return new LastEvent("PICKUP_REJECTED", playerId, itemId, reason);
     }
+
+    public static LastEvent purchaseSuccess(String playerId, String itemId) {
+        return new LastEvent("PURCHASE_SUCCESS", playerId, itemId, null);
+    }
+
+    public static LastEvent purchaseRejected(String playerId, String itemId, String reason) {
+        return new LastEvent("PURCHASE_REJECTED", playerId, itemId, reason);
+    }
+
+    // itemId se reutiliza como missionId aca — mismo shape generico, sin
+    // agregar un campo nuevo solo para misiones.
+    public static LastEvent missionSuccess(String playerId, String missionId) {
+        return new LastEvent("MISSION_SUCCESS", playerId, missionId, null);
+    }
+
+    public static LastEvent missionRejected(String playerId, String missionId, String reason) {
+        return new LastEvent("MISSION_REJECTED", playerId, missionId, reason);
+    }
 }

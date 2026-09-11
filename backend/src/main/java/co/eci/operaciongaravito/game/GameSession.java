@@ -26,11 +26,15 @@ public class GameSession {
 
     private static final double PICKUP_RANGE_PX = 110; // ~1.7 tiles de holgura
     private static final int FOOD_HEALTH_BONUS = 15;
+    private static final double SHOP_RANGE_PX = 110; // mismo orden que PICKUP_RANGE_PX
+    private static final double MISSION_RANGE_PX = 90;
+    private static final long MISSION_COOLDOWN_MS = 60_000;
 
     private final String gameId;
     private final Map<String, Player> players = new ConcurrentHashMap<>();
     private final Map<String, WorldItem> worldItems = WorldItemCatalog.defaultCatalog();
     private final Map<String, String> claimedItems = new ConcurrentHashMap<>(); // itemId -> playerId
+    private final Map<String, Long> missionCooldowns = new ConcurrentHashMap<>(); // missionId -> ultimo completado (millis)
     private final RoundCoordinator roundCoordinator;
 
     /**
@@ -94,8 +98,82 @@ public class GameSession {
 
     public List<PlayerState> playerStates() {
         return players.values().stream()
-                .map(p -> new PlayerState(p.getPlayerId(), p.getRole(), p.getHealth(), p.inventorySnapshot()))
+                .map(p -> new PlayerState(p.getPlayerId(), p.getRole(), p.getHealth(), p.getGaravitos(), p.inventorySnapshot()))
                 .toList();
+    }
+
+    /**
+     * Compra en un vendedor de stock ilimitado (vendedora/maquina). A
+     * diferencia de attemptPickup, no hay reclamo cruzado entre jugadores
+     * que resolver (los Garavitos y el inventario son de UN jugador) — toda
+     * la atomicidad la da Player.purchase(...). La validacion de distancia
+     * es contra la posicion del VENDEDOR que vende ese item, no del item
+     * (los ShopItem no tienen posicion propia — ver ShopItem/ShopVendor).
+     */
+    public PurchaseResult attemptPurchase(String playerId, String itemId, double x, double y) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return PurchaseResult.rejected("unknown_player");
+        }
+
+        ShopItem item = ShopCatalog.itemById(itemId);
+        ShopVendor vendor = ShopCatalog.vendorSelling(itemId);
+        if (item == null || vendor == null) {
+            return PurchaseResult.rejected("unknown_item");
+        }
+
+        double dx = x - vendor.x();
+        double dy = y - vendor.y();
+        if (Math.sqrt(dx * dx + dy * dy) > SHOP_RANGE_PX) {
+            return PurchaseResult.rejected("too_far");
+        }
+
+        return player.purchase(item.price(), new InventorySlot(item.type(), item.itemId(), item.itemName()), item.healAmount());
+    }
+
+    /**
+     * Completar una mision: reclamo atomico del "turno" de cooldown con
+     * Map.compute (no putIfAbsent — a diferencia de un item del mapa, una
+     * mision se puede volver a reclamar despues del cooldown, no una sola
+     * vez para siempre).
+     */
+    public MissionResult attemptCompleteMission(String playerId, String missionId, double x, double y) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return MissionResult.rejected("unknown_player");
+        }
+
+        MissionZone mission = MissionCatalog.byId(missionId);
+        if (mission == null) {
+            return MissionResult.rejected("unknown_mission");
+        }
+
+        if (!mission.role().equals(player.getRole())) {
+            return MissionResult.rejected("wrong_role");
+        }
+
+        double dx = x - mission.x();
+        double dy = y - mission.y();
+        if (Math.sqrt(dx * dx + dy * dy) > MISSION_RANGE_PX) {
+            return MissionResult.rejected("too_far");
+        }
+
+        long now = System.currentTimeMillis();
+        boolean[] granted = { false };
+        missionCooldowns.compute(missionId, (key, lastCompletedAt) -> {
+            if (lastCompletedAt == null || now - lastCompletedAt >= MISSION_COOLDOWN_MS) {
+                granted[0] = true;
+                return now;
+            }
+            return lastCompletedAt;
+        });
+
+        if (!granted[0]) {
+            return MissionResult.rejected("on_cooldown");
+        }
+
+        player.addGaravitos(mission.rewardGaravitos());
+        return MissionResult.ok(mission.rewardGaravitos());
     }
 
     public Set<String> claimedItemIdsSnapshot() {
