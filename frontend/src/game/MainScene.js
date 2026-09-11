@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout } from './mapLayout';
+import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
+import { ensureJoined, onStateChange, requestPickup } from './gameSync';
 
 // --- Placeholder de respaldo (capsula de color generada en codigo) ---
 // Para revertir rapido a este placeholder (sin depender de los atlas reales
@@ -44,6 +46,10 @@ const LANDING_TINT = 0xbfe0e6;
 
 const STAIRS_ARROW_GLYPH = { up: '▲', down: '▼' };
 
+// Placeholder de color por tipo de item recolectable (mismo criterio que el
+// HUD en Hud.jsx) — se reemplaza por sprites reales mas adelante.
+const ITEM_TYPE_COLORS = { WEAPON: 0x8a3b3b, FOOD: 0x3b8a4e, AMMO: 0x8a7a3b };
+
 const SEGURIDAD_ATLAS = {
   key: 'seguridad',
   texture: '/sprites/seguridad.png',
@@ -77,6 +83,8 @@ export default class MainScene extends Phaser.Scene {
     this.solids = null;
     this.stairsZones = [];
     this.doors = [];
+    this.foodItems = [];
+    this.unsubscribeGameState = null;
   }
 
   preload() {
@@ -132,6 +140,51 @@ export default class MainScene extends Phaser.Scene {
       left: Phaser.Input.Keyboard.KeyCodes.A,
       right: Phaser.Input.Keyboard.KeyCodes.D,
     });
+
+    this.createFoodItems();
+    ensureJoined();
+    this.events.once('shutdown', () => this.unsubscribeGameState?.());
+  }
+
+  /**
+   * Items de comida de la Cafeteria: placeholder de color, no solidos.
+   * `applyClaimedItems` oculta los que el backend ya marco como reclamados
+   * (por este jugador o por otro) — la unica fuente de verdad de "que
+   * queda en el mapa" es el broadcast, no un estado local aparte.
+   */
+  createFoodItems() {
+    this.foodItems = FOOD_ITEMS.map((item) => {
+      const rect = this.add
+        .rectangle(item.x, item.y, 26, 26, ITEM_TYPE_COLORS[item.type])
+        .setStrokeStyle(2, 0x1f5c2e)
+        .setDepth(3);
+      return { ...item, rect, inRange: false };
+    });
+
+    this.unsubscribeGameState = onStateChange((state) => {
+      const claimed = new Set(state.claimedItemIds);
+      this.foodItems.forEach((food) => food.rect.setVisible(!claimed.has(food.itemId)));
+    });
+  }
+
+  updateFoodProximity() {
+    const px = this.player.x;
+    const py = this.player.y;
+
+    this.foodItems.forEach((food) => {
+      if (!food.rect.visible) return; // ya reclamado, no hay nada que recoger
+
+      const dx = px - food.x;
+      const dy = py - food.y;
+      const withinRange = dx * dx + dy * dy <= PICKUP_RANGE_PX * PICKUP_RANGE_PX;
+
+      if (withinRange && !food.inRange) {
+        food.inRange = true;
+        requestPickup(food.itemId, px, py);
+      } else if (!withinRange && food.inRange) {
+        food.inRange = false;
+      }
+    });
   }
 
   update() {
@@ -176,6 +229,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.updateStairsZones();
     this.updateDoorProximity();
+    this.updateFoodProximity();
   }
 
   /**

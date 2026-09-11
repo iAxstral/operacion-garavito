@@ -12,9 +12,136 @@
   border-radius: 4px;
 }
 
+.game-stage {
+  position: relative;
+  width: 800px;
+  height: 600px;
+}
+
 .connection-status {
   display: flex;
   align-items: center;
   gap: 12px;
   font-size: 14px;
+}
+
+/* --- HUD (vida + inventario propios, siempre visibles) --- */
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: sans-serif;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.hud-health-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 180px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hud-health-bar--small {
+  position: static;
+  width: 140px;
+  height: 10px;
+  margin: 4px 0;
+}
+
+.hud-health-fill {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.hud-health-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.hud-inventory {
+  position: absolute;
+  top: 40px;
+  left: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.hud-inventory--small {
+  position: static;
+  margin-top: 2px;
+}
+
+.hud-slot {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.hud-slot--small {
+  width: 16px;
+  height: 16px;
+}
+
+.hud-hint {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.hud-toast {
+  position: absolute;
+  top: 76px;
+  left: 12px;
+  background: rgba(20, 20, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.team-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 15, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 16px 20px;
+  min-width: 260px;
+  pointer-events: auto;
+}
+
+.team-panel h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.team-panel-row {
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.team-panel-row:first-of-type {
+  border-top: none;
+}
+
+.team-panel-empty,
+.team-panel-empty-inv {
+  font-size: 12px;
+  opacity: 0.7;
 }

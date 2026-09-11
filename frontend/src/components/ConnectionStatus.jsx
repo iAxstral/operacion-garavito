@@ -21,8 +21,12 @@ export default function ConnectionStatus() {
     });
 
     return () => {
+      // Ojo: NO se llama a socketService.disconnect() aca. El socket es un
+      // singleton compartido — Hud.jsx y MainScene.js (via gameSync) tambien
+      // dependen de que siga activo. Desconectarlo cuando ESTE componente se
+      // desmonta rompia a los demas consumidores (visible sobre todo con el
+      // doble mount/unmount de React StrictMode en dev).
       subscriptionRef.current?.unsubscribe();
-      socketService.disconnect();
     };
   }, []);
 
