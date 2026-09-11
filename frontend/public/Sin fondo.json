@@ -1,0 +1,104 @@
+{
+	"textures": [
+		{
+			"image": "Sin fondo.png",
+			"format": "RGBA8888",
+			"size": {
+				"w": 480,
+				"h": 2003
+			},
+			"scale": 1,
+			"frames": [
+				{
+					"filename": "BiomedicaOperacionGaravito-removebg-preview.png",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 500,
+						"h": 500
+					},
+					"spriteSourceSize": {
+						"x": 15,
+						"y": 5,
+						"w": 467,
+						"h": 494
+					},
+					"frame": {
+						"x": 1,
+						"y": 1508,
+						"w": 467,
+						"h": 494
+					}
+				},
+				{
+					"filename": "EconomiaOperacionGaravito-removebg-preview.png",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 500,
+						"h": 500
+					},
+					"spriteSourceSize": {
+						"x": 12,
+						"y": 6,
+						"w": 474,
+						"h": 494
+					},
+					"frame": {
+						"x": 1,
+						"y": 1012,
+						"w": 474,
+						"h": 494
+					}
+				},
+				{
+					"filename": "InfraestructuraOperacionGaravito-removebg-preview.png",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 500,
+						"h": 500
+					},
+					"spriteSourceSize": {
+						"x": 9,
+						"y": 5,
+						"w": 478,
+						"h": 495
+					},
+					"frame": {
+						"x": 1,
+						"y": 1,
+						"w": 478,
+						"h": 495
+					}
+				},
+				{
+					"filename": "SeguridadOperacionGaravito-removebg-preview.png",
+					"rotated": false,
+					"trimmed": true,
+					"sourceSize": {
+						"w": 481,
+						"h": 518
+					},
+					"spriteSourceSize": {
+						"x": 4,
+						"y": 5,
+						"w": 474,
+						"h": 512
+					},
+					"frame": {
+						"x": 1,
+						"y": 498,
+						"w": 474,
+						"h": 512
+					}
+				}
+			]
+		}
+	],
+	"meta": {
+		"app": "https://www.codeandweb.com/texturepacker",
+		"version": "3.0",
+		"smartupdate": "$TexturePacker:SmartUpdate:b567cfcd091b3122a19cfd4f295bbab6:f84344fac5098299ddc3fa1d3b3e9ff3:e2d9f18d84870906d4b4072c86bd5fd9$"
+	}
+}

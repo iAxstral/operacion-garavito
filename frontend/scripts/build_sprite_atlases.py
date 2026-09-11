@@ -11,6 +11,7 @@ conectados (para detectar cada pose individual) esta implementado a mano
 con flood-fill (BFS), sin numpy/scipy.
 """
 import json
+import re
 import sys
 from collections import deque
 from pathlib import Path
@@ -293,6 +294,55 @@ def crop_with_padding(image, bbox, padding, width, height):
     return image.crop((x0, y0, x1, y1))
 
 
+def direction_group_for_frame_name(name):
+    """down_idle_0 -> down, up_idle_2 -> up, right_5 -> right, down_3 -> down.
+
+    Une el set idle de una direccion con su set de caminata: comparten
+    personaje parado en el mismo lugar, asi que anclarlos al mismo lienzo
+    tambien evita un salto de tamano al arrancar/frenar de caminar.
+    """
+    base = re.sub(r"_\d+$", "", name)
+    return base.replace("_idle", "")
+
+
+def anchor_crops_to_shared_canvas(crops, frame_names):
+    """Reemplaza el recorte-ajustado-al-contorno (un tamano distinto por
+    pose) por un lienzo de tamano FIJO por direccion, con cada pose pegada
+    en el mismo punto de ancla (centro horizontal, borde inferior = pies).
+
+    Este es el fix de raiz del "salto entre imagenes": Phaser centra cada
+    frame en su propio origin al cambiar de textura, asi que si el ancho
+    del frame cambia 40-70% entre poses (como pasaba con el recorte por
+    contorno), el personaje se corre de lado aunque su posicion fisica no
+    se mueva. Con todas las poses de una direccion en el mismo lienzo y el
+    mismo punto de ancla, el ancho/alto de frame no cambia dentro del
+    ciclo — el "temblor" desaparece por construccion, no por casualidad.
+
+    Si el conteo de poses no coincidio con FRAME_NAMES (fallback a
+    "frame_N"), no hay agrupacion por direccion confiable: se devuelven los
+    crops sin tocar en vez de arriesgar una agrupacion incorrecta.
+    """
+    if any(name.startswith("frame_") for name in frame_names):
+        return crops
+
+    canvas_size_by_group = {}
+    for crop, name in zip(crops, frame_names):
+        group = direction_group_for_frame_name(name)
+        gw, gh = canvas_size_by_group.get(group, (0, 0))
+        canvas_size_by_group[group] = (max(gw, crop.width), max(gh, crop.height))
+
+    anchored = []
+    for crop, name in zip(crops, frame_names):
+        canvas_w, canvas_h = canvas_size_by_group[direction_group_for_frame_name(name)]
+        canvas = Image.new("RGBA", (canvas_w, canvas_h), (0, 0, 0, 0))
+        paste_x = (canvas_w - crop.width) // 2
+        paste_y = canvas_h - crop.height  # borde inferior compartido = pies
+        canvas.paste(crop, (paste_x, paste_y), crop)
+        anchored.append(canvas)
+
+    return anchored
+
+
 def pack_grid(crops):
     """Packing simple en grilla: todas las celdas del tamano del crop mas
     grande. No es un bin-packing optimo, pero es predecible y suficiente
@@ -438,6 +488,8 @@ def build_atlas(name, source_path):
         crop_with_padding(image, c["bbox"], PADDING, width, height)
         for c in ordered
     ]
+    frame_names = [frame_name_for_index(i, len(ordered)) for i in range(len(ordered))]
+    crops = anchor_crops_to_shared_canvas(crops, frame_names)
 
     contact_sheet_dir = REPO_ROOT / "frontend" / "scripts" / "_contact_sheets"
     contact_sheet_path = generate_contact_sheet(name, crops, contact_sheet_dir)

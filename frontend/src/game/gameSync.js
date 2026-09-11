@@ -16,6 +16,13 @@ let latestState = { players: [], claimedItemIds: [], lastEvent: null };
 const listeners = new Set();
 let joined = false;
 
+// Vendedor cercano (proximidad, igual patron que las puertas): lo escribe
+// MainScene.js en su loop de update, lo lee Hud.jsx para mostrar "Presiona
+// E" y el menu correspondiente. No es parte de latestState porque es
+// puramente local del cliente (no viene del backend).
+let nearVendor = null;
+const vendorListeners = new Set();
+
 function notify() {
   listeners.forEach((callback) => callback(latestState));
 }
@@ -74,8 +81,42 @@ export function submitDecision(action) {
   socketService.publish(`/app/game/${GAME_ID}/decide`, { playerId: MY_ROLE, action });
 }
 
+export function purchaseItem(itemId, x, y) {
+  socketService.publish(`/app/game/${GAME_ID}/purchase`, { playerId: MY_ROLE, itemId, x, y });
+}
+
+export function requestMissionComplete(missionId, x, y) {
+  socketService.publish(`/app/game/${GAME_ID}/mission/complete`, { playerId: MY_ROLE, missionId, x, y });
+}
+
+/** Llamado por MainScene en cada frame con el vendedor en rango, o null. */
+export function setNearVendor(vendor) {
+  if (nearVendor?.vendorId === vendor?.vendorId) return; // sin cambios, no molestar a los listeners
+  nearVendor = vendor;
+  vendorListeners.forEach((callback) => callback(nearVendor));
+}
+
+export function getNearVendor() {
+  return nearVendor;
+}
+
+export function onNearVendorChange(callback) {
+  vendorListeners.add(callback);
+  callback(nearVendor);
+  return () => vendorListeners.delete(callback);
+}
+
 // Conveniencia de dev: inspeccionar el estado sincronizado desde la consola
 // del navegador, igual que window.__phaserGame en GameCanvas.jsx.
 if (import.meta.env.DEV) {
-  window.__gameSync = { getLatestState, getMyPlayerState, ensureJoined, requestPickup, submitDecision };
+  window.__gameSync = {
+    getLatestState,
+    getMyPlayerState,
+    ensureJoined,
+    requestPickup,
+    submitDecision,
+    purchaseItem,
+    requestMissionComplete,
+    getNearVendor,
+  };
 }

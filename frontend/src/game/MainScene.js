@@ -1,7 +1,9 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout } from './mapLayout';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
-import { ensureJoined, onStateChange, requestPickup } from './gameSync';
+import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
+import { MISSION_ZONES, MISSION_RANGE_PX } from './missionCatalog';
+import { ensureJoined, onStateChange, requestPickup, setNearVendor, requestMissionComplete } from './gameSync';
 
 // --- Placeholder de respaldo (capsula de color generada en codigo) ---
 // Para revertir rapido a este placeholder (sin depender de los atlas reales
@@ -34,6 +36,17 @@ const TILE_TEXTURE_FILES = {
 // "abierta" — un poco mas de un tile, para que el cambio de textura no se
 // sienta pegado al umbral exacto.
 const DOOR_PROXIMITY_PX = 90;
+
+// Ventana de gracia (ms) para seguir animando la caminata cuando NINGUNA
+// tecla de direccion esta activa. Un teclado real casi nunca suelta una
+// tecla y presiona la opuesta (ej. Left -> Right) en el mismo frame — hay
+// un hueco de varios frames sin ninguna tecla activa mientras la mano se
+// mueve. Sin esta ventana, ese hueco se lee como "se solto todo" y la
+// animacion salta a idle por 1-varios frames antes de retomar la caminata,
+// el "salta y despues va hacia donde quiere" reportado. 120ms alcanza para
+// cubrir un cambio de tecla humano tipico sin sentirse como input-lag en
+// una parada real.
+const DIRECTION_HOLD_MS = 120;
 
 // Tipos de celda del grid que bloquean el paso del jugador. 'floor'/'stair'/
 // 'landing' son caminables; puertas y baranda se resuelven en 'decorations'
@@ -80,10 +93,13 @@ export default class MainScene extends Phaser.Scene {
     this.cursors = null;
     this.wasd = null;
     this.currentDirection = 'down';
+    this.lastMoveAt = 0;
     this.solids = null;
     this.stairsZones = [];
     this.doors = [];
     this.foodItems = [];
+    this.vendors = [];
+    this.missionZones = [];
     this.unsubscribeGameState = null;
   }
 
@@ -93,6 +109,10 @@ export default class MainScene extends Phaser.Scene {
 
     Object.entries(TILE_TEXTURE_FILES).forEach(([key, file]) => {
       this.load.image(key, `/tiles/${file}`);
+    });
+
+    VENDORS.forEach((vendor) => {
+      this.load.image(vendor.sprite, vendor.spriteFile);
     });
 
     // --- Placeholder de respaldo ---
@@ -142,8 +162,50 @@ export default class MainScene extends Phaser.Scene {
     });
 
     this.createFoodItems();
+    this.createVendors();
+    this.createMissionZones();
     ensureJoined();
-    this.events.once('shutdown', () => this.unsubscribeGameState?.());
+    this.events.once('shutdown', () => {
+      this.unsubscribeGameState?.();
+      setNearVendor(null);
+    });
+  }
+
+  /**
+   * NPC de la vendedora + maquina expendedora: sprites estaticos en
+   * posiciones fijas (VENDORS en shopCatalog.js). Solidos (no se puede
+   * caminar sobre ellos) — la interaccion es por proximidad, no por
+   * overlap fisico (ver updateVendorProximity).
+   */
+  createVendors() {
+    this.vendors = VENDORS.map((vendor) => {
+      const image = this.add.image(vendor.x, vendor.y, vendor.sprite).setDepth(6);
+      this.solids.add(image);
+      return { ...vendor, inRange: false };
+    });
+  }
+
+  /**
+   * Zonas de mision (una por rol): se completan automaticamente al
+   * pisarlas, mismo patron de "disparar en el flanco de entrada" que la
+   * comida y las escaleras — no solidas, no requieren tecla.
+   */
+  createMissionZones() {
+    this.missionZones = MISSION_ZONES.map((zone) => {
+      this.add
+        .text(zone.x, zone.y, `Misión\n(${zone.role})`, {
+          fontFamily: 'sans-serif',
+          fontSize: '11px',
+          color: '#ffffff',
+          align: 'center',
+          backgroundColor: '#5b3fa0',
+          padding: { x: 4, y: 3 },
+        })
+        .setOrigin(0.5)
+        .setDepth(4)
+        .setAlpha(0.85);
+      return { ...zone, inRange: false };
+    });
   }
 
   /**
@@ -219,8 +281,15 @@ export default class MainScene extends Phaser.Scene {
 
     if (direction) {
       this.currentDirection = direction;
+      this.lastMoveAt = this.time.now;
       this.player.setFlipX(direction === 'left');
       this.player.anims.play(WALK_ANIM_BY_DIRECTION[direction], true);
+    } else if (this.time.now - this.lastMoveAt < DIRECTION_HOLD_MS) {
+      // Hueco corto sin ninguna tecla activa (probable cambio de direccion
+      // en curso): seguir mostrando la caminata de la ultima direccion en
+      // vez de cortar a idle — ver DIRECTION_HOLD_MS.
+      this.player.setFlipX(this.currentDirection === 'left');
+      this.player.anims.play(WALK_ANIM_BY_DIRECTION[this.currentDirection], true);
     } else {
       this.player.anims.stop();
       this.player.setFlipX(this.currentDirection === 'left');
@@ -230,6 +299,56 @@ export default class MainScene extends Phaser.Scene {
     this.updateStairsZones();
     this.updateDoorProximity();
     this.updateFoodProximity();
+    this.updateVendorProximity();
+    this.updateMissionProximity();
+  }
+
+  /**
+   * A diferencia de las puertas (puramente visual), aca la proximidad
+   * decide si Hud.jsx ofrece la interaccion "Presiona E" — se notifica via
+   * gameSync.setNearVendor, que ya deduplica si no hay cambios.
+   */
+  updateVendorProximity() {
+    const px = this.player.x;
+    const py = this.player.y;
+    let closest = null;
+    let closestDistSq = Infinity;
+
+    this.vendors.forEach((vendor) => {
+      const dx = px - vendor.x;
+      const dy = py - vendor.y;
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= SHOP_RANGE_PX * SHOP_RANGE_PX && distSq < closestDistSq) {
+        closest = vendor;
+        closestDistSq = distSq;
+      }
+    });
+
+    setNearVendor(closest);
+  }
+
+  /**
+   * Mismo patron de flanco de entrada que la comida: se envia el pickup
+   * una vez al entrar al rango, no en cada frame. El backend valida rol y
+   * cooldown — este cliente no necesita saber de antemano si la mision es
+   * del rol propio, el rechazo "wrong_role" del backend ya lo cubre.
+   */
+  updateMissionProximity() {
+    const px = this.player.x;
+    const py = this.player.y;
+
+    this.missionZones.forEach((zone) => {
+      const dx = px - zone.x;
+      const dy = py - zone.y;
+      const withinRange = dx * dx + dy * dy <= MISSION_RANGE_PX * MISSION_RANGE_PX;
+
+      if (withinRange && !zone.inRange) {
+        zone.inRange = true;
+        requestMissionComplete(zone.missionId, px, py);
+      } else if (!withinRange && zone.inRange) {
+        zone.inRange = false;
+      }
+    });
   }
 
   /**

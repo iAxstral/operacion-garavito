@@ -1,6 +1,14 @@
 import { useEffect, useState } from 'react';
 import { socketService } from '../services/socketService';
-import { ensureJoined, getMyRole, onStateChange, submitDecision } from '../game/gameSync';
+import {
+  ensureJoined,
+  getMyRole,
+  onStateChange,
+  submitDecision,
+  onNearVendorChange,
+  purchaseItem,
+} from '../game/gameSync';
+import { REWARD_GARAVITOS } from '../game/missionCatalog';
 
 // Placeholder: una sola accion fija. El catalogo real de acciones por rol
 // (y su UI) es un cambio aparte — esto solo demuestra el flujo end-to-end
@@ -15,6 +23,10 @@ const REJECTION_MESSAGES = {
   too_far: 'Estás muy lejos de ese item',
   unknown_item: 'Ese item no existe',
   unknown_player: 'Todavía no te uniste a la partida',
+  insufficient_garavitos: 'No tienes suficientes Garavitos',
+  wrong_role: 'Esa misión no es de tu rol',
+  on_cooldown: 'Esa misión ya se completó hace poco, espera un poco',
+  unknown_mission: 'Esa misión no existe',
 };
 
 function healthColor(health) {
@@ -28,28 +40,54 @@ export default function Hud() {
   const [panelOpen, setPanelOpen] = useState(false);
   const [toast, setToast] = useState(null);
   const [roundBanner, setRoundBanner] = useState(null);
+  const [nearVendor, setNearVendorState] = useState(null);
+  const [shopOpen, setShopOpen] = useState(false);
 
   useEffect(() => {
     socketService.connect({ onConnect: () => ensureJoined() });
     return onStateChange(setState);
   }, []);
 
+  useEffect(() => onNearVendorChange((vendor) => {
+    setNearVendorState(vendor);
+    if (!vendor) setShopOpen(false); // el jugador se alejo: cerrar el menu si estaba abierto
+  }), []);
+
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === 'Tab' || event.key === 'm' || event.key === 'M') {
         event.preventDefault();
         setPanelOpen((open) => !open);
+        return;
+      }
+      if ((event.key === 'e' || event.key === 'E') && nearVendor) {
+        event.preventDefault();
+        setShopOpen((open) => !open);
+        return;
+      }
+      if (event.key === 'Escape' && shopOpen) {
+        setShopOpen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, []);
+  }, [nearVendor, shopOpen]);
 
   useEffect(() => {
     const event = state.lastEvent;
-    if (!event || event.playerId !== getMyRole() || event.type !== 'PICKUP_REJECTED') return undefined;
+    if (!event || event.playerId !== getMyRole()) return undefined;
 
-    setToast(REJECTION_MESSAGES[event.reason] ?? 'No se pudo recoger el item');
+    let message = null;
+    if (event.type === 'PICKUP_REJECTED' || event.type === 'PURCHASE_REJECTED' || event.type === 'MISSION_REJECTED') {
+      message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo completar la acción';
+    } else if (event.type === 'PURCHASE_SUCCESS') {
+      message = '¡Compra exitosa!';
+    } else if (event.type === 'MISSION_SUCCESS') {
+      message = `¡Misión completada! +${REWARD_GARAVITOS} Garavitos`;
+    }
+    if (!message) return undefined;
+
+    setToast(message);
     const timeout = setTimeout(() => setToast(null), 2500);
     return () => clearTimeout(timeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -70,8 +108,20 @@ export default function Hud() {
   const me = state.players.find((p) => p.playerId === getMyRole());
   const others = state.players.filter((p) => p.playerId !== getMyRole());
   const health = me?.health ?? 100;
+  const garavitos = me?.garavitos ?? 0;
   const inventory = me?.inventory ?? [];
   const slots = [...inventory, ...Array(5 - inventory.length).fill(null)];
+  const inventoryFull = inventory.length >= 5;
+
+  const handleBuy = (item) => {
+    if (!nearVendor) return;
+    // El vendedor tiene posicion fija y conocida; si el menu esta abierto es
+    // porque el cliente ya se detecto dentro de rango de ESE vendedor, asi
+    // que enviar su propia posicion como x/y satisface la validacion de
+    // proximidad del backend sin necesitar un puente aparte para la
+    // posicion exacta del jugador.
+    purchaseItem(item.itemId, nearVendor.x, nearVendor.y);
+  };
 
   return (
     <div className="hud">
@@ -79,6 +129,8 @@ export default function Hud() {
         <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
         <span className="hud-health-label">{health} / 100</span>
       </div>
+
+      <div className="hud-garavitos">{garavitos} Garavitos</div>
 
       <div className="hud-inventory">
         {slots.map((slot, i) => (
@@ -99,8 +151,42 @@ export default function Hud() {
         Decidir
       </button>
 
+      {nearVendor && !shopOpen && (
+        <div className="hud-interact-hint">
+          Presiona <strong>E</strong> — {nearVendor.label}
+        </div>
+      )}
+
       {toast && <div className="hud-toast">{toast}</div>}
       {roundBanner && <div className="hud-round-banner">{roundBanner}</div>}
+
+      {shopOpen && nearVendor && (
+        <div className="shop-modal">
+          <h3>{nearVendor.label}</h3>
+          <div className="shop-items">
+            {nearVendor.menu.map((item) => {
+              const canAfford = garavitos >= item.price;
+              const disabled = !canAfford || inventoryFull;
+              return (
+                <button
+                  key={item.itemId}
+                  type="button"
+                  className="shop-item"
+                  disabled={disabled}
+                  onClick={() => handleBuy(item)}
+                  title={disabled ? (inventoryFull ? 'Inventario lleno' : 'No tienes suficientes Garavitos') : undefined}
+                >
+                  <img src={item.icon} alt={item.itemName} className="shop-item-icon" />
+                  <span className="shop-item-name">{item.itemName}</span>
+                  {item.healAmount > 0 && <span className="shop-item-heal">+{item.healAmount} vida</span>}
+                  <span className="shop-item-price">{item.price} Garavitos</span>
+                </button>
+              );
+            })}
+          </div>
+          <p className="shop-hint">E / Esc para cerrar</p>
+        </div>
+      )}
 
       {panelOpen && (
         <div className="team-panel">
@@ -108,7 +194,7 @@ export default function Hud() {
           {others.length === 0 && <p className="team-panel-empty">Nadie más conectado todavía.</p>}
           {others.map((p) => (
             <div key={p.playerId} className="team-panel-row">
-              <strong>{p.role}</strong>
+              <strong>{p.role}</strong> — {p.garavitos} Garavitos
               <div className="hud-health-bar hud-health-bar--small">
                 <div className="hud-health-fill" style={{ width: `${p.health}%`, background: healthColor(p.health) }} />
               </div>
