@@ -6,8 +6,8 @@
  * rendering. Still no Phaser import (see GAMEPLAY.md).
  */
 
-import { AXE_COST, ZOMBIE_BOUNTY, createEconomy, earn, spend } from './economy';
-import { MISSIONS, activeMission, advance, createMissions } from './missions';
+import { AXE_COST, ZOMBIE_BOUNTY, createEconomy, earn, spend } from './economy.js';
+import { MISSIONS, activeMission, advance, createMissions } from './missions.js';
 
 export function createGameState(bus) {
   let economy = createEconomy();

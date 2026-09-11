@@ -6,7 +6,9 @@
  * touching gameplay code — only this list.
  */
 
-import { AXE_COST } from './economy';
+// Extensions are explicit throughout `systems/` so these modules also load
+// under plain Node (`npm test`), not just through Vite's resolver.
+import { AXE_COST } from './economy.js';
 
 export const MISSIONS = [
   {
