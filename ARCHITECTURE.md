@@ -9,7 +9,7 @@
 
 El "Cliente Jugador" **dejó de ser un dashboard de tarjetas** (React renderizando
 tarjetas de estado/acciones) y pasó a ser **un cliente de juego 2D top-down**
-construido con **Phaser 3**, embebido dentro de la misma app React/Vite. React
+construido con **Phaser 4** (`phaser@4.2.1`), embebido dentro de la misma app React/Vite. React
 ya no dibuja la UI del juego directamente: monta el canvas de Phaser y aloja
 UI periférica (paneles de estado, HUD futuro) alrededor de él.
 
