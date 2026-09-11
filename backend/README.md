@@ -19,7 +19,7 @@ Para desarrollar localmente **sin tener Postgres instalado**, usa el perfil
 O, corriendo el jar empaquetado:
 
 ```bash
-./mvnw -DskipTests package
+./mvnw package
 java -jar target/operacion-garavito-0.0.1-SNAPSHOT.jar --spring.profiles.active=dev
 ```
 
@@ -30,6 +30,13 @@ Con el perfil `dev` puedes inspeccionar la base en memoria en
 Sin el perfil `dev`, el backend intentará conectarse a PostgreSQL usando la
 URL por defecto (`jdbc:postgresql://localhost:5432/operaciongaravito`) y
 fallará al arrancar si no hay una instancia corriendo ahí.
+
+Los tests corren con el perfil `dev`, así que `./mvnw package` compila sin
+Postgres.
+
+En despliegue, `WS_ALLOWED_ORIGINS` define qué orígenes pueden abrir el
+WebSocket (separados por coma; por defecto solo `localhost:5173` y
+`localhost:4173`). El perfil `dev` acepta cualquier origen.
 
 ## Endpoints
 
