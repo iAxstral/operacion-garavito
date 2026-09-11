@@ -145,3 +145,46 @@
   font-size: 12px;
   opacity: 0.7;
 }
+
+.hud-round {
+  position: absolute;
+  top: 40px;
+  right: 12px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+.hud-decide-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  pointer-events: auto;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: #2d6a4f;
+  color: #fff;
+  cursor: pointer;
+}
+
+.hud-decide-btn:hover {
+  background: #1f6f43;
+}
+
+.hud-round-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(31, 111, 67, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 16px;
+  font-weight: bold;
+}

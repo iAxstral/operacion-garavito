@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react';
 import { socketService } from '../services/socketService';
-import { ensureJoined, getMyRole, onStateChange } from '../game/gameSync';
+import { ensureJoined, getMyRole, onStateChange, submitDecision } from '../game/gameSync';
+
+// Placeholder: una sola accion fija. El catalogo real de acciones por rol
+// (y su UI) es un cambio aparte — esto solo demuestra el flujo end-to-end
+// de decision -> RoundCoordinator -> resolucion -> broadcast.
+const PLACEHOLDER_ACTION = 'placeholder_action';
 
 const TYPE_COLORS = { WEAPON: '#8a3b3b', FOOD: '#3b8a4e', AMMO: '#8a7a3b' };
 
@@ -19,9 +24,10 @@ function healthColor(health) {
 }
 
 export default function Hud() {
-  const [state, setState] = useState({ players: [], claimedItemIds: [], lastEvent: null });
+  const [state, setState] = useState({ players: [], claimedItemIds: [], lastEvent: null, round: null });
   const [panelOpen, setPanelOpen] = useState(false);
   const [toast, setToast] = useState(null);
+  const [roundBanner, setRoundBanner] = useState(null);
 
   useEffect(() => {
     socketService.connect({ onConnect: () => ensureJoined() });
@@ -49,6 +55,18 @@ export default function Hud() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.lastEvent]);
 
+  // Aviso de ronda resuelta: a diferencia del toast de pickup (solo para el
+  // jugador afectado), esto lo ve cualquier jugador conectado — resolver
+  // una ronda es un evento del juego entero, no de un jugador especifico.
+  useEffect(() => {
+    if (!state.round?.resolved) return undefined;
+
+    setRoundBanner(`¡Ronda ${state.round.number} resuelta!`);
+    const timeout = setTimeout(() => setRoundBanner(null), 3000);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.round]);
+
   const me = state.players.find((p) => p.playerId === getMyRole());
   const others = state.players.filter((p) => p.playerId !== getMyRole());
   const health = me?.health ?? 100;
@@ -75,7 +93,14 @@ export default function Hud() {
 
       <div className="hud-hint">Tab / M: equipo</div>
 
+      {state.round && <div className="hud-round">Ronda {state.round.number}</div>}
+
+      <button type="button" className="hud-decide-btn" onClick={() => submitDecision(PLACEHOLDER_ACTION)}>
+        Decidir
+      </button>
+
       {toast && <div className="hud-toast">{toast}</div>}
+      {roundBanner && <div className="hud-round-banner">{roundBanner}</div>}
 
       {panelOpen && (
         <div className="team-panel">

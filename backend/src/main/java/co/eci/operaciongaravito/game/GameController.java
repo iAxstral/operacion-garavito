@@ -6,9 +6,15 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Controller;
 
 /**
- * Endpoints STOMP de vida/inventario. Todo se difunde por el mismo
- * /topic/game/{gameId} (un solo canal por partida, tambien usado a futuro
- * por el RoundCoordinator) — nunca un topic separado por tipo de evento.
+ * Endpoints STOMP de vida/inventario y decisiones de ronda. Todo se difunde
+ * por el mismo /topic/game/{gameId} — un solo canal por partida, nunca uno
+ * separado por tipo de evento.
+ *
+ * /decide no difunde nada por si mismo: el unico disparador de un
+ * broadcast "se resolvio la ronda" es el callback de RoundCoordinator (via
+ * GameSessionService), que cubre tanto la resolucion por las 4 decisiones
+ * como la resolucion por timeout — asi no hay dos caminos de broadcast
+ * distintos para el mismo evento.
  */
 @Controller
 public class GameController {
@@ -48,11 +54,28 @@ public class GameController {
         broadcast(gameId, session, event);
     }
 
+    @MessageMapping("/game/{gameId}/decide")
+    public void decide(@DestinationVariable String gameId, DecideRequest request) {
+        GameSession session = sessionService.getOrCreate(gameId);
+        try {
+            session.submitDecision(request.playerId(), request.action());
+        } catch (IllegalArgumentException ex) {
+            // Rol invalido: se descarta sin registrar. No hay un evento de
+            // rechazo dedicado para /decide todavia (a diferencia de join/
+            // pickup) porque el flujo esperado siempre manda un rol valido;
+            // se puede agregar si hace falta mas adelante.
+        }
+        // Sin broadcast aca: si esta decision completa la ronda (o si el
+        // timeout la resuelve despues), GameSessionService.broadcastRoundResolved
+        // ya se encarga — ver el comentario de clase.
+    }
+
     private void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
         GameStateMessage message = new GameStateMessage(
                 session.playerStates(),
                 session.claimedItemIdsSnapshot(),
-                lastEvent
+                lastEvent,
+                session.currentRoundView()
         );
         messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }

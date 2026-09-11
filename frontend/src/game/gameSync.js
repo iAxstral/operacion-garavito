@@ -64,8 +64,18 @@ export function requestPickup(itemId, x, y) {
   socketService.publish(`/app/game/${GAME_ID}/pickup`, { playerId: MY_ROLE, itemId, x, y });
 }
 
+/**
+ * Envia la decision de este jugador para la ronda actual al
+ * RoundCoordinator del backend. `action` es un placeholder de texto libre
+ * por ahora (ej. 'placeholder_action') — el catalogo real de acciones por
+ * rol todavia no esta definido.
+ */
+export function submitDecision(action) {
+  socketService.publish(`/app/game/${GAME_ID}/decide`, { playerId: MY_ROLE, action });
+}
+
 // Conveniencia de dev: inspeccionar el estado sincronizado desde la consola
 // del navegador, igual que window.__phaserGame en GameCanvas.jsx.
 if (import.meta.env.DEV) {
-  window.__gameSync = { getLatestState, getMyPlayerState, ensureJoined, requestPickup };
+  window.__gameSync = { getLatestState, getMyPlayerState, ensureJoined, requestPickup, submitDecision };
 }

@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.function.Consumer;
 
 /**
  * Una partida activa: hasta 4 jugadores (uno por rol) + el catalogo de
@@ -29,9 +31,20 @@ public class GameSession {
     private final Map<String, Player> players = new ConcurrentHashMap<>();
     private final Map<String, WorldItem> worldItems = WorldItemCatalog.defaultCatalog();
     private final Map<String, String> claimedItems = new ConcurrentHashMap<>(); // itemId -> playerId
+    private final RoundCoordinator roundCoordinator;
 
-    public GameSession(String gameId) {
+    /**
+     * @param onRoundResolved se invoca cada vez que el RoundCoordinator resuelve
+     *                        una ronda (por las 4 decisiones o por timeout) — el
+     *                        llamador (GameSessionService) lo usa para difundir
+     *                        el resultado, incluyendo el caso de timeout, que no
+     *                        ocurre como respuesta directa a ningun mensaje STOMP
+     *                        entrante y por eso necesita su propio disparador de
+     *                        broadcast.
+     */
+    public GameSession(String gameId, ScheduledExecutorService scheduler, Consumer<RoundState> onRoundResolved) {
         this.gameId = gameId;
+        this.roundCoordinator = new RoundCoordinator(scheduler, onRoundResolved);
     }
 
     public String getGameId() {
@@ -87,5 +100,14 @@ public class GameSession {
 
     public Set<String> claimedItemIdsSnapshot() {
         return new HashSet<>(claimedItems.keySet());
+    }
+
+    /** @throws IllegalArgumentException si role no es uno de los 4 roles validos */
+    public void submitDecision(String role, String action) {
+        roundCoordinator.submitDecision(role, action);
+    }
+
+    public RoundState currentRoundView() {
+        return roundCoordinator.currentStateView();
     }
 }
