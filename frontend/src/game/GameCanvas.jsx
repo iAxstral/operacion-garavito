@@ -25,6 +25,13 @@ export default function GameCanvas() {
       scene: [MainScene],
     });
 
+    // Conveniencia de dev: acceso rapido a la instancia de Phaser desde la
+    // consola del navegador (debug de camara/escena). No se incluye en build
+    // de produccion.
+    if (import.meta.env.DEV) {
+      window.__phaserGame = gameRef.current;
+    }
+
     return () => {
       gameRef.current?.destroy(true);
       gameRef.current = null;
