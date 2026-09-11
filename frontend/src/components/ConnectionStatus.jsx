@@ -17,6 +17,9 @@ export default function ConnectionStatus() {
           setLastEcho(payload.text);
         });
       },
+      // Fires both when the backend is unreachable and when an open
+      // connection drops; stompjs keeps retrying every reconnectDelay.
+      onDisconnect: () => setStatus('disconnected'),
       onError: () => setStatus('error'),
     });
 
@@ -27,6 +30,7 @@ export default function ConnectionStatus() {
   }, []);
 
   const sendPing = () => {
+    if (!socketService.isConnected()) return;
     socketService.publish(TEST_DESTINATION, { text: `ping @ ${new Date().toLocaleTimeString()}` });
   };
 

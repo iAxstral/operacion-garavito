@@ -13,18 +13,24 @@ class SocketService {
     this.client = null;
   }
 
-  connect({ onConnect, onError } = {}) {
+  connect({ onConnect, onDisconnect, onError } = {}) {
     if (this.client?.active) return this.client;
 
-    this.client = new Client({
+    const client = new Client({
       webSocketFactory: () => new SockJS(SOCKET_URL),
       reconnectDelay: 5000,
-      onConnect: (frame) => onConnect?.(frame),
-      onStompError: (frame) => onError?.(frame),
     });
+    // Callbacks from a client that was already replaced/disconnected are
+    // dropped: StrictMode mounts twice, and the first client's late close
+    // event must not overwrite the second client's "connected" state.
+    const isCurrent = () => this.client === client;
+    client.onConnect = (frame) => isCurrent() && onConnect?.(frame);
+    client.onWebSocketClose = (event) => isCurrent() && onDisconnect?.(event);
+    client.onStompError = (frame) => isCurrent() && onError?.(frame);
 
-    this.client.activate();
-    return this.client;
+    this.client = client;
+    client.activate();
+    return client;
   }
 
   disconnect() {
@@ -32,8 +38,12 @@ class SocketService {
     this.client = null;
   }
 
+  isConnected() {
+    return Boolean(this.client?.connected);
+  }
+
   subscribe(destination, callback) {
-    if (!this.client?.active) {
+    if (!this.isConnected()) {
       throw new Error('Socket client is not connected yet');
     }
     return this.client.subscribe(destination, (message) => {
@@ -42,7 +52,7 @@ class SocketService {
   }
 
   publish(destination, body) {
-    if (!this.client?.active) {
+    if (!this.isConnected()) {
       throw new Error('Socket client is not connected yet');
     }
     this.client.publish({ destination, body: JSON.stringify(body) });
