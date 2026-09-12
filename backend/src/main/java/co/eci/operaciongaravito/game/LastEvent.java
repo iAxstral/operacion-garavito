@@ -9,6 +9,15 @@ package co.eci.operaciongaravito.game;
  */
 public record LastEvent(String type, String playerId, String itemId, String reason) {
 
+    /** El itemId lleva cuantos zombis cayeron con ese golpe. */
+    public static LastEvent attackKill(String playerId, int kills) {
+        return new LastEvent("ATTACK_KILL", playerId, String.valueOf(kills), null);
+    }
+
+    public static LastEvent attackRejected(String playerId, String reason) {
+        return new LastEvent("ATTACK_REJECTED", playerId, null, reason);
+    }
+
     public static LastEvent joinOk(String playerId) {
         return new LastEvent("JOIN_OK", playerId, null, null);
     }

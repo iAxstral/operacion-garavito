@@ -78,6 +78,33 @@ public class GameController {
         broadcast(gameId, session, event);
     }
 
+    /**
+     * Posicion del jugador. Es el unico mensaje de alta frecuencia (10 Hz por
+     * jugador) y por eso NO difunde: responder con un broadcast por cada uno
+     * multiplicaria el trafico por el numero de jugadores. Las posiciones
+     * viajan en el broadcast del tick.
+     */
+    @MessageMapping("/game/{gameId}/move")
+    public void move(@DestinationVariable String gameId, MoveRequest request) {
+        sessionService.getOrCreate(gameId).reportPosition(request.playerId(), request.x(), request.y());
+    }
+
+    @MessageMapping("/game/{gameId}/attack")
+    public void attack(@DestinationVariable String gameId, AttackRequest request) {
+        GameSession session = sessionService.getOrCreate(gameId);
+        AttackResult result = session.attemptAttack(request.playerId(), request.x(), request.y(), request.facing());
+
+        // Un golpe al aire no vale un broadcast: solo se difunde cuando algo
+        // cambio para los demas (mato zombis) o cuando hay que avisarle al
+        // que golpeo por que no paso nada.
+        if (result.kills() > 0 || !result.success()) {
+            LastEvent event = result.success()
+                    ? LastEvent.attackKill(request.playerId(), result.kills())
+                    : LastEvent.attackRejected(request.playerId(), result.reason());
+            broadcast(gameId, session, event);
+        }
+    }
+
     @MessageMapping("/game/{gameId}/decide")
     public void decide(@DestinationVariable String gameId, DecideRequest request) {
         GameSession session = sessionService.getOrCreate(gameId);
@@ -99,7 +126,9 @@ public class GameController {
                 session.playerStates(),
                 session.claimedItemIdsSnapshot(),
                 lastEvent,
-                session.currentRoundView()
+                session.currentRoundView(),
+                session.zombieStates(),
+                session.waveState()
         );
         messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }

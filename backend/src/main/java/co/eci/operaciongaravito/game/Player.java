@@ -19,8 +19,16 @@ public class Player {
     private final String playerId;
     private final String role;
     private volatile int health = 100;
-    private volatile int garavitos = 0; // se gana con misiones, no arranca con saldo
+    private volatile int garavitos = 0; // se gana con misiones y zombis, no arranca con saldo
     private final List<InventorySlot> inventory = new ArrayList<>();
+
+    // Posicion reportada por el cliente (ver /game/{id}/move). El servidor la
+    // necesita de forma continua para que los zombis puedan perseguir; hasta
+    // el primer reporte vale el spawn del piso 1 (mapLayout.js).
+    private volatile double x = 608;
+    private volatile double y = 800;
+    private volatile PlayerLifeState lifeState = PlayerLifeState.ALIVE;
+    private volatile long attackReadyAt = 0;
 
     public Player(String role) {
         this.playerId = role;
@@ -41,6 +49,62 @@ public class Player {
 
     public int getGaravitos() {
         return garavitos;
+    }
+
+    public double getX() {
+        return x;
+    }
+
+    public double getY() {
+        return y;
+    }
+
+    public PlayerLifeState getLifeState() {
+        return lifeState;
+    }
+
+    public boolean isAlive() {
+        return lifeState == PlayerLifeState.ALIVE;
+    }
+
+    public void reportPosition(double x, double y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    /**
+     * Daño recibido de un zombi. Devuelve si el golpe se aplico: un jugador
+     * ya caido no vuelve a recibir daño, para que los zombis dejen de
+     * "castigar" un cuerpo y pasen al siguiente objetivo.
+     */
+    public synchronized boolean takeDamage(int amount) {
+        if (lifeState == PlayerLifeState.DOWNED) {
+            return false;
+        }
+        health = Math.max(0, health - amount);
+        if (health == 0) {
+            lifeState = PlayerLifeState.DOWNED;
+        }
+        return true;
+    }
+
+    /** Levanta al jugador al terminar la oleada. */
+    public synchronized void revive(int toHealth) {
+        health = Math.max(health, toHealth);
+        lifeState = PlayerLifeState.ALIVE;
+    }
+
+    /** True si el arma ya salio de cooldown; reserva el proximo golpe. */
+    public synchronized boolean tryConsumeAttackCooldown(long now, long cooldownMs) {
+        if (now < attackReadyAt) {
+            return false;
+        }
+        attackReadyAt = now + cooldownMs;
+        return true;
+    }
+
+    public synchronized boolean hasWeapon() {
+        return inventory.stream().anyMatch(slot -> slot.type() == ItemType.WEAPON);
     }
 
     public synchronized boolean tryAddItem(InventorySlot slot) {

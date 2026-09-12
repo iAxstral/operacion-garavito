@@ -23,6 +23,10 @@ public final class ShopCatalog {
     );
 
     public static final List<ShopItem> WEAPON_MACHINE_MENU = List.of(
+            // Arma inicial: cuesta exactamente lo que paga una mision de rol
+            // (MissionCatalog.REWARD_GARAVITOS), asi la primera mision que
+            // complete un jugador le alcanza justo para armarse.
+            new ShopItem("shop-hacha", ItemType.WEAPON, "Hacha", MissionCatalog.REWARD_GARAVITOS, 0),
             new ShopItem("shop-pistola", ItemType.WEAPON, "Pistola", 50, 0),
             new ShopItem("shop-rifle", ItemType.WEAPON, "Rifle", 90, 0),
             new ShopItem("shop-municion", ItemType.AMMO, "Munición", 15, 0)

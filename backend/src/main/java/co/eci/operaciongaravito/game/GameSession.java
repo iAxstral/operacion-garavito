@@ -30,12 +30,26 @@ public class GameSession {
     private static final double MISSION_RANGE_PX = 90;
     private static final long MISSION_COOLDOWN_MS = 60_000;
 
+    // --- Zombis (ver GAMEPLAY.md) ---
+    private static final int GARAVITOS_PER_ZOMBIE = 1;
+    private static final int ATTACK_DAMAGE = 2; // mata de un golpe a un zombi normal
+    private static final double ATTACK_RANGE_PX = 62; // 46 de arma + holgura de latencia
+    private static final double ATTACK_HALF_ARC_RAD = Math.toRadians(45);
+    private static final long ATTACK_COOLDOWN_MS = 400;
+    private static final double ATTACK_KNOCKBACK_PX_S = 280;
+    private static final double CONTACT_RANGE_PX = 40;
+    private static final double SEPARATION_RADIUS_PX = 26;
+    private static final double SEPARATION_FORCE = 90;
+    private static final int REVIVE_HEALTH = 50;
+
     private final String gameId;
     private final Map<String, Player> players = new ConcurrentHashMap<>();
     private final Map<String, WorldItem> worldItems = WorldItemCatalog.defaultCatalog();
     private final Map<String, String> claimedItems = new ConcurrentHashMap<>(); // itemId -> playerId
     private final Map<String, Long> missionCooldowns = new ConcurrentHashMap<>(); // missionId -> ultimo completado (millis)
     private final RoundCoordinator roundCoordinator;
+    private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
+    private final WaveDirector waveDirector;
 
     /**
      * @param onRoundResolved se invoca cada vez que el RoundCoordinator resuelve
@@ -49,6 +63,13 @@ public class GameSession {
     public GameSession(String gameId, ScheduledExecutorService scheduler, Consumer<RoundState> onRoundResolved) {
         this.gameId = gameId;
         this.roundCoordinator = new RoundCoordinator(scheduler, onRoundResolved);
+        // Un respiro antes de la primera oleada, para que quien entra alcance
+        // a ubicarse en el mapa antes de que aparezca el primer zombi.
+        this.waveDirector = new WaveDirector(System.currentTimeMillis(), 4_000);
+    }
+
+    public boolean hasPlayers() {
+        return !players.isEmpty();
     }
 
     public String getGameId() {
@@ -98,8 +119,160 @@ public class GameSession {
 
     public List<PlayerState> playerStates() {
         return players.values().stream()
-                .map(p -> new PlayerState(p.getPlayerId(), p.getRole(), p.getHealth(), p.getGaravitos(), p.inventorySnapshot()))
+                .map(p -> new PlayerState(p.getPlayerId(), p.getRole(), p.getHealth(), p.getGaravitos(),
+                        p.inventorySnapshot(), Math.round(p.getX()), Math.round(p.getY()), p.getLifeState()))
                 .toList();
+    }
+
+    public void reportPosition(String playerId, double x, double y) {
+        Player player = players.get(playerId);
+        if (player != null) {
+            player.reportPosition(x, y);
+        }
+    }
+
+    public List<ZombieState> zombieStates() {
+        return zombies.values().stream().map(Zombie::toState).toList();
+    }
+
+    public WaveState waveState() {
+        long now = System.currentTimeMillis();
+        return new WaveState(waveDirector.getWave(), waveDirector.remaining(aliveZombieCount()), waveDirector.restingSeconds(now));
+    }
+
+    private int aliveZombieCount() {
+        return (int) zombies.values().stream().filter(Zombie::isAlive).count();
+    }
+
+    /**
+     * Un paso de simulacion: spawn de la oleada, persecucion, mordidas y
+     * limpieza de cadaveres. Lo llama solo el hilo del tick.
+     */
+    public void tick(long now, double deltaSeconds) {
+        Zombie spawned = waveDirector.update(now, aliveZombieCount(), players.values());
+        if (spawned != null) {
+            zombies.put(spawned.getId(), spawned);
+        }
+
+        List<Player> targets = players.values().stream().filter(Player::isAlive).toList();
+        List<Zombie> living = zombies.values().stream().filter(Zombie::isAlive).toList();
+
+        for (Zombie zombie : living) {
+            Player target = nearestPlayer(zombie, targets);
+            if (target == null) {
+                continue;
+            }
+            double[] separation = separationFor(zombie, living);
+            zombie.step(target.getX(), target.getY(), separation[0], separation[1], deltaSeconds, now);
+
+            if (Math.hypot(target.getX() - zombie.getX(), target.getY() - zombie.getY()) <= CONTACT_RANGE_PX) {
+                zombie.tryBite(target, now);
+            }
+        }
+
+        // Los muertos se retiran del mapa aca y no en el momento del golpe:
+        // asi el cliente alcanza a recibir al menos un broadcast con el zombi
+        // ya sin vida y puede animar la muerte en vez de desaparecerlo.
+        zombies.values().removeIf(zombie -> !zombie.isAlive());
+
+        if (waveDirector.restingSeconds(now) > 0) {
+            players.values().forEach(player -> {
+                if (!player.isAlive()) {
+                    player.revive(REVIVE_HEALTH);
+                }
+            });
+        }
+    }
+
+    private Player nearestPlayer(Zombie zombie, List<Player> candidates) {
+        Player nearest = null;
+        double best = Double.MAX_VALUE;
+        for (Player candidate : candidates) {
+            double distance = Math.hypot(candidate.getX() - zombie.getX(), candidate.getY() - zombie.getY());
+            if (distance < best) {
+                best = distance;
+                nearest = candidate;
+            }
+        }
+        return nearest;
+    }
+
+    /** Empuje entre zombis cercanos, para que la horda no se apile en un punto. */
+    private double[] separationFor(Zombie zombie, List<Zombie> others) {
+        double sx = 0;
+        double sy = 0;
+        for (Zombie other : others) {
+            if (other == zombie) {
+                continue;
+            }
+            double dx = zombie.getX() - other.getX();
+            double dy = zombie.getY() - other.getY();
+            double distanceSq = dx * dx + dy * dy;
+            if (distanceSq == 0 || distanceSq > SEPARATION_RADIUS_PX * SEPARATION_RADIUS_PX) {
+                continue;
+            }
+            double distance = Math.sqrt(distanceSq);
+            sx += (dx / distance) * SEPARATION_FORCE;
+            sy += (dy / distance) * SEPARATION_FORCE;
+        }
+        return new double[] { sx, sy };
+    }
+
+    /**
+     * Golpe de arma cuerpo a cuerpo. El servidor valida arma, cooldown,
+     * alcance y arco; el cliente solo pide y anima.
+     */
+    public AttackResult attemptAttack(String playerId, double x, double y, double facing) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return AttackResult.rejected("unknown_player");
+        }
+        if (!player.isAlive()) {
+            return AttackResult.rejected("downed");
+        }
+        if (!player.hasWeapon()) {
+            return AttackResult.rejected("no_weapon");
+        }
+
+        long now = System.currentTimeMillis();
+        if (!player.tryConsumeAttackCooldown(now, ATTACK_COOLDOWN_MS)) {
+            return AttackResult.rejected("on_cooldown");
+        }
+
+        player.reportPosition(x, y);
+
+        int hits = 0;
+        int kills = 0;
+        for (Zombie zombie : zombies.values()) {
+            if (!zombie.isAlive()) {
+                continue;
+            }
+            double dx = zombie.getX() - x;
+            double dy = zombie.getY() - y;
+            if (Math.hypot(dx, dy) > ATTACK_RANGE_PX) {
+                continue;
+            }
+            double angleToZombie = Math.atan2(dy, dx);
+            if (Math.abs(wrapAngle(angleToZombie - facing)) > ATTACK_HALF_ARC_RAD) {
+                continue;
+            }
+
+            hits++;
+            double knockback = Math.hypot(dx, dy) == 0 ? 0 : ATTACK_KNOCKBACK_PX_S;
+            if (zombie.hit(ATTACK_DAMAGE, Math.cos(angleToZombie) * knockback, Math.sin(angleToZombie) * knockback, now)) {
+                kills++;
+            }
+        }
+
+        if (kills > 0) {
+            player.addGaravitos(kills * GARAVITOS_PER_ZOMBIE);
+        }
+        return AttackResult.ok(hits, kills);
+    }
+
+    /** Normaliza un angulo a [-PI, PI], para poder compararlo con el medio arco. */
+    private static double wrapAngle(double radians) {
+        return Math.IEEEremainder(radians, 2 * Math.PI);
     }
 
     /**
