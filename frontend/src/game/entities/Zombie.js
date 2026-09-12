@@ -123,8 +123,12 @@ export default class Zombie {
     if (!this.alive) return;
 
     this.health -= damage;
-    this.sprite.setTintFill(0xffffff);
-    this.scene.time.delayedCall(70, () => this.alive && this.sprite.clearTint());
+    // Phaser 4 removed setTintFill; FILL mode is how a solid hit flash is done
+    // now (a MULTIPLY tint of white would be invisible).
+    this.sprite.setTint(0xffffff).setTintMode(Phaser.TintModes.FILL);
+    this.scene.time.delayedCall(70, () => {
+      if (this.alive) this.sprite.clearTint().setTintMode(Phaser.TintModes.MULTIPLY);
+    });
 
     if (this.health <= 0) {
       this.die();
