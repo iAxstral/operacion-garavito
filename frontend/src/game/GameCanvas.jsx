@@ -35,9 +35,14 @@ export default function GameCanvas() {
       scene: [MainScene, HudScene],
     });
 
+    // Dev-only handle for poking at the running game from the console or from
+    // an automated smoke test. Stripped from production builds.
+    if (import.meta.env.DEV) window.__garavito = gameRef.current;
+
     return () => {
       gameRef.current?.destroy(true);
       gameRef.current = null;
+      if (import.meta.env.DEV) delete window.__garavito;
     };
   }, []);
 
