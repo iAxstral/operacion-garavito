@@ -71,24 +71,38 @@ public class Zombie {
         return health <= 0;
     }
 
+    /** Radio del cuerpo del zombi para chequear contra las paredes. */
+    private static final double BODY_RADIUS = 12;
+
     /** Mueve al zombi un paso hacia el objetivo. La llama solo el tick. */
-    public void step(double targetX, double targetY, double separationX, double separationY,
-                     double deltaSeconds, long now) {
+    public void step(FloorGrid floor, double targetX, double targetY,
+                     double separationX, double separationY, double deltaSeconds, long now) {
+        double moveX;
+        double moveY;
+
         if (now < knockbackUntil) {
-            x += knockbackVx * deltaSeconds;
-            y += knockbackVy * deltaSeconds;
-            return;
+            moveX = knockbackVx * deltaSeconds;
+            moveY = knockbackVy * deltaSeconds;
+        } else {
+            double dx = targetX - x;
+            double dy = targetY - y;
+            double distance = Math.hypot(dx, dy);
+            moveX = distance > 1 ? (dx / distance) * speed * deltaSeconds : 0;
+            moveY = distance > 1 ? (dy / distance) * speed * deltaSeconds : 0;
+            moveX += separationX * deltaSeconds;
+            moveY += separationY * deltaSeconds;
         }
 
-        double dx = targetX - x;
-        double dy = targetY - y;
-        double distance = Math.hypot(dx, dy);
-        if (distance > 1) {
-            x += (dx / distance) * speed * deltaSeconds;
-            y += (dy / distance) * speed * deltaSeconds;
+        // Cada eje se resuelve por separado para que el zombi *deslice* a lo
+        // largo de una pared en vez de quedarse clavado contra ella: si la
+        // diagonal esta bloqueada, la componente que si es libre igual avanza.
+        // Sin esto un zombi contra un muro se queda vibrando en el sitio.
+        if (floor.fits(x + moveX, y, BODY_RADIUS)) {
+            x += moveX;
         }
-        x += separationX * deltaSeconds;
-        y += separationY * deltaSeconds;
+        if (floor.fits(x, y + moveY, BODY_RADIUS)) {
+            y += moveY;
+        }
     }
 
     /**

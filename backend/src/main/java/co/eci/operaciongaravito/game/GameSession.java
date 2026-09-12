@@ -50,6 +50,7 @@ public class GameSession {
     private final RoundCoordinator roundCoordinator;
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final WaveDirector waveDirector;
+    private final FloorGrid floor = FloorGrid.floor1();
 
     /**
      * @param onRoundResolved se invoca cada vez que el RoundCoordinator resuelve
@@ -176,7 +177,7 @@ public class GameSession {
                 continue;
             }
             double[] separation = separationFor(zombie, living);
-            zombie.step(target.getX(), target.getY(), separation[0], separation[1], deltaSeconds, now);
+            zombie.step(floor, target.getX(), target.getY(), separation[0], separation[1], deltaSeconds, now);
 
             if (Math.hypot(target.getX() - zombie.getX(), target.getY() - zombie.getY()) <= CONTACT_RANGE_PX) {
                 zombie.tryBite(target, now);
