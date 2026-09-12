@@ -106,13 +106,13 @@ export default class MainScene extends Phaser.Scene {
     return this.zombies.filter((zombie) => zombie.alive).length;
   }
 
-  update() {
+  update(time, delta) {
     if (this.gameOver) {
       if (Phaser.Input.Keyboard.JustDown(this.restartKey)) this.restart();
       return;
     }
 
-    this.player.update();
+    this.player.update(time, delta);
 
     // Dead zombies are dropped from the list once their fade-out finished, so
     // the separation loop below stays proportional to what is actually on

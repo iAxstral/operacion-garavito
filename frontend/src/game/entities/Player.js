@@ -54,10 +54,6 @@ export default class Player {
     // Without this the player bumps into walls "with their head", which is the
     // classic top-down feel bug.
     this.sprite.body.setSize(20, 16).setOffset(6, 30);
-    this.sprite.body.setDrag(PLAYER.drag, PLAYER.drag);
-    // Velocity is clamped by magnitude below; the per-axis cap would let
-    // diagonals run ~41% faster.
-    this.sprite.body.setMaxVelocity(PLAYER.dashSpeed * 2);
 
     this.shadow = scene.add.ellipse(x, y, 26, 10, 0x000000, 0.3).setDepth(DEPTH.SHADOW);
 
@@ -117,9 +113,8 @@ export default class Player {
     this.sprite.body.setAcceleration(0, 0);
   }
 
-  update() {
+  update(_time, delta) {
     const now = this.scene.time.now;
-    const body = this.sprite.body;
 
     const input = new Phaser.Math.Vector2(
       (this.keys.right.isDown || this.cursors.right.isDown ? 1 : 0)
@@ -130,19 +125,45 @@ export default class Player {
     // Normalising is what makes diagonal movement the same speed as cardinal.
     if (input.lengthSq() > 0) input.normalize();
 
-    if (this.isDashing) {
-      body.setAcceleration(0, 0);
-      body.velocity.limit(PLAYER.dashSpeed);
-    } else {
+    if (!this.isDashing) {
       if (input.lengthSq() > 0) this.facing = Player.facingFor(input);
-      body.setAcceleration(input.x * PLAYER.acceleration, input.y * PLAYER.acceleration);
-      body.velocity.limit(PLAYER.maxSpeed);
+      this.steer(input, delta);
 
       const wantsDash = this.keys.dash.isDown || this.keys.dashAlt.isDown;
       if (wantsDash && now >= this.dashReadyAt) this.startDash(input);
     }
 
     this.syncVisuals();
+  }
+
+  /**
+   * Eases the current velocity toward the one the input asks for.
+   *
+   * Arcade's own acceleration + drag was the obvious way to do this, but the
+   * speed cap then has to be applied before the physics step integrates, which
+   * overshoots the cap by `acceleration * delta` and makes top speed depend on
+   * the frame rate. Stepping the velocity ourselves keeps the weighty feel and
+   * caps the speed exactly, on any frame rate.
+   */
+  steer(input, delta) {
+    const body = this.sprite.body;
+    const seconds = delta / 1000;
+    const target = input.clone().scale(PLAYER.maxSpeed);
+    const rate = input.lengthSq() > 0 ? PLAYER.acceleration : PLAYER.drag;
+
+    const dx = target.x - body.velocity.x;
+    const dy = target.y - body.velocity.y;
+    const distance = Math.hypot(dx, dy);
+    const step = rate * seconds;
+
+    if (distance <= step || distance === 0) {
+      body.setVelocity(target.x, target.y);
+      return;
+    }
+    body.setVelocity(
+      body.velocity.x + (dx / distance) * step,
+      body.velocity.y + (dy / distance) * step,
+    );
   }
 
   startDash(input) {
