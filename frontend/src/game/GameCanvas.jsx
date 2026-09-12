@@ -1,7 +1,14 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
-import MainScene from './MainScene';
 
+import MainScene from './MainScene';
+import HudScene from './ui/HudScene';
+
+/**
+ * Viewport size. The world itself is much larger (see world/campus.js) and the
+ * camera follows the player across it — that gap is what stops the zone from
+ * reading as a static board.
+ */
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 600;
 
@@ -18,11 +25,14 @@ export default function GameCanvas() {
       width: GAME_WIDTH,
       height: GAME_HEIGHT,
       pixelArt: true,
+      backgroundColor: '#0d1117',
       physics: {
         default: 'arcade',
         arcade: { debug: false },
       },
-      scene: [MainScene],
+      // HudScene is listed but not auto-started: MainScene launches it once it
+      // has a bus and a game state to hand over.
+      scene: [MainScene, HudScene],
     });
 
     return () => {

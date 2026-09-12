@@ -96,10 +96,16 @@ Definidas en `systems/waves.js` (puro), ejecutadas por `WaveDirector.js`.
 
 | Oleada | Zombis | Cadencia de spawn | Vida del zombi |
 |---|---|---|---|
-| 1 | 5 | 1200 ms | 2 |
-| 2 | 8 | 1000 ms | 2 |
-| 3 | 12 | 850 ms | 2 |
-| n ≥ 4 | `5 + 3(n−1)` | `max(350, 1300 − 90n)` | 2, y 4 para un 25% "tesos" |
+| 1 | 5 | 1250 ms | 2 |
+| 2 | 8 | 1100 ms | 2 |
+| 3 | 11 | 950 ms | 2 |
+| n | `5 + 3(n−1)` | `max(350, 1250 − 150(n−1))` | 2; desde la 4 un 25% son "tesos" con 4 |
+
+La velocidad del zombi sube con la oleada pero está topada por debajo de los
+180 px/s del jugador: quedar acorralado debe ser un error de posicionamiento,
+no algo inevitable. Los tres primeros parámetros son una única fórmula en
+`systems/waves.js`, no una tabla: las tres primeras filas son solo su
+resultado.
 
 Entre oleadas hay 6 s de respiro, anunciados en el HUD.
 

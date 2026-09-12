@@ -1,18 +1,32 @@
 import Phaser from 'phaser';
+
 import { USE_REAL_SPRITESHEET, SEGURIDAD_SPRITE } from './spriteConfig';
+import { createEventBus } from './systems/eventBus.js';
+import { createGameState } from './systems/gameState.js';
+import { AXE_COST } from './systems/economy.js';
+import {
+  PLAY_AREA,
+  WORLD,
+  addVignette,
+  buildCampus,
+  isAtSecurityPost,
+} from './world/campus';
+import Player, { AXE } from './entities/Player';
+import Zombie, { bakeZombieTextures } from './entities/Zombie';
+import WaveDirector from './WaveDirector';
 
-const WORLD_WIDTH = 800;
-const WORLD_HEIGHT = 600;
-const PLAYER_SPEED = 160;
-const WALL_THICKNESS = 16;
-
+/**
+ * The only gameplay scene. It owns the Phaser side of things — entities,
+ * physics, camera — and forwards everything that matters to the rule modules
+ * in `systems/` through the event bus (see GAMEPLAY.md).
+ */
 export default class MainScene extends Phaser.Scene {
   constructor() {
     super('MainScene');
     this.player = null;
-    this.cursors = null;
-    this.wasd = null;
-    this.currentDirection = 'down';
+    this.zombies = [];
+    this.gameOver = false;
+    this.hintVisible = false;
   }
 
   preload() {
@@ -25,99 +39,128 @@ export default class MainScene extends Phaser.Scene {
   }
 
   create() {
-    this.createStaticMap();
+    this.bus = createEventBus();
+    this.gameState = createGameState(this.bus);
 
-    if (!USE_REAL_SPRITESHEET) {
-      this.generatePlaceholderSpritesheet();
-    }
+    const { obstacles } = buildCampus(this);
+
+    if (!USE_REAL_SPRITESHEET) this.generatePlaceholderSpritesheet();
     this.createWalkAnimations();
+    bakeZombieTextures(this);
 
-    this.player = this.physics.add.sprite(WORLD_WIDTH / 2, WORLD_HEIGHT / 2, SEGURIDAD_SPRITE.key, 0);
-    this.player.setCollideWorldBounds(true);
-    // Bounds sit on the inner edge of the painted walls so the player
-    // collides with them instead of walking over them.
-    this.physics.world.setBounds(
-      WALL_THICKNESS,
-      WALL_THICKNESS,
-      WORLD_WIDTH - WALL_THICKNESS * 2,
-      WORLD_HEIGHT - WALL_THICKNESS * 2,
+    this.physics.world.setBounds(PLAY_AREA.x, PLAY_AREA.y, PLAY_AREA.width, PLAY_AREA.height);
+
+    this.player = new Player(this, WORLD.width / 2, WORLD.height / 2, this.bus);
+    this.zombieGroup = this.physics.add.group();
+
+    this.physics.add.collider(this.player.sprite, obstacles);
+    this.physics.add.collider(this.zombieGroup, obstacles);
+    this.physics.add.overlap(
+      this.player.sprite,
+      this.zombieGroup,
+      (_playerSprite, zombieSprite) => zombieSprite.owner?.touch(this.player),
     );
 
-    this.cursors = this.input.keyboard.createCursorKeys();
-    this.wasd = this.input.keyboard.addKeys({
-      up: Phaser.Input.Keyboard.KeyCodes.W,
-      down: Phaser.Input.Keyboard.KeyCodes.S,
-      left: Phaser.Input.Keyboard.KeyCodes.A,
-      right: Phaser.Input.Keyboard.KeyCodes.D,
+    this.cameras.main.setBounds(0, 0, WORLD.width, WORLD.height);
+    this.cameras.main.startFollow(this.player.sprite, true, 0.09, 0.09);
+    addVignette(this);
+
+    this.waveDirector = new WaveDirector(
+      this,
+      this.bus,
+      (x, y, stats) => this.spawnZombie(x, y, stats),
+    );
+    this.waveDirector.start();
+
+    this.bindBus();
+
+    this.restartKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+    this.input.mouse?.disableContextMenu();
+
+    this.scene.launch('HudScene', { bus: this.bus, gameState: this.gameState });
+  }
+
+  bindBus() {
+    this.bus.on('weapon:equipped', () => this.player.equipAxe());
+
+    this.bus.on('player:damaged', () => {
+      this.cameras.main.shake(120, 0.006);
+      this.cameras.main.flash(90, 120, 20, 20);
     });
+
+    this.bus.on('player:died', () => {
+      this.gameOver = true;
+      this.player.sprite.body.setVelocity(0, 0);
+    });
+
+    this.bus.on('zombie:killed', () => this.cameras.main.shake(60, 0.002));
+  }
+
+  spawnZombie(x, y, stats) {
+    const zombie = new Zombie(this, x, y, stats, this.bus);
+    this.zombieGroup.add(zombie.sprite);
+    this.zombies.push(zombie);
+  }
+
+  livingZombies() {
+    return this.zombies.filter((zombie) => zombie.alive).length;
   }
 
   update() {
-    if (!this.player) return;
-
-    const up = this.cursors.up.isDown || this.wasd.up.isDown;
-    const down = this.cursors.down.isDown || this.wasd.down.isDown;
-    const left = this.cursors.left.isDown || this.wasd.left.isDown;
-    const right = this.cursors.right.isDown || this.wasd.right.isDown;
-
-    let vx = 0;
-    let vy = 0;
-    let direction = null;
-
-    if (left) {
-      vx = -PLAYER_SPEED;
-      direction = 'left';
-    } else if (right) {
-      vx = PLAYER_SPEED;
-      direction = 'right';
+    if (this.gameOver) {
+      if (Phaser.Input.Keyboard.JustDown(this.restartKey)) this.restart();
+      return;
     }
 
-    if (up) {
-      vy = -PLAYER_SPEED;
-      direction = direction ?? 'up';
-    } else if (down) {
-      vy = PLAYER_SPEED;
-      direction = direction ?? 'down';
-    }
+    this.player.update();
 
-    this.player.setVelocity(vx, vy);
+    // Dead zombies are dropped from the list once their fade-out finished, so
+    // the separation loop below stays proportional to what is actually on
+    // screen instead of to everything ever spawned.
+    this.zombies = this.zombies.filter((zombie) => zombie.sprite.active);
+    this.zombies.forEach((zombie) => zombie.update(this.player, this.zombies));
 
-    if (direction) {
-      this.currentDirection = direction;
-      this.player.anims.play(`walk-${direction}`, true);
-    } else {
-      this.player.anims.stop();
-      const row = SEGURIDAD_SPRITE.rowOrder.indexOf(this.currentDirection);
-      this.player.setFrame(row * SEGURIDAD_SPRITE.framesPerDirection);
-    }
+    this.waveDirector.update(this.livingZombies(), this.player);
+    this.resolveAttack();
+    this.resolveSecurityPost();
   }
 
-  createStaticMap() {
-    // Placeholder single-screen "zona del campus" until a real Tiled map lands.
-    const floor = this.add.graphics();
-    floor.fillStyle(0xcfc9b8, 1);
-    floor.fillRect(0, 0, WORLD_WIDTH, WORLD_HEIGHT);
+  resolveAttack() {
+    if (!this.player.wantsToAttack() || !this.player.canAttack()) return;
 
-    floor.lineStyle(1, 0xb8b09a, 1);
-    for (let x = 0; x <= WORLD_WIDTH; x += 40) {
-      floor.lineBetween(x, 0, x, WORLD_HEIGHT);
-    }
-    for (let y = 0; y <= WORLD_HEIGHT; y += 40) {
-      floor.lineBetween(0, y, WORLD_WIDTH, y);
-    }
-
-    const walls = this.add.graphics();
-    walls.fillStyle(0x5b4636, 1);
-    walls.fillRect(0, 0, WORLD_WIDTH, WALL_THICKNESS);
-    walls.fillRect(0, WORLD_HEIGHT - WALL_THICKNESS, WORLD_WIDTH, WALL_THICKNESS);
-    walls.fillRect(0, 0, WALL_THICKNESS, WORLD_HEIGHT);
-    walls.fillRect(WORLD_WIDTH - WALL_THICKNESS, 0, WALL_THICKNESS, WORLD_HEIGHT);
-
-    this.add.text(24, 24, 'Edificio F — Zona de prueba (Sprint 1)', {
-      fontFamily: 'sans-serif',
-      fontSize: '14px',
-      color: '#5b4636',
+    const swing = this.player.beginAttack();
+    this.zombies.forEach((zombie) => {
+      if (zombie.alive && swing.hits(zombie)) {
+        zombie.hit(AXE.damage, swing.angle, AXE.knockback);
+      }
     });
+  }
+
+  resolveSecurityPost() {
+    const near = isAtSecurityPost(this.player.x, this.player.y);
+    const claimable = near && this.gameState.canClaimAxe();
+
+    if (claimable !== this.hintVisible) {
+      this.hintVisible = claimable;
+      this.bus.emit(
+        claimable ? 'hint:show' : 'hint:hide',
+        { text: `E · Reclamar el hacha (${AXE_COST} Garavitos)` },
+      );
+    }
+
+    if (claimable && this.player.wantsToInteract()) this.gameState.claimAxe();
+  }
+
+  restart() {
+    this.zombies.forEach((zombie) => zombie.destroy());
+    this.zombies = [];
+    this.gameOver = false;
+    this.hintVisible = false;
+
+    this.player.reset(WORLD.width / 2, WORLD.height / 2);
+    this.gameState.reset();
+    this.waveDirector.start();
+    this.bus.emit('game:restarted', {});
   }
 
   /**
@@ -129,6 +172,8 @@ export default class MainScene extends Phaser.Scene {
    */
   generatePlaceholderSpritesheet() {
     const { key, frameWidth, frameHeight, framesPerDirection, rowOrder, color } = SEGURIDAD_SPRITE;
+    if (this.textures.exists(key)) return;
+
     const cols = framesPerDirection;
     const rows = rowOrder.length;
     const sheetWidth = frameWidth * cols;
@@ -195,12 +240,16 @@ export default class MainScene extends Phaser.Scene {
     const { key, framesPerDirection, rowOrder } = SEGURIDAD_SPRITE;
 
     rowOrder.forEach((direction, row) => {
-      const start = row * framesPerDirection;
-      const end = start + framesPerDirection - 1;
+      const animKey = `walk-${direction}`;
+      if (this.anims.exists(animKey)) return;
 
+      const start = row * framesPerDirection;
       this.anims.create({
-        key: `walk-${direction}`,
-        frames: this.anims.generateFrameNumbers(key, { start, end }),
+        key: animKey,
+        frames: this.anims.generateFrameNumbers(key, {
+          start,
+          end: start + framesPerDirection - 1,
+        }),
         frameRate: 8,
         repeat: -1,
       });
