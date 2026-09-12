@@ -69,6 +69,34 @@ class FloorGridTest {
     }
 
     @Test
+    @DisplayName("un zombi del aula encuentra el camino hasta el vestibulo")
+    void zombiesNavigateBetweenRooms() {
+        // Sin campo de distancias, este zombi se clava contra la pared que
+        // separa el aula del vestibulo y nunca llega: es exactamente el caso
+        // que se veia en vivo (zombis parados a 300px del jugador).
+        double playerX = 608;
+        double playerY = 800;
+        int[][] field = floor.distanceField(playerX, playerY);
+
+        Zombie zombie = new Zombie("z1", 736, 288, 2, 150);
+        for (int i = 0; i < 900; i++) {
+            zombie.step(floor, field, playerX, playerY, 0, 0, 0.066, 0);
+        }
+
+        double distance = Math.hypot(zombie.getX() - playerX, zombie.getY() - playerY);
+        assertTrue(distance < 60, "el zombi quedo a " + Math.round(distance) + "px, no llego");
+        assertTrue(floor.fits(zombie.getX(), zombie.getY(), 12), "termino dentro de una pared");
+    }
+
+    @Test
+    @DisplayName("el campo de distancias marca inalcanzable lo que esta tapiado")
+    void unreachableCellsAreMarked() {
+        int[][] field = floor.distanceField(608, 800);
+        // La esquina (0,0) es pared: nunca puede tener distancia.
+        assertTrue(field[0][0] == -1);
+    }
+
+    @Test
     @DisplayName("un zombi no atraviesa una pared persiguiendo al jugador")
     void zombiesDoNotWalkThroughWalls() {
         // Zombi en el corredor central, objetivo al otro lado de la pared de
@@ -77,7 +105,7 @@ class FloorGridTest {
         double startY = zombie.getY();
 
         for (int i = 0; i < 120; i++) {
-            zombie.step(floor, 800, 0, 0, 0, 0.066, 0);
+            zombie.step(floor, floor.distanceField(800, 0), 800, 0, 0, 0, 0.066, 0);
         }
 
         assertTrue(floor.fits(zombie.getX(), zombie.getY(), 12),

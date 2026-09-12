@@ -70,7 +70,16 @@ export function ensureJoined() {
   joined = true;
 
   socketService.subscribe(`/topic/game/${GAME_ID}`, (body) => {
-    latestState = body;
+    // El tick de zombis difunde 8 veces por segundo con lastEvent en null, así
+    // que tomar el payload tal cual borraba cualquier aviso ("inventario
+    // lleno", "muy lejos") a los 125 ms — antes de que el HUD alcanzara a
+    // mostrarlo. Un evento se conserva hasta que llegue OTRO evento real; se
+    // mantiene la misma referencia para que los efectos de React no lo
+    // vuelvan a disparar.
+    latestState = {
+      ...body,
+      lastEvent: body.lastEvent ?? latestState.lastEvent,
+    };
     notify();
   });
   socketService.publish(`/app/game/${GAME_ID}/join`, { role: MY_ROLE });
@@ -158,5 +167,9 @@ if (import.meta.env.DEV) {
     purchaseItem,
     requestMissionComplete,
     getNearVendor,
+    requestAttack,
+    reportPosition,
+    getZombies,
+    getWave,
   };
 }

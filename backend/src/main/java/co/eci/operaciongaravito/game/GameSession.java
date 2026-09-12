@@ -191,13 +191,21 @@ public class GameSession {
 
         List<Zombie> living = zombies.values().stream().filter(Zombie::isAlive).toList();
 
+        // Un campo de distancias por jugador, calculado una vez por tick y
+        // compartido por todos los zombis que lo persiguen: recalcularlo por
+        // zombi seria el mismo BFS repetido decenas de veces por tick.
+        Map<String, int[][]> fields = new java.util.HashMap<>();
+        targets.forEach(target ->
+                fields.put(target.getPlayerId(), floor.distanceField(target.getX(), target.getY())));
+
         for (Zombie zombie : living) {
             Player target = nearestPlayer(zombie, targets);
             if (target == null) {
                 continue;
             }
             double[] separation = separationFor(zombie, living);
-            zombie.step(floor, target.getX(), target.getY(), separation[0], separation[1], deltaSeconds, now);
+            zombie.step(floor, fields.get(target.getPlayerId()), target.getX(), target.getY(),
+                    separation[0], separation[1], deltaSeconds, now);
 
             if (Math.hypot(target.getX() - zombie.getX(), target.getY() - zombie.getY()) <= CONTACT_RANGE_PX) {
                 zombie.tryBite(target, now);

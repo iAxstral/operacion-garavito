@@ -74,8 +74,18 @@ public class Zombie {
     /** Radio del cuerpo del zombi para chequear contra las paredes. */
     private static final double BODY_RADIUS = 12;
 
-    /** Mueve al zombi un paso hacia el objetivo. La llama solo el tick. */
-    public void step(FloorGrid floor, double targetX, double targetY,
+    /** Distancia a partir de la cual conviene ir derecho en vez de por celdas. */
+    private static final double DIRECT_CHASE_PX = FloorGrid.TILE;
+
+    /**
+     * Mueve al zombi un paso. La llama solo el tick.
+     *
+     * @param distanceField campo de distancias hacia el objetivo (ver
+     *                      {@link FloorGrid#distanceField}). Perseguir en linea
+     *                      recta no alcanza dentro de un edificio: el zombi se
+     *                      clava contra la pared que lo separa del jugador.
+     */
+    public void step(FloorGrid floor, int[][] distanceField, double targetX, double targetY,
                      double separationX, double separationY, double deltaSeconds, long now) {
         double moveX;
         double moveY;
@@ -84,13 +94,26 @@ public class Zombie {
             moveX = knockbackVx * deltaSeconds;
             moveY = knockbackVy * deltaSeconds;
         } else {
-            double dx = targetX - x;
-            double dy = targetY - y;
-            double distance = Math.hypot(dx, dy);
-            moveX = distance > 1 ? (dx / distance) * speed * deltaSeconds : 0;
-            moveY = distance > 1 ? (dy / distance) * speed * deltaSeconds : 0;
-            moveX += separationX * deltaSeconds;
-            moveY += separationY * deltaSeconds;
+            double distance = Math.hypot(targetX - x, targetY - y);
+            double dirX;
+            double dirY;
+
+            if (distance <= DIRECT_CHASE_PX) {
+                // Ya en la misma celda o pegado: ir derecho, que el campo a
+                // esta escala solo produciria tironeos entre centros de celda.
+                dirX = distance == 0 ? 0 : (targetX - x) / distance;
+                dirY = distance == 0 ? 0 : (targetY - y) / distance;
+            } else {
+                double[] flow = floor.flowDirection(distanceField, x, y);
+                // Sin ruta (el jugador quedo en otra zona sin conexion): se cae
+                // a la persecucion directa para no dejar al zombi paralizado.
+                boolean noRoute = flow[0] == 0 && flow[1] == 0;
+                dirX = noRoute ? (targetX - x) / distance : flow[0];
+                dirY = noRoute ? (targetY - y) / distance : flow[1];
+            }
+
+            moveX = dirX * speed * deltaSeconds + separationX * deltaSeconds;
+            moveY = dirY * speed * deltaSeconds + separationY * deltaSeconds;
         }
 
         // Cada eje se resuelve por separado para que el zombi *deslice* a lo
