@@ -3,7 +3,30 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout } from './mapLayout';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { MISSION_ZONES, MISSION_RANGE_PX } from './missionCatalog';
-import { ensureJoined, onStateChange, requestPickup, setNearVendor, requestMissionComplete } from './gameSync';
+import {
+  ensureJoined,
+  getZombies,
+  onStateChange,
+  reportPosition,
+  requestAttack,
+  requestPickup,
+  setNearVendor,
+  requestMissionComplete,
+} from './gameSync';
+import ZombieLayer from './ZombieLayer';
+
+// Dash: unico recurso defensivo antes de conseguir un arma. La
+// invulnerabilidad es lo que lo vuelve una herramienta y no solo una forma
+// de ir mas rapido.
+const DASH_SPEED = 420;
+const DASH_MS = 180;
+const DASH_COOLDOWN_MS = 1200;
+
+// El servidor valida su propio cooldown de ataque; este solo evita inundar
+// el socket con golpes que van a ser rechazados.
+const ATTACK_REQUEST_MS = 400;
+
+const FACING_RADIANS = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
 
 // --- Placeholder de respaldo (capsula de color generada en codigo) ---
 // Para revertir rapido a este placeholder (sin depender de los atlas reales
@@ -101,6 +124,13 @@ export default class MainScene extends Phaser.Scene {
     this.vendors = [];
     this.missionZones = [];
     this.unsubscribeGameState = null;
+    this.zombieLayer = null;
+    this.facing = 'down';
+    this.dashUntil = 0;
+    this.dashReadyAt = 0;
+    this.dashVx = 0;
+    this.dashVy = 0;
+    this.nextAttackAt = 0;
   }
 
   preload() {
@@ -154,6 +184,10 @@ export default class MainScene extends Phaser.Scene {
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
     this.cursors = this.input.keyboard.createCursorKeys();
+    this.dashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+    this.input.mouse?.disableContextMenu();
+    this.zombieLayer = new ZombieLayer(this);
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -249,7 +283,7 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
-  update() {
+  update(time, delta) {
     if (!this.player) return;
 
     const up = this.cursors.up.isDown || this.wasd.up.isDown;
@@ -257,27 +291,49 @@ export default class MainScene extends Phaser.Scene {
     const left = this.cursors.left.isDown || this.wasd.left.isDown;
     const right = this.cursors.right.isDown || this.wasd.right.isDown;
 
-    let vx = 0;
-    let vy = 0;
+    let vx = (right ? 1 : 0) - (left ? 1 : 0);
+    let vy = (down ? 1 : 0) - (up ? 1 : 0);
     let direction = null;
 
-    if (left) {
-      vx = -PLAYER_SPEED;
-      direction = 'left';
-    } else if (right) {
-      vx = PLAYER_SPEED;
-      direction = 'right';
+    if (left) direction = 'left';
+    else if (right) direction = 'right';
+    if (up) direction = direction ?? 'up';
+    else if (down) direction = direction ?? 'down';
+
+    // Normalizar es lo que hace que la diagonal vaya igual de rapido que la
+    // horizontal: con velocidad por eje, moverse en diagonal daba ~41% extra.
+    const magnitude = Math.hypot(vx, vy);
+    if (magnitude > 0) {
+      vx = (vx / magnitude) * PLAYER_SPEED;
+      vy = (vy / magnitude) * PLAYER_SPEED;
     }
 
-    if (up) {
-      vy = -PLAYER_SPEED;
-      direction = direction ?? 'up';
-    } else if (down) {
-      vy = PLAYER_SPEED;
-      direction = direction ?? 'down';
+    if (direction) this.facing = direction;
+
+    if (time < this.dashUntil) {
+      // Durante el dash se conserva la velocidad que se fijo al arrancarlo,
+      // aunque el jugador suelte las teclas.
+      this.player.setVelocity(this.dashVx, this.dashVy);
+    } else {
+      this.player.setVelocity(vx, vy);
+
+      if (this.dashKey.isDown && time >= this.dashReadyAt) {
+        // vx/vy ya vienen escalados a PLAYER_SPEED, asi que dividir devuelve
+        // el vector unitario. Sin teclas, el dash sale hacia donde se mira.
+        const dx = magnitude > 0 ? vx / PLAYER_SPEED : Math.cos(FACING_RADIANS[this.facing]);
+        const dy = magnitude > 0 ? vy / PLAYER_SPEED : Math.sin(FACING_RADIANS[this.facing]);
+        this.dashVx = dx * DASH_SPEED;
+        this.dashVy = dy * DASH_SPEED;
+        this.dashUntil = time + DASH_MS;
+        this.dashReadyAt = time + DASH_COOLDOWN_MS;
+        this.spawnDashTrail();
+      }
     }
 
-    this.player.setVelocity(vx, vy);
+    reportPosition(Math.round(this.player.x), Math.round(this.player.y), time);
+    this.updateAttack(time);
+    this.zombieLayer.sync(getZombies());
+    this.zombieLayer.update(delta);
 
     if (direction) {
       this.currentDirection = direction;
@@ -301,6 +357,36 @@ export default class MainScene extends Phaser.Scene {
     this.updateFoodProximity();
     this.updateVendorProximity();
     this.updateMissionProximity();
+  }
+
+  /**
+   * Pide un golpe al servidor y lo anima localmente. El arco que se dibuja es
+   * solo feedback: quien decide si algo fue golpeado es el backend, que valida
+   * arma, cooldown, alcance y angulo.
+   */
+  updateAttack(time) {
+    const wants = this.attackKey.isDown || this.input.activePointer.leftButtonDown();
+    if (!wants || time < this.nextAttackAt) return;
+
+    this.nextAttackAt = time + ATTACK_REQUEST_MS;
+    const facing = FACING_RADIANS[this.facing];
+    requestAttack(Math.round(this.player.x), Math.round(this.player.y), facing);
+    this.drawSwing(facing);
+  }
+
+  drawSwing(facing) {
+    const arc = this.add.graphics();
+    arc.setDepth(this.player.y + 1);
+    arc.fillStyle(0xfff2c4, 0.45);
+    arc.slice(this.player.x, this.player.y, 62, facing - Math.PI / 4, facing + Math.PI / 4);
+    arc.fillPath();
+    this.tweens.add({ targets: arc, alpha: 0, duration: 160, onComplete: () => arc.destroy() });
+  }
+
+  spawnDashTrail() {
+    const ghost = this.add.sprite(this.player.x, this.player.y, this.player.texture.key, this.player.frame.name);
+    ghost.setDepth(this.player.depth - 1).setAlpha(0.45).setTint(0x7ec8ff).setFlipX(this.player.flipX);
+    this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
   }
 
   /**

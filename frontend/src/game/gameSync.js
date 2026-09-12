@@ -12,7 +12,16 @@ import { socketService } from '../services/socketService';
 const GAME_ID = 'default';
 const MY_ROLE = 'SEGURIDAD'; // unico rol jugable en este sprint
 
-let latestState = { players: [], claimedItemIds: [], lastEvent: null };
+let latestState = { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null };
+
+// Cadencia del reporte de posicion. 10 Hz alcanza para que los zombis
+// persigan de forma continua; el umbral en pixeles evita gastar mensajes
+// mientras el jugador esta quieto, que es buena parte del tiempo.
+const MOVE_REPORT_MS = 100;
+const MOVE_REPORT_MIN_PX = 4;
+let lastMoveSentAt = 0;
+let lastSentX = null;
+let lastSentY = null;
 const listeners = new Set();
 let joined = false;
 
@@ -65,6 +74,37 @@ export function ensureJoined() {
     notify();
   });
   socketService.publish(`/app/game/${GAME_ID}/join`, { role: MY_ROLE });
+}
+
+/**
+ * Reporta la posicion al servidor, que la necesita para que los zombis
+ * persigan. Se llama en cada frame; este modulo decide si toca mandar.
+ */
+export function reportPosition(x, y, now) {
+  if (!joined || !socketService.client?.connected) return;
+  if (now - lastMoveSentAt < MOVE_REPORT_MS) return;
+  if (lastSentX !== null
+    && Math.abs(x - lastSentX) < MOVE_REPORT_MIN_PX
+    && Math.abs(y - lastSentY) < MOVE_REPORT_MIN_PX) return;
+
+  lastMoveSentAt = now;
+  lastSentX = x;
+  lastSentY = y;
+  socketService.publish(`/app/game/${GAME_ID}/move`, { playerId: MY_ROLE, x, y });
+}
+
+/** `facing` en radianes. El servidor valida arma, cooldown, alcance y arco. */
+export function requestAttack(x, y, facing) {
+  if (!socketService.client?.connected) return;
+  socketService.publish(`/app/game/${GAME_ID}/attack`, { playerId: MY_ROLE, x, y, facing });
+}
+
+export function getZombies() {
+  return latestState.zombies ?? [];
+}
+
+export function getWave() {
+  return latestState.wave ?? null;
 }
 
 export function requestPickup(itemId, x, y) {
