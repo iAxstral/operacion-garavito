@@ -11,26 +11,37 @@ const SOCKET_URL = import.meta.env.VITE_WS_URL ?? 'http://localhost:8080/ws';
 class SocketService {
   constructor() {
     this.client = null;
+    this.connectListeners = new Set();
   }
 
-  connect({ onConnect, onDisconnect, onError } = {}) {
-    if (this.client?.active) return this.client;
+  /**
+   * Varias partes de la UI (HUD, panel de conexion, MainScene) llaman a
+   * connect() de forma independiente. Todas quedan registradas como
+   * listeners; si el socket ya esta activo cuando alguien llama a connect,
+   * se le avisa de inmediato en vez de esperar un evento onConnect que ya
+   * paso.
+   */
+  connect({ onConnect, onError } = {}) {
+    if (onConnect) this.connectListeners.add(onConnect);
 
-    const client = new Client({
+    // client.active se pone en true casi de inmediato al llamar activate()
+    // — antes de que el handshake STOMP realmente termine. client.connected
+    // es la senal real de "listo para publish/subscribe".
+    if (this.client?.connected) {
+      onConnect?.();
+      return this.client;
+    }
+    if (this.client) return this.client; // ya se esta activando/conectando
+
+    this.client = new Client({
       webSocketFactory: () => new SockJS(SOCKET_URL),
       reconnectDelay: 5000,
+      onConnect: (frame) => this.connectListeners.forEach((cb) => cb(frame)),
+      onStompError: (frame) => onError?.(frame),
     });
-    // Callbacks from a client that was already replaced/disconnected are
-    // dropped: StrictMode mounts twice, and the first client's late close
-    // event must not overwrite the second client's "connected" state.
-    const isCurrent = () => this.client === client;
-    client.onConnect = (frame) => isCurrent() && onConnect?.(frame);
-    client.onWebSocketClose = (event) => isCurrent() && onDisconnect?.(event);
-    client.onStompError = (frame) => isCurrent() && onError?.(frame);
 
-    this.client = client;
-    client.activate();
-    return client;
+    this.client.activate();
+    return this.client;
   }
 
   disconnect() {
@@ -38,12 +49,8 @@ class SocketService {
     this.client = null;
   }
 
-  isConnected() {
-    return Boolean(this.client?.connected);
-  }
-
   subscribe(destination, callback) {
-    if (!this.isConnected()) {
+    if (!this.client?.connected) {
       throw new Error('Socket client is not connected yet');
     }
     return this.client.subscribe(destination, (message) => {
@@ -52,7 +59,7 @@ class SocketService {
   }
 
   publish(destination, body) {
-    if (!this.isConnected()) {
+    if (!this.client?.connected) {
       throw new Error('Socket client is not connected yet');
     }
     this.client.publish({ destination, body: JSON.stringify(body) });

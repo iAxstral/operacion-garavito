@@ -1,14 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
-
 import MainScene from './MainScene';
-import HudScene from './ui/HudScene';
 
-/**
- * Viewport size. The world itself is much larger (see world/campus.js) and the
- * camera follows the player across it — that gap is what stops the zone from
- * reading as a static board.
- */
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 600;
 
@@ -25,24 +18,23 @@ export default function GameCanvas() {
       width: GAME_WIDTH,
       height: GAME_HEIGHT,
       pixelArt: true,
-      backgroundColor: '#0d1117',
       physics: {
         default: 'arcade',
         arcade: { debug: false },
       },
-      // HudScene is listed but not auto-started: MainScene launches it once it
-      // has a bus and a game state to hand over.
-      scene: [MainScene, HudScene],
+      scene: [MainScene],
     });
 
-    // Dev-only handle for poking at the running game from the console or from
-    // an automated smoke test. Stripped from production builds.
-    if (import.meta.env.DEV) window.__garavito = gameRef.current;
+    // Conveniencia de dev: acceso rapido a la instancia de Phaser desde la
+    // consola del navegador (debug de camara/escena). No se incluye en build
+    // de produccion.
+    if (import.meta.env.DEV) {
+      window.__phaserGame = gameRef.current;
+    }
 
     return () => {
       gameRef.current?.destroy(true);
       gameRef.current = null;
-      if (import.meta.env.DEV) delete window.__garavito;
     };
   }, []);
 

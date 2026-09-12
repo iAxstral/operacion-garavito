@@ -12,9 +12,287 @@
   border-radius: 4px;
 }
 
+.game-stage {
+  position: relative;
+  width: 800px;
+  height: 600px;
+}
+
 .connection-status {
   display: flex;
   align-items: center;
   gap: 12px;
   font-size: 14px;
+}
+
+/* --- HUD (vida + inventario propios, siempre visibles) --- */
+.hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  font-family: sans-serif;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+
+.hud-health-bar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  width: 180px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hud-health-bar--small {
+  position: static;
+  width: 140px;
+  height: 10px;
+  margin: 4px 0;
+}
+
+.hud-health-fill {
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.hud-health-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
+.hud-inventory {
+  position: absolute;
+  top: 40px;
+  left: 12px;
+  display: flex;
+  gap: 6px;
+}
+
+.hud-inventory--small {
+  position: static;
+  margin-top: 2px;
+}
+
+.hud-slot {
+  width: 28px;
+  height: 28px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.hud-slot--small {
+  width: 16px;
+  height: 16px;
+}
+
+.hud-garavitos {
+  position: absolute;
+  top: 12px;
+  left: 204px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(232, 195, 74, 0.6);
+  border-radius: 4px;
+  padding: 0 10px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  color: #e8c34a;
+  white-space: nowrap;
+}
+
+.hud-hint {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.hud-toast {
+  position: absolute;
+  top: 76px;
+  left: 12px;
+  background: rgba(20, 20, 20, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 6px 10px;
+  font-size: 13px;
+}
+
+.team-panel {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 15, 18, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 16px 20px;
+  min-width: 260px;
+  pointer-events: auto;
+}
+
+.team-panel h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.team-panel-row {
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.team-panel-row:first-of-type {
+  border-top: none;
+}
+
+.team-panel-empty,
+.team-panel-empty-inv {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.hud-round {
+  position: absolute;
+  top: 40px;
+  right: 12px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+.hud-decide-btn {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  pointer-events: auto;
+  font-family: inherit;
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  background: #2d6a4f;
+  color: #fff;
+  cursor: pointer;
+}
+
+.hud-decide-btn:hover {
+  background: #1f6f43;
+}
+
+.hud-round-banner {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(31, 111, 67, 0.9);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  padding: 10px 18px;
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* --- Economia: interaccion con vendedores + modal de tienda --- */
+.hud-interact-hint {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 14px;
+}
+
+.hud-interact-hint strong {
+  color: #e8c34a;
+}
+
+.shop-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 15, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 18px 22px;
+  min-width: 320px;
+  pointer-events: auto;
+}
+
+.shop-modal h3 {
+  margin: 0 0 12px;
+  font-size: 16px;
+}
+
+.shop-items {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.shop-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-family: inherit;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 10px 8px;
+  cursor: pointer;
+}
+
+.shop-item:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.shop-item:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.shop-item-icon {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.shop-item-name {
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.shop-item-heal {
+  font-size: 11px;
+  color: #7bc47f;
+}
+
+.shop-item-price {
+  font-size: 12px;
+  color: #e8c34a;
+}
+
+.shop-hint {
+  margin: 12px 0 0;
+  font-size: 11px;
+  opacity: 0.7;
+  text-align: center;
 }
