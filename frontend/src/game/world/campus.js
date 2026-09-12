@@ -67,12 +67,14 @@ function bakeGround(scene) {
   for (let x = 0; x <= WORLD.width; x += TILE) g.lineBetween(x, 0, x, WORLD.height);
   for (let y = 0; y <= WORLD.height; y += TILE) g.lineBetween(0, y, WORLD.width, y);
 
-  // Scuffs break up the grid so the eye stops reading it as graph paper.
-  g.fillStyle(COLORS.scuff, 0.3);
-  for (let i = 0; i < 90; i += 1) {
+  // Scuffs break up the grid so the eye stops reading it as graph paper. They
+  // have to stay near-subliminal: at any real opacity they read as clouds of
+  // dirt sitting on top of the floor rather than as wear in it.
+  g.fillStyle(COLORS.scuff, 0.09);
+  for (let i = 0; i < 110; i += 1) {
     const x = noise(i, 1) * WORLD.width;
     const y = noise(i, 2) * WORLD.height;
-    g.fillEllipse(x, y, 30 + noise(i, 3) * 70, 18 + noise(i, 4) * 34);
+    g.fillEllipse(x, y, 22 + noise(i, 3) * 44, 12 + noise(i, 4) * 20);
   }
 
   drawPerimeterWalls(g);
@@ -218,7 +220,7 @@ export function buildCampus(scene) {
 
   LAYOUT.forEach(([name, x, y]) => {
     const spec = PROPS[name];
-    scene.add.ellipse(x, y - spec.base * 0.3, spec.w * 1.05, spec.base * 0.9, 0x000000, 0.26)
+    scene.add.ellipse(x, y - spec.base * 0.3, spec.w * 0.92, spec.base * 0.7, 0x000000, 0.2)
       .setDepth(DEPTH.SHADOW);
     scene.add.image(x, y, `prop-${name}`).setOrigin(0.5, 1).setDepth(y);
 
