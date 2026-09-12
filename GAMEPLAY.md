@@ -1,191 +1,143 @@
-# Gameplay — Supervivencia, economía y misiones (Sprint 1+)
+# Gameplay — Oleadas de zombis (servidor autoritativo)
 
 > Complementa a [`ARCHITECTURE.md`](ARCHITECTURE.md). Ese documento describe
-> *cómo* está montado el cliente; este describe *qué hace el juego*.
+> cómo está montado el sistema; este describe la oleada de zombis y cómo se
+> engancha con lo que el backend ya resuelve.
 
-## Decisión de arquitectura
+## Punto de partida
 
-Toda la lógica de oleadas, economía y misiones corre **en el cliente** por
-ahora, pero vive en módulos **puros** (`frontend/src/game/systems/`) que **no
-importan Phaser**: reciben estado y eventos, devuelven estado nuevo. Phaser solo
-los alimenta con eventos y pinta el resultado.
+El backend ya es dueño de la lógica de juego: `GameSession` administra
+jugadores, vida, Garavitos, inventario, items del mundo, misiones por zona y
+tienda; `RoundCoordinator` sincroniza las rondas. Los zombis entran **ahí**, no
+en el cliente.
 
-El motivo es que cuando exista el `RoundCoordinator` en Spring, esos módulos se
-mueven al backend casi tal cual (misma forma de estado, mismos eventos) sin
-tener que reescribir reglas de juego enredadas con sprites. Mientras tanto el
-juego es **de un solo jugador**: no hay sincronización de posición ni de
-economía entre clientes. Eso es deliberado y sigue fuera de alcance.
+Eso obliga a resolver antes un hueco: **hoy el servidor no sabe dónde está
+nadie.** Las posiciones solo llegan dentro de un `PickupRequest` o
+`MissionCompleteRequest` puntual. Un zombi que persigue necesita la posición
+del jugador de forma continua.
 
-```
-   Phaser (render + input)              systems/ (lógica pura, portable)
-┌───────────────────────────┐        ┌──────────────────────────────────┐
-│ MainScene                 │        │  gameState.js   (orquestador)    │
-│  ├── Player.js            │ evento │    ├── waves.js                  │
-│  ├── Zombie.js            │───────▶│    ├── economy.js                │
-│  ├── WaveDirector.js      │        │    └── missions.js               │
-│  └── HudScene.js          │◀───────│                                  │
-└───────────────────────────┘ estado └──────────────────────────────────┘
-                                              │
-                                     (a futuro) se muda a Spring
-```
+## 1. Posición de los jugadores
 
-## 1. Movilidad
+Se agrega `/app/game/{gameId}/move` con `{ playerId, x, y }`. El cliente lo
+publica **a 10 Hz y solo si se movió** más de 4 px desde el último envío
+(parado no gasta mensajes). `Player` guarda `x`, `y` y `lastSeenAt`.
 
-El movimiento actual pone velocidad directa (`setVelocity`) desde las teclas.
-Eso tiene dos problemas: en diagonal el personaje va ~41% más rápido, y el
-arranque/frenado es instantáneo, lo que se siente rígido.
+Este endpoint **no difunde nada**: es el único mensaje entrante de alta
+frecuencia, y responder con un broadcast por cada uno multiplicaría el tráfico
+por el número de jugadores. Las posiciones viajan en el broadcast del tick.
 
-El controlador nuevo vive en `entities/Player.js` y está **parametrizado por
-rol**, así que aplica igual a los cuatro personajes cuando existan (Seguridad,
-Biomédica, Economía, Infraestructura) — cada rol solo cambia sus números.
+> **Fuera de alcance:** el servidor *cree* la posición que le reporta el
+> cliente; no valida velocidad ni atraviesa-paredes. Para este sprint es
+> deliberado — el anti-cheat no es el objetivo y validar movimiento exigiría
+> subir la colisión del mapa al backend.
 
-| Parámetro | Valor | Nota |
+## 2. El tick
+
+`GameSession` gana un bucle propio sobre el `ScheduledExecutorService` que ya
+recibe en el constructor (el mismo que usa `RoundCoordinator` para sus
+timeouts).
+
+| | Frecuencia | Por qué |
 |---|---|---|
-| Velocidad máxima | 180 px/s | Igual en diagonal: el input se normaliza |
-| Aceleración | 1200 px/s² | Arranque con peso, no instantáneo |
-| Fricción (drag) | 1400 px/s² | Frena rápido pero derrapa un poco |
-| Dash | +420 px/s, 180 ms | Tecla `Shift` o `Espacio` |
-| Cooldown de dash | 1.2 s | Con feedback visual en el HUD |
+| Simulación | 15 Hz (66 ms) | Suficiente para que la persecución se vea continua sin quemar CPU |
+| Broadcast | 8 Hz (125 ms) | El cliente interpola entre paquetes; mandar los 15 no se nota y casi duplica el tráfico |
 
-Además:
+El tick arranca cuando entra el primer jugador y se detiene cuando la sesión
+queda vacía, para que una partida abandonada no siga simulando para nadie.
 
-- El cuerpo de colisión se reduce a los **pies** del sprite (32×48 → 20×16 con
-  offset), que es lo estándar en top-down: evita que el personaje choque con
-  paredes "por la cabeza".
-- La animación se elige por la **velocidad real** del cuerpo, no por la tecla
-  pulsada, así el dash y el derrape animan correctamente.
-- Durante el dash el jugador es brevemente invulnerable (i-frames), que es lo
-  que lo vuelve una herramienta de defensa y no solo de velocidad.
+**Concurrencia:** el tick corre en un hilo del scheduler mientras los mensajes
+STOMP llegan en hilos de Tomcat. La lista de zombis se mantiene en una
+`ConcurrentHashMap` y las mutaciones de un zombi (daño, muerte) se hacen con
+`compute`, siguiendo el mismo criterio que ya usa `attemptPickup` con
+`putIfAbsent`: reclamo atómico en vez de check-then-act.
 
-## 2. Profundidad visual
+## 3. Curva de oleadas
 
-El mapa hoy es un rectángulo plano con una grilla encima. Lo que lo aplana no
-es la falta de arte, es la falta de **capas** y de **cámara**. En orden de
-impacto:
+Portada a `WaveCurve.java`, con pruebas JUnit. Una sola fórmula, no una tabla:
 
-1. **Mundo más grande que la pantalla** (1600×1200 contra un viewport de
-   800×600) con la cámara siguiendo al jugador con suavizado. Por sí solo es el
-   cambio que más quita la sensación de tablero estático.
-2. **Orden por Y** (`setDepth(y)`): jugador, zombis y props se dibujan según su
-   posición vertical, así el personaje pasa por detrás de una matera cuando
-   está arriba de ella y por delante cuando está abajo.
-3. **Sombras**: una elipse oscura semitransparente bajo cada entidad. Es lo que
-   despega los sprites del suelo.
-4. **Muros con cara frontal**: cada muro se pinta con una cara superior y una
-   frontal más oscura, en vez de un rectángulo plano. Falsea altura sin 3D.
-5. **Suelo con variación**: baldosas con ruido de tono y manchas, en vez de una
-   grilla uniforme.
-6. **Props del campus con colisión**: bancas, materas, columnas y escritorios
-   volcados. Rompen la línea de visión y dan al mapa lectura de "lugar".
-7. **Viñeta + tinte ambiental** nocturno. Encuadra la escena y da tono.
+| Parámetro | Fórmula | Oleadas 1-4 |
+|---|---|---|
+| Zombis | `5 + 3(n−1)` | 5, 8, 11, 14 |
+| Cadencia de spawn | `max(350, 1250 − 150(n−1))` ms | 1250, 1100, 950, 800 |
+| Vida | 2; desde la oleada 4 un 25% son "tesos" con 4 | |
+| Velocidad | `min(120, 55 + 4(n−1))` a `min(150, 75 + 4(n−1))` px/s | |
 
-Todo esto se genera por código en `world/campus.js`; no requiere assets nuevos
-y no toca el camino de reemplazo por arte real descrito en `ARCHITECTURE.md`.
+La velocidad está topada **por debajo** de los 160 px/s del jugador: quedar
+acorralado tiene que ser un error de posicionamiento, no algo inevitable.
 
-## 3. Oleadas de zombis
+Entre oleadas hay 6 s de respiro. Los zombis aparecen en un anillo a 560 px del
+jugador más cercano, recortado contra el área caminable del piso; los
+candidatos que quedan a menos de 320 px se descartan, porque el recorte puede
+arrastrar el punto hacia el jugador cuando está pegado a un muro.
 
-Definidas en `systems/waves.js` (puro), ejecutadas por `WaveDirector.js`.
+## 4. Combate
 
-- Los zombis aparecen en puntos de spawn **fuera del viewport**, nunca encima
-  del jugador.
-- Persecución directa hacia el jugador, con separación básica entre zombis para
-  que no se apilen en una sola columna.
-- Atacan por contacto: 10 de daño, con cooldown de 0.6 s **por zombi**.
-- El jugador tiene 100 de vida. Al llegar a 0 → pantalla de derrota y reinicio
-  desde la oleada 1.
-
-| Oleada | Zombis | Cadencia de spawn | Vida del zombi |
-|---|---|---|---|
-| 1 | 5 | 1250 ms | 2 |
-| 2 | 8 | 1100 ms | 2 |
-| 3 | 11 | 950 ms | 2 |
-| n | `5 + 3(n−1)` | `max(350, 1250 − 150(n−1))` | 2; desde la 4 un 25% son "tesos" con 4 |
-
-La velocidad del zombi sube con la oleada pero está topada por debajo de los
-180 px/s del jugador: quedar acorralado debe ser un error de posicionamiento,
-no algo inevitable. Los tres primeros parámetros son una única fórmula en
-`systems/waves.js`, no una tabla: las tres primeras filas son solo su
-resultado.
-
-Entre oleadas hay 6 s de respiro, anunciados en el HUD.
-
-## 4. Economía: Garavitos
-
-`systems/economy.js`. El **Garavito** es la moneda del juego.
-
-- **1 Garavito por zombi eliminado.**
-- Las misiones pagan Garavitos extra al completarse.
-- El saldo se muestra en el HUD y es la única fuente de verdad para compras.
-
-Antes de tener arma no se puede matar, así que el saldo arranca en 0 y el
-primer ingreso real viene de la misión 1. Esa es la curva: sobrevives
-desarmado, te armas, y recién ahí empiezas a generar ingresos.
-
-## 5. Misiones
-
-`systems/missions.js`. Una misión es un objetivo con progreso que escucha los
-mismos eventos que ya emite el juego (`zombie:killed`, `wave:cleared`, …), y
-una recompensa.
-
-| # | Id | Objetivo | Recompensa |
-|---|---|---|---|
-| 1 | `primer-contacto` | Sobrevive la oleada 1 **sin arma** | 10 Garavitos + desbloquea el hacha |
-| 2 | `armate` | Reclama el hacha en el puesto de seguridad (cuesta 10 Garavitos) | Hacha equipada |
-| 3 | `limpieza` | Elimina 10 zombis | 15 Garavitos |
-
-> **Decisión a confirmar.** Interpreté *"la primera misión que completen les va
-> a dar **para** una hacha"* como que la misión paga lo justo para comprarla, no
-> que la regale. Por eso son dos misiones: la 1 paga 10 Garavitos y desbloquea
-> el hacha, y la 2 es ir al **puesto de seguridad** (un punto marcado del mapa)
-> y reclamarla con `E` por esos mismos 10 Garavitos. Eso deja la economía
-> funcionando desde el minuto uno y el hacha se siente ganada.
->
-> Si la idea era simplemente que la misión 1 **entregue** el hacha, se colapsan
-> en una sola y desaparece el puesto de seguridad — es un cambio de dos líneas
-> en `missions.js`.
-
-El puesto de seguridad es además el gancho natural para la tienda completa de
-sprints siguientes (mejores armas, botiquines, barricadas).
-
-## 6. El hacha
-
-Primera arma de defensa.
+Se agrega `/app/game/{gameId}/attack` con `{ playerId, x, y, facing }`. El
+servidor valida y resuelve; el cliente solo pide y anima.
 
 | Parámetro | Valor |
 |---|---|
-| Daño | 2 (mata de un golpe a un zombi normal) |
-| Alcance | 46 px |
-| Arco | 90° al frente, en la dirección que mira el jugador |
-| Cooldown | 400 ms |
-| Tecla | Click izquierdo o `J` |
+| Arma inicial | **Hacha**, ítem de tienda (ver §5) |
+| Daño | 2 — mata de un golpe a un zombi normal |
+| Alcance | 46 px, arco de 90° hacia donde mira el jugador |
+| Cooldown | 400 ms, validado en el servidor |
+| Empuje | 280 px/s, para que el jugador no quede atrapado en un abrazo |
 
-El golpe empuja al zombi hacia atrás (knockback), que es lo que evita que el
-jugador quede atrapado en un abrazo de varios zombis.
+El golpe se rechaza si el jugador no tiene un arma en el inventario. Los
+rechazos viajan como `LastEvent`, igual que `pickup` y `purchase`.
 
-## 7. HUD
+**Daño por contacto:** 10 de vida, con cooldown de 600 ms **por zombi**,
+aplicado en el tick. Cuando un jugador llega a 0 queda `DOWNED`: deja de ser
+objetivo válido y no puede atacar, hasta que otro jugador lo levante o termine
+la oleada.
 
-Escena de Phaser aparte (`ui/HudScene.js`) superpuesta a `MainScene`, fija a la
-cámara. Muestra: barra de vida, saldo de Garavitos, oleada actual con zombis
-restantes, misión activa con su progreso, y el estado del dash.
+## 5. Garavitos y el hacha
 
-## 8. Eventos
+- **1 Garavito por zombi eliminado**, vía el `addGaravitos` que `Player` ya
+  tiene. Entra a la misma economía que las misiones — no hay una paralela.
+- El **hacha** se agrega a `ShopCatalog` en la máquina expendedora, a **25
+  Garavitos**, que es exactamente lo que paga una misión de rol.
 
-Contrato entre la capa Phaser y los módulos puros. Es a propósito el mismo
-vocabulario que tendrían los mensajes STOMP cuando esto se mude al backend.
+Eso hace que la progresión pedida caiga sola sobre lo que ya existe: completas
+tu primera misión, cobras 25 Garavitos, y eso te alcanza justo para el hacha en
+la expendedora. No hace falta una máquina de desbloqueos aparte.
 
-| Evento | Emitido por | Consumido por |
-|---|---|---|
-| `zombie:killed` | `MainScene` | `economy`, `missions` |
-| `wave:started` / `wave:cleared` | `WaveDirector` | `missions`, HUD |
-| `player:damaged` / `player:died` | `Player` | HUD, `gameState` |
-| `garavitos:changed` | `economy` | HUD |
-| `mission:progress` / `mission:completed` | `missions` | HUD |
-| `weapon:unlocked` / `weapon:equipped` | `gameState` | `Player`, HUD |
+## 6. Qué se difunde
 
-## Fuera de alcance (sigue vigente)
+`GameStateMessage` gana dos campos, manteniendo la regla de **un solo topic por
+partida** que ya fijó `GameController`:
 
-- Sincronización multijugador de posición, economía o misiones.
-- `RoundCoordinator` y protocolo real de decisiones.
-- Selección de edificio/zona.
-- Spritesheet real recortado (ver nota de assets en `ARCHITECTURE.md`).
-- Tienda completa más allá del hacha.
+```
+zombies: [{ id, x, y, health, tough }]
+wave:    { number, remaining, restingSeconds }
+```
+
+Los `PlayerState` ganan `x`, `y` y `state` (`ALIVE` / `DOWNED`).
+
+> **Costo:** a 8 Hz con 20 zombis el mensaje ronda los 2-3 KB, o sea ~20 KB/s
+> por cliente. Es aceptable para 4 jugadores en una partida de clase, pero es
+> el primer lugar donde mirar si algo se siente lento. La optimización obvia
+> —mandar deltas en vez del estado completo— queda fuera de alcance.
+
+## 7. Cliente
+
+`MainScene` deja de decidir nada sobre zombis: los dibuja desde el estado que
+llega y **interpola** hacia la última posición conocida, para que 8 Hz se vean
+fluidos a 60 fps. La textura del zombi se genera por código, igual que el
+placeholder del personaje, hasta que haya arte real.
+
+La movilidad del jugador sigue siendo local y sin cambios de autoridad. Se
+recuperan de la rama anterior las mejoras que no dependían del campus
+generado: **entrada normalizada** (la diagonal deja de ir 41% más rápido) y
+**dash con `Shift`/`Espacio`** con invulnerabilidad breve, que es el único
+recurso defensivo antes del hacha.
+
+## Fuera de alcance
+
+- Validación de movimiento en el servidor (anti-cheat).
+- Deltas o compresión binaria en el broadcast.
+- Navegación de zombis con pathfinding: persiguen en línea recta con
+  separación entre ellos, sin rodear muros.
+- Reanimar a un jugador `DOWNED` por otro jugador (por ahora solo revive al
+  terminar la oleada).
+- Zombis en pisos distintos del que está el jugador.
