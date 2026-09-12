@@ -9,6 +9,11 @@ package co.eci.operaciongaravito.game;
  */
 public record LastEvent(String type, String playerId, String itemId, String reason) {
 
+    /** Cayo el equipo completo: se perdio la corrida y se vuelve a la oleada 1. */
+    public static LastEvent teamWiped() {
+        return new LastEvent("TEAM_WIPED", null, null, null);
+    }
+
     /** El itemId lleva cuantos zombis cayeron con ese golpe. */
     public static LastEvent attackKill(String playerId, int kills) {
         return new LastEvent("ATTACK_KILL", playerId, String.valueOf(kills), null);

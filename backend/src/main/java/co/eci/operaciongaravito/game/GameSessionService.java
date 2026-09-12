@@ -91,10 +91,13 @@ public class GameSessionService {
     }
 
     private void broadcastTick(String gameId, GameSession session) {
+        // El wipe se consume aca para que el aviso salga exactamente una vez
+        // y no en cada tick del respiro siguiente.
+        LastEvent event = session.consumeWipedRun() ? LastEvent.teamWiped() : null;
         GameStateMessage message = new GameStateMessage(
                 session.playerStates(),
                 session.claimedItemIdsSnapshot(),
-                null,
+                event,
                 session.currentRoundView(),
                 session.zombieStates(),
                 session.waveState()
