@@ -28,6 +28,13 @@ const ATTACK_REQUEST_MS = 400;
 
 const FACING_RADIANS = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
 
+// Caja de colision del jugador: solo los pies. Bastante mas angosta que un
+// tile (64) para que quepa por los vanos de puerta sin pelear con el borde.
+const PLAYER_BODY_WIDTH = 30;
+const PLAYER_BODY_HEIGHT = 18;
+/** Cuanto sube la caja desde el borde inferior del frame. */
+const PLAYER_BODY_FOOT_INSET = 6;
+
 // --- Placeholder de respaldo (capsula de color generada en codigo) ---
 // Para revertir rapido a este placeholder (sin depender de los atlas reales
 // en frontend/public/sprites/), descomentar este import y los tres bloques
@@ -177,6 +184,16 @@ export default class MainScene extends Phaser.Scene {
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
+    // El frame del atlas mide 69x129: sin esto el cuerpo de colision es TODO
+    // el sprite (cabeza y aire incluidos), mas ancho y mas del doble de alto
+    // que un tile de 64, asi que el personaje no cabe por una puerta y choca
+    // "con la cabeza". La caja va solo en los pies, que es lo estandar en
+    // top-down: lo que colisiona es donde el personaje pisa.
+    this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
+    this.player.body.setOffset(
+      (this.player.width - PLAYER_BODY_WIDTH) / 2,
+      this.player.height - PLAYER_BODY_HEIGHT - PLAYER_BODY_FOOT_INSET,
+    );
     this.physics.world.setBounds(0, 0, MAP_PIXEL_WIDTH, MAP_PIXEL_HEIGHT);
     this.physics.add.collider(this.player, this.solids);
 
