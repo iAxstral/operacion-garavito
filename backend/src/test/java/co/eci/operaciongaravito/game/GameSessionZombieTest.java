@@ -13,8 +13,8 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Cubre las reglas de zombis que no se pueden comprobar a ojo jugando:
- * que la recompensa se pague una sola vez, que el arma sea obligatoria y
- * que el cooldown no se pueda saltear mandando mensajes mas rapido.
+ * que la recompensa se pague una sola vez, que el cooldown no se pueda
+ * saltear mandando mensajes mas rapido, y que morir cueste la corrida.
  */
 class GameSessionZombieTest {
 
@@ -50,11 +50,25 @@ class GameSessionZombieTest {
     }
 
     @Test
-    @DisplayName("sin arma no se puede atacar")
-    void attackNeedsAWeapon() {
+    @DisplayName("sin arma igual se puede pegar: el juego nunca queda sin salida")
+    void unarmedPlayersCanStillFight() {
         AttackResult result = session.attemptAttack("SEGURIDAD", 800, 736, 0);
-        assertFalse(result.success());
-        assertEquals("no_weapon", result.reason());
+        assertTrue(result.success(), "desarmado debe poder golpear, solo que mas debil");
+    }
+
+    @Test
+    @DisplayName("desarmado golpea pero no mata de un solo golpe")
+    void unarmedTakesMoreThanOneHit() {
+        tickUntilZombies();
+        ZombieState target = session.zombieStates().get(0);
+
+        AttackResult unarmed = session.attemptAttack("SEGURIDAD", target.x() - 20, target.y(), 0);
+
+        assertEquals(1, unarmed.hits(), "el golpe deberia conectar");
+        assertEquals(0, unarmed.kills(), "desarmado no deberia matar de un golpe");
+        // El caso con hacha (mata de un golpe) lo cubre
+        // killingAZombiePaysOneGaravito; aca no se puede encadenar el segundo
+        // golpe porque el cooldown del servidor es en tiempo real.
     }
 
     @Test
@@ -145,23 +159,32 @@ class GameSessionZombieTest {
     }
 
     @Test
-    @DisplayName("tras un wipe se reintenta la misma oleada, no la siguiente")
-    void wipeRetriesTheSameWave() {
-        tickUntilZombies();
-        int waveBefore = session.waveState().number();
+    @DisplayName("morir cuesta la corrida: se vuelve a la oleada 1")
+    void wipeResetsTheRun() {
+        // Se avanza a mano hasta una oleada alta para que el reinicio se note.
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < 4000 && session.waveState().number() < 3; i++) {
+            now += 200;
+            session.tick(now, 0.2);
+            session.zombieStates().forEach(z -> { });
+            // Matar todo lo que aparezca para que la oleada avance.
+            armPlayer();
+            session.attemptAttack("SEGURIDAD", player.getX(), player.getY(), 0);
+        }
 
         for (int i = 0; i < 10; i++) {
             player.takeDamage(10);
         }
-        long now = System.currentTimeMillis();
+        now += 200;
         session.tick(now, 0.066);
 
-        // Se deja pasar el respiro y se vuelve a simular hasta que arranque.
+        assertTrue(session.consumeWipedRun(), "deberia avisarse el wipe");
+        // Tras el respiro, la corrida arranca de nuevo en la oleada 1.
         for (int i = 0; i < 400 && session.waveState().restingSeconds() > 0; i++) {
             now += 200;
             session.tick(now, 0.2);
         }
-        assertEquals(waveBefore, session.waveState().number());
+        assertEquals(1, session.waveState().number(), "el wipe debe costar el progreso");
     }
 
     @Test

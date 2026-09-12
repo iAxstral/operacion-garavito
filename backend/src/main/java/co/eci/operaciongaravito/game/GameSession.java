@@ -32,15 +32,26 @@ public class GameSession {
 
     // --- Zombis (ver GAMEPLAY.md) ---
     private static final int GARAVITOS_PER_ZOMBIE = 1;
-    private static final int ATTACK_DAMAGE = 2; // mata de un golpe a un zombi normal
-    private static final double ATTACK_RANGE_PX = 62; // 46 de arma + holgura de latencia
     private static final double ATTACK_HALF_ARC_RAD = Math.toRadians(45);
-    private static final long ATTACK_COOLDOWN_MS = 400;
-    private static final double ATTACK_KNOCKBACK_PX_S = 280;
+
+    /**
+     * Como pega el jugador segun con que. Desarmado SIEMPRE se puede pegar:
+     * es lento, corto y necesita dos golpes, pero hace que el juego nunca
+     * quede sin salida — antes, sin arma no habia absolutamente ninguna forma
+     * de matar un zombi, y el arma estaba detras de una mision y una caminata.
+     * El hacha sigue siendo una mejora clara, no la diferencia entre jugar y
+     * no jugar.
+     */
+    private record Melee(int damage, double range, long cooldownMs, double knockback) {
+    }
+
+    private static final Melee UNARMED = new Melee(1, 48, 700, 170);
+    private static final Melee ARMED = new Melee(2, 62, 400, 280);
     private static final double CONTACT_RANGE_PX = 40;
     private static final double SEPARATION_RADIUS_PX = 26;
     private static final double SEPARATION_FORCE = 90;
-    private static final int REVIVE_HEALTH = 50;
+    /** Se vuelve a arrancar la corrida con el equipo entero, no a medias. */
+    private static final int REVIVE_HEALTH = 100;
 
     private final String gameId;
     private final Map<String, Player> players = new ConcurrentHashMap<>();
@@ -51,6 +62,8 @@ public class GameSession {
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final WaveDirector waveDirector;
     private final FloorGrid floor = FloorGrid.floor1();
+    /** Se consume en el proximo broadcast para avisar del wipe una sola vez. */
+    private volatile boolean wipedRun = false;
 
     /**
      * @param onRoundResolved se invoca cada vez que el RoundCoordinator resuelve
@@ -136,6 +149,13 @@ public class GameSession {
         return zombies.values().stream().map(Zombie::toState).toList();
     }
 
+    /** True (una sola vez) si acaba de caer el equipo completo. */
+    public boolean consumeWipedRun() {
+        boolean value = wipedRun;
+        wipedRun = false;
+        return value;
+    }
+
     public WaveState waveState() {
         long now = System.currentTimeMillis();
         return new WaveState(waveDirector.getWave(), waveDirector.remaining(aliveZombieCount()), waveDirector.restingSeconds(now));
@@ -157,15 +177,15 @@ public class GameSession {
 
         List<Player> targets = players.values().stream().filter(Player::isAlive).toList();
 
-        // Equipo completo caido. Sin esto la partida se congela para siempre:
-        // sin nadie vivo los zombis no tienen a quien perseguir, la oleada no
-        // se limpia nunca, y como revivir depende del respiro entre oleadas,
-        // nadie vuelve a levantarse. Se corta la oleada, se limpia el mapa y
-        // se revive al equipo para reintentar la MISMA oleada.
+        // Equipo completo caido: se pierde la corrida y se vuelve a la oleada
+        // 1. Ese es el costo de morir. Sin este bloque la partida ademas se
+        // congelaria para siempre — sin nadie vivo los zombis no tienen a
+        // quien perseguir, la oleada no se limpia nunca y nadie revive.
         if (targets.isEmpty() && !players.isEmpty()) {
             zombies.clear();
-            waveDirector.forceRest(now);
+            waveDirector.resetRun(now);
             players.values().forEach(player -> player.revive(REVIVE_HEALTH));
+            wipedRun = true;
             return;
         }
 
@@ -244,12 +264,10 @@ public class GameSession {
         if (!player.isAlive()) {
             return AttackResult.rejected("downed");
         }
-        if (!player.hasWeapon()) {
-            return AttackResult.rejected("no_weapon");
-        }
 
+        Melee melee = player.hasWeapon() ? ARMED : UNARMED;
         long now = System.currentTimeMillis();
-        if (!player.tryConsumeAttackCooldown(now, ATTACK_COOLDOWN_MS)) {
+        if (!player.tryConsumeAttackCooldown(now, melee.cooldownMs())) {
             return AttackResult.rejected("on_cooldown");
         }
 
@@ -263,7 +281,7 @@ public class GameSession {
             }
             double dx = zombie.getX() - x;
             double dy = zombie.getY() - y;
-            if (Math.hypot(dx, dy) > ATTACK_RANGE_PX) {
+            if (Math.hypot(dx, dy) > melee.range()) {
                 continue;
             }
             double angleToZombie = Math.atan2(dy, dx);
@@ -272,8 +290,8 @@ public class GameSession {
             }
 
             hits++;
-            double knockback = Math.hypot(dx, dy) == 0 ? 0 : ATTACK_KNOCKBACK_PX_S;
-            if (zombie.hit(ATTACK_DAMAGE, Math.cos(angleToZombie) * knockback, Math.sin(angleToZombie) * knockback, now)) {
+            double knockback = melee.knockback();
+            if (zombie.hit(melee.damage(), Math.cos(angleToZombie) * knockback, Math.sin(angleToZombie) * knockback, now)) {
                 kills++;
             }
         }
