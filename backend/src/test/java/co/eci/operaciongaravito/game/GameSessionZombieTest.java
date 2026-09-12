@@ -124,6 +124,47 @@ class GameSessionZombieTest {
     }
 
     @Test
+    @DisplayName("si cae el equipo completo la partida no se congela")
+    void teamWipeDoesNotFreezeTheGame() {
+        tickUntilZombies();
+        for (int i = 0; i < 10; i++) {
+            player.takeDamage(10);
+        }
+        assertFalse(player.isAlive());
+
+        // Un solo tick con todo el equipo caido tiene que limpiar la oleada y
+        // levantar al equipo; sin eso los zombis se quedan sin objetivo, la
+        // oleada nunca se limpia y nadie revive jamas.
+        long now = System.currentTimeMillis();
+        session.tick(now, 0.066);
+
+        assertTrue(session.zombieStates().isEmpty(), "la oleada deberia haberse limpiado");
+        assertTrue(player.isAlive(), "el equipo deberia haberse levantado");
+        assertTrue(player.getHealth() > 0);
+        assertTrue(session.waveState().restingSeconds() > 0, "deberia haber entrado al respiro");
+    }
+
+    @Test
+    @DisplayName("tras un wipe se reintenta la misma oleada, no la siguiente")
+    void wipeRetriesTheSameWave() {
+        tickUntilZombies();
+        int waveBefore = session.waveState().number();
+
+        for (int i = 0; i < 10; i++) {
+            player.takeDamage(10);
+        }
+        long now = System.currentTimeMillis();
+        session.tick(now, 0.066);
+
+        // Se deja pasar el respiro y se vuelve a simular hasta que arranque.
+        for (int i = 0; i < 400 && session.waveState().restingSeconds() > 0; i++) {
+            now += 200;
+            session.tick(now, 0.2);
+        }
+        assertEquals(waveBefore, session.waveState().number());
+    }
+
+    @Test
     @DisplayName("un jugador caido deja de recibir daño y no puede atacar")
     void downedPlayersAreOutOfPlay() {
         armPlayer();

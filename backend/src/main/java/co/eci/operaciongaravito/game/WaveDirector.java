@@ -81,6 +81,18 @@ public class WaveDirector {
         return null;
     }
 
+    /**
+     * Corta la oleada en curso y manda al respiro. Se usa cuando cae el equipo
+     * completo: la oleada se reintenta desde el mismo numero, no se avanza ni
+     * se reinicia el progreso.
+     */
+    public void forceRest(long now) {
+        phase = Phase.RESTING;
+        nextEventAt = now + WaveCurve.WAVE_REST_MS;
+        wave = Math.max(0, wave - 1); // startWave sumara 1 y repetira esta oleada
+        spawned = 0;
+    }
+
     private void startWave(long now, int number) {
         wave = number;
         blueprint = WaveCurve.blueprint(number);

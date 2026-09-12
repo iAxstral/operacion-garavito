@@ -155,6 +155,19 @@ public class GameSession {
         }
 
         List<Player> targets = players.values().stream().filter(Player::isAlive).toList();
+
+        // Equipo completo caido. Sin esto la partida se congela para siempre:
+        // sin nadie vivo los zombis no tienen a quien perseguir, la oleada no
+        // se limpia nunca, y como revivir depende del respiro entre oleadas,
+        // nadie vuelve a levantarse. Se corta la oleada, se limpia el mapa y
+        // se revive al equipo para reintentar la MISMA oleada.
+        if (targets.isEmpty() && !players.isEmpty()) {
+            zombies.clear();
+            waveDirector.forceRest(now);
+            players.values().forEach(player -> player.revive(REVIVE_HEALTH));
+            return;
+        }
+
         List<Zombie> living = zombies.values().stream().filter(Zombie::isAlive).toList();
 
         for (Zombie zombie : living) {
