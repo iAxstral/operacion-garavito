@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import Phaser from 'phaser';
-import MainScene from './MainScene';
+import IntroScene from "./IntroScene";
+//import MainScene from './MainScene';
 
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 600;
@@ -22,7 +23,7 @@ export default function GameCanvas() {
         default: 'arcade',
         arcade: { debug: false },
       },
-      scene: [MainScene],
+      scene: [IntroScene],
     });
 
     return () => {
