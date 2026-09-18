@@ -1,28 +1,45 @@
 #game-root {
+  position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  padding: 24px;
+  flex: 1;
+  min-height: 0;
+}
+
+#game-canvas {
+  position: absolute;
+  inset: 0;
 }
 
 #game-canvas canvas {
   display: block;
-  border: 2px solid var(--border);
-  border-radius: 4px;
+  width: 100%;
+  height: 100%;
 }
 
+/* El juego llena toda la pantalla disponible: sin ancho/alto fijo, sin
+ * borde ni padding — es justamente eso lo que dejaba franjas vacias
+ * alrededor del canvas en vez de una resolucion a pantalla completa. */
 .game-stage {
   position: relative;
-  width: 800px;
-  height: 600px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .connection-status {
+  position: absolute;
+  bottom: 4px;
+  left: 4px;
+  z-index: 5;
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: 12px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 2px 8px;
+  border-radius: 4px;
 }
 
 /* --- HUD (vida + inventario propios, siempre visibles) --- */
@@ -295,4 +312,264 @@
   font-size: 11px;
   opacity: 0.7;
   text-align: center;
+}
+
+/* --- Seguridad: tarea de camaras (popup estilo among us) --- */
+.mission-hint {
+  position: absolute;
+  bottom: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  border-radius: 6px;
+  padding: 6px 14px;
+  font-size: 14px;
+  color: #fff;
+  font-family: sans-serif;
+  pointer-events: none;
+}
+
+.mission-hint strong {
+  color: #e8c34a;
+}
+
+.mission-modal {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(10, 14, 10, 0.96);
+  border: 1px solid rgba(120, 200, 120, 0.5);
+  border-radius: 10px;
+  padding: 16px 20px 20px;
+  pointer-events: auto;
+  text-align: center;
+  color: #d8f5d8;
+  font-family: sans-serif;
+}
+
+.mission-modal h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: #9be89b;
+}
+
+.mission-modal p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.mission-window {
+  border: 2px solid #3a5a3a;
+  border-radius: 6px;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.mission-progress {
+  margin-top: 10px;
+  font-size: 15px;
+  font-weight: bold;
+}
+
+.mission-cancel-btn {
+  margin-top: 12px;
+  font-family: inherit;
+  font-size: 12px;
+  color: #d8f5d8;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.mission-cancel-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.mission-success {
+  font-size: 15px;
+  font-weight: bold;
+  color: #9be89b;
+}
+
+/* --- Menu principal --- */
+.main-menu {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  height: 100dvh;
+  width: 100%;
+  overflow: hidden;
+  font-family: sans-serif;
+  color: #e7f2e7;
+  text-align: center;
+  background:
+    linear-gradient(rgba(6, 10, 8, 0.88), rgba(6, 10, 8, 0.94)),
+    url('/tiles/v2_wall_concreto_64.png');
+  background-size: auto, 128px 128px;
+}
+
+.main-menu-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.75) 100%);
+}
+
+.main-menu-hero {
+  position: relative;
+  width: clamp(90px, 14vw, 170px);
+  image-rendering: pixelated;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.6));
+}
+
+.main-menu-content {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 0 20px;
+}
+
+.main-menu-kicker {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #86a86a;
+}
+
+.main-menu-title {
+  margin: 0;
+  font-size: clamp(28px, 6vw, 52px);
+  letter-spacing: 2px;
+  color: #f2fbe2;
+  text-shadow: 0 0 18px rgba(134, 168, 106, 0.55), 0 4px 0 rgba(0, 0, 0, 0.6);
+}
+
+.main-menu-tagline {
+  margin: 0 0 6px;
+  max-width: 480px;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.main-menu-play-btn {
+  font-family: inherit;
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #0b120b;
+  background: #86a86a;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 46px;
+  cursor: pointer;
+  box-shadow: 0 6px 0 #4a6b38;
+  transition: transform 0.08s ease;
+}
+
+.main-menu-play-btn:hover {
+  background: #9bc27c;
+}
+
+.main-menu-play-btn:active {
+  transform: translateY(4px);
+  box-shadow: 0 2px 0 #4a6b38;
+}
+
+.main-menu-controls {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 8px;
+  font-size: 12px;
+  opacity: 0.75;
+}
+
+.main-menu-controls strong {
+  color: #e8c34a;
+}
+
+/* --- Pantalla de derrota --- */
+.game-over-screen {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 4, 4, 0.75);
+  pointer-events: auto;
+}
+
+.game-over-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 32px 40px;
+  background: rgba(15, 8, 8, 0.95);
+  border: 1px solid rgba(255, 90, 90, 0.4);
+  border-radius: 10px;
+  font-family: sans-serif;
+  color: #f5d8d8;
+  text-align: center;
+  max-width: 420px;
+}
+
+.game-over-panel h2 {
+  margin: 0;
+  font-size: 30px;
+  letter-spacing: 2px;
+  color: #e05a5a;
+  text-shadow: 0 0 16px rgba(224, 90, 90, 0.5);
+}
+
+.game-over-panel p {
+  margin: 0;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.game-over-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.game-over-btn {
+  font-family: inherit;
+  font-size: 14px;
+  color: #f5d8d8;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 10px 20px;
+  cursor: pointer;
+}
+
+.game-over-btn:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.game-over-btn--primary {
+  background: #e05a5a;
+  border-color: #e05a5a;
+  color: #1a0808;
+  font-weight: bold;
+}
+
+.game-over-btn--primary:hover {
+  background: #ea7373;
 }

@@ -11,5 +11,6 @@ public record PlayerState(
         List<InventorySlot> inventory,
         long x,
         long y,
-        PlayerLifeState lifeState) {
+        PlayerLifeState lifeState,
+        boolean invulnerable) {
 }

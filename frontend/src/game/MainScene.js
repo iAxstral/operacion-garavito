@@ -6,11 +6,14 @@ import { MISSION_ZONES, MISSION_RANGE_PX } from './missionCatalog';
 import {
   ensureJoined,
   getZombies,
+  isInputLocked,
   onStateChange,
   reportPosition,
   requestAttack,
   requestPickup,
   setNearVendor,
+  setNearMission,
+  setNearDoor,
   requestMissionComplete,
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
@@ -35,16 +38,18 @@ const PLAYER_BODY_HEIGHT = 18;
 /** Cuanto sube la caja desde el borde inferior del frame. */
 const PLAYER_BODY_FOOT_INSET = 6;
 
-// --- Placeholder de respaldo (capsula de color generada en codigo) ---
-// Para revertir rapido a este placeholder (sin depender de los atlas reales
-// en frontend/public/sprites/), descomentar este import y los tres bloques
-// marcados "Placeholder de respaldo" mas abajo, y comentar en su lugar el
-// bloque "Atlas real" correspondiente en preload()/create().
-// import { USE_REAL_SPRITESHEET, SEGURIDAD_SPRITE } from './spriteConfig';
-
 const MAP_PIXEL_WIDTH = MAP_COLS * TILE;
 const MAP_PIXEL_HEIGHT = MAP_ROWS * TILE;
 const PLAYER_SPEED = 160;
+
+// Solo hay UNA pose fija por direccion (sin frames de ciclo de caminata, ver
+// SEGURIDAD_TEXTURE_BY_DIRECTION): sin esto el personaje se desliza por el
+// piso como un cartel pegado, sin ningun indicio de que esta caminando. Un
+// balanceo leve (rotacion, no posicion — no le pega en nada a la caja de
+// colision, que ignora la rotacion del sprite) alcanza para que se sienta
+// vivo sin necesitar frames de arte nuevos.
+const WALK_WOBBLE_HZ = 3;
+const WALK_WOBBLE_DEG = 2.5;
 
 const TILE_TEXTURE_FILES = {
   v2_floor_terrazo: 'v2_floor_terrazo_64.png',
@@ -62,21 +67,9 @@ const TILE_TEXTURE_FILES = {
   v2_banca: 'v2_banca_64x32.png',
 };
 
-// Distancia (px) del jugador al centro de una puerta para considerarla
-// "abierta" — un poco mas de un tile, para que el cambio de textura no se
-// sienta pegado al umbral exacto.
+// Distancia (px) del jugador al centro de una puerta para ofrecer la
+// interaccion "Presiona E" (abrir/cerrar) — un poco mas de un tile.
 const DOOR_PROXIMITY_PX = 90;
-
-// Ventana de gracia (ms) para seguir animando la caminata cuando NINGUNA
-// tecla de direccion esta activa. Un teclado real casi nunca suelta una
-// tecla y presiona la opuesta (ej. Left -> Right) en el mismo frame — hay
-// un hueco de varios frames sin ninguna tecla activa mientras la mano se
-// mueve. Sin esta ventana, ese hueco se lee como "se solto todo" y la
-// animacion salta a idle por 1-varios frames antes de retomar la caminata,
-// el "salta y despues va hacia donde quiere" reportado. 120ms alcanza para
-// cubrir un cambio de tecla humano tipico sin sentirse como input-lag en
-// una parada real.
-const DIRECTION_HOLD_MS = 120;
 
 // Tipos de celda del grid que bloquean el paso del jugador. 'floor'/'stair'/
 // 'landing' son caminables; puertas y baranda se resuelven en 'decorations'
@@ -93,27 +86,23 @@ const STAIRS_ARROW_GLYPH = { up: '▲', down: '▼' };
 // HUD en Hud.jsx) — se reemplaza por sprites reales mas adelante.
 const ITEM_TYPE_COLORS = { WEAPON: 0x8a3b3b, FOOD: 0x3b8a4e, AMMO: 0x8a7a3b };
 
-const SEGURIDAD_ATLAS = {
-  key: 'seguridad',
-  texture: '/sprites/seguridad.png',
-  atlas: '/sprites/seguridad.json',
-};
+// Unica mision con tarea propia por ahora (el resto sigue con el patron
+// viejo de "completar al pisar"): abre el popup con el minijuego en vez de
+// completarse sola al entrar en rango — ver SecurityMission.jsx.
+const SECURITY_MISSION_ID = 'mission-seguridad';
 
-// Ninguna lamina de origen tiene poses de perfil izquierdo: 'left' no es una
-// animacion propia, reutiliza los frames de 'right' con el sprite espejado
-// (setFlipX) en vez de arte duplicado.
-const WALK_ANIM_BY_DIRECTION = {
-  down: 'down',
-  up: 'up',
-  right: 'right',
-  left: 'right',
-};
-
-const IDLE_FRAME_BY_DIRECTION = {
-  down: 'down_idle_0',
-  up: 'up_idle_0',
-  right: 'right_0',
-  left: 'right_0',
+// 4 fotos fijas (una pose por direccion, sin ciclo de caminata) en vez del
+// atlas auto-detectado anterior: ese atlas armaba el ciclo mezclando poses de
+// angulos distintos dentro de una misma lamina de referencia, lo que se veia
+// como si el personaje "diera vueltas" al caminar. Con una textura estatica
+// por direccion ese problema no puede volver a aparecer — no hay frames que
+// mezclar, solo un cambio de textura al girar (ver build_seguridad_static_
+// sprites.py).
+const SEGURIDAD_TEXTURE_BY_DIRECTION = {
+  down: 'seguridad_down',
+  up: 'seguridad_up',
+  right: 'seguridad_right',
+  left: 'seguridad_left',
 };
 
 export default class MainScene extends Phaser.Scene {
@@ -123,7 +112,6 @@ export default class MainScene extends Phaser.Scene {
     this.cursors = null;
     this.wasd = null;
     this.currentDirection = 'down';
-    this.lastMoveAt = 0;
     this.solids = null;
     this.stairsZones = [];
     this.doors = [];
@@ -132,7 +120,11 @@ export default class MainScene extends Phaser.Scene {
     this.missionZones = [];
     this.unsubscribeGameState = null;
     this.zombieLayer = null;
-    this.facing = 'down';
+    // Angulo continuo (no uno de 4 direcciones) hacia donde apunta el golpe:
+    // ver el comentario en updateAttack sobre por que el golpe fallaba en
+    // diagonal cuando esto estaba atado a 'facing' de 4 valores.
+    this.facingAngle = FACING_RADIANS.down;
+    this.walkWobblePhaseMs = 0;
     this.dashUntil = 0;
     this.dashReadyAt = 0;
     this.dashVx = 0;
@@ -141,8 +133,9 @@ export default class MainScene extends Phaser.Scene {
   }
 
   preload() {
-    // --- Atlas real ---
-    this.load.atlas(SEGURIDAD_ATLAS.key, SEGURIDAD_ATLAS.texture, SEGURIDAD_ATLAS.atlas);
+    Object.values(SEGURIDAD_TEXTURE_BY_DIRECTION).forEach((key) => {
+      this.load.image(key, `/sprites/${key}.png`);
+    });
 
     Object.entries(TILE_TEXTURE_FILES).forEach(([key, file]) => {
       this.load.image(key, `/tiles/${file}`);
@@ -151,14 +144,6 @@ export default class MainScene extends Phaser.Scene {
     VENDORS.forEach((vendor) => {
       this.load.image(vendor.sprite, vendor.spriteFile);
     });
-
-    // --- Placeholder de respaldo ---
-    // if (USE_REAL_SPRITESHEET) {
-    //   this.load.spritesheet(SEGURIDAD_SPRITE.key, SEGURIDAD_SPRITE.path, {
-    //     frameWidth: SEGURIDAD_SPRITE.frameWidth,
-    //     frameHeight: SEGURIDAD_SPRITE.frameHeight,
-    //   });
-    // }
   }
 
   create() {
@@ -166,29 +151,20 @@ export default class MainScene extends Phaser.Scene {
     // bajar). El cambio de piso real todavia no esta conectado.
     const layout = buildFloorLayout({ hasUpStairs: true, hasDownStairs: false });
     this.createMap(layout);
-    this.createAnimations();
 
-    // --- Atlas real ---
     this.player = this.physics.add.sprite(
       layout.spawn.x,
       layout.spawn.y,
-      SEGURIDAD_ATLAS.key,
-      IDLE_FRAME_BY_DIRECTION.down,
+      SEGURIDAD_TEXTURE_BY_DIRECTION.down,
     );
-
-    // --- Placeholder de respaldo ---
-    // if (!USE_REAL_SPRITESHEET) {
-    //   this.generatePlaceholderSpritesheet();
-    // }
-    // this.player = this.physics.add.sprite(layout.spawn.x, layout.spawn.y, SEGURIDAD_SPRITE.key, 0);
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
-    // El frame del atlas mide 69x129: sin esto el cuerpo de colision es TODO
-    // el sprite (cabeza y aire incluidos), mas ancho y mas del doble de alto
-    // que un tile de 64, asi que el personaje no cabe por una puerta y choca
-    // "con la cabeza". La caja va solo en los pies, que es lo estandar en
-    // top-down: lo que colisiona es donde el personaje pisa.
+    // El sprite mide 57x132: sin esto el cuerpo de colision es TODO el
+    // sprite (cabeza y aire incluidos), mas del doble de alto que un tile de
+    // 64, asi que el personaje no cabe por una puerta y choca "con la
+    // cabeza". La caja va solo en los pies, que es lo estandar en top-down:
+    // lo que colisiona es donde el personaje pisa.
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
       (this.player.width - PLAYER_BODY_WIDTH) / 2,
@@ -277,6 +253,19 @@ export default class MainScene extends Phaser.Scene {
     this.unsubscribeGameState = onStateChange((state) => {
       const claimed = new Set(state.claimedItemIds);
       this.foodItems.forEach((food) => food.rect.setVisible(!claimed.has(food.itemId)));
+
+      // Estado de puertas: el backend es la unica fuente de verdad (asi
+      // decide tambien si un zombi puede pasar). Cerrada = mismo trato que
+      // una pared para el jugador: se prende el body que ya existe desde
+      // renderDecorations (ver ese comentario sobre por que nunca se
+      // agrega/quita del grupo).
+      (state.doors ?? []).forEach((doorState) => {
+        const door = this.doors.find((d) => d.doorId === doorState.doorId);
+        if (!door || door.open === doorState.open) return;
+        door.open = doorState.open;
+        door.image.setTexture(doorState.open ? 'v2_door_madera_open' : 'v2_door_madera');
+        door.image.body.enable = !doorState.open;
+      });
     });
   }
 
@@ -303,6 +292,17 @@ export default class MainScene extends Phaser.Scene {
   update(time, delta) {
     if (!this.player) return;
 
+    // Con una tarea de mision abierta (ver SecurityMission.jsx) el jugador
+    // queda inmune en el backend Y quieto en el cliente — estilo Among Us,
+    // el mapa/los zombis siguen corriendo alrededor, pero no se puede
+    // caminar ni atacar mientras el popup esta abierto.
+    if (isInputLocked()) {
+      this.player.setVelocity(0, 0);
+      this.zombieLayer.sync(getZombies());
+      this.zombieLayer.update(delta);
+      return;
+    }
+
     const up = this.cursors.up.isDown || this.wasd.up.isDown;
     const down = this.cursors.down.isDown || this.wasd.down.isDown;
     const left = this.cursors.left.isDown || this.wasd.left.isDown;
@@ -323,9 +323,13 @@ export default class MainScene extends Phaser.Scene {
     if (magnitude > 0) {
       vx = (vx / magnitude) * PLAYER_SPEED;
       vy = (vy / magnitude) * PLAYER_SPEED;
+      // Angulo real de movimiento (incluye diagonales), no uno de los 4
+      // valores de FACING_RADIANS — es lo que le llega al backend como
+      // 'facing' para decidir que golpea el ataque.
+      this.facingAngle = Math.atan2(vy, vx);
     }
 
-    if (direction) this.facing = direction;
+    if (direction) this.currentDirection = direction;
 
     if (time < this.dashUntil) {
       // Durante el dash se conserva la velocidad que se fijo al arrancarlo,
@@ -337,8 +341,8 @@ export default class MainScene extends Phaser.Scene {
       if (this.dashKey.isDown && time >= this.dashReadyAt) {
         // vx/vy ya vienen escalados a PLAYER_SPEED, asi que dividir devuelve
         // el vector unitario. Sin teclas, el dash sale hacia donde se mira.
-        const dx = magnitude > 0 ? vx / PLAYER_SPEED : Math.cos(FACING_RADIANS[this.facing]);
-        const dy = magnitude > 0 ? vy / PLAYER_SPEED : Math.sin(FACING_RADIANS[this.facing]);
+        const dx = magnitude > 0 ? vx / PLAYER_SPEED : Math.cos(this.facingAngle);
+        const dy = magnitude > 0 ? vy / PLAYER_SPEED : Math.sin(this.facingAngle);
         this.dashVx = dx * DASH_SPEED;
         this.dashVy = dy * DASH_SPEED;
         this.dashUntil = time + DASH_MS;
@@ -352,21 +356,18 @@ export default class MainScene extends Phaser.Scene {
     this.zombieLayer.sync(getZombies());
     this.zombieLayer.update(delta);
 
+    // Una sola pose fija por direccion (ver SEGURIDAD_TEXTURE_BY_DIRECTION):
+    // no hay ciclo que animar ni flip que aplicar (izquierda y derecha ya
+    // son arte distinto, no un espejo) — el balanceo de abajo es lo unico
+    // que distingue caminar de estar quieto.
+    this.player.setTexture(SEGURIDAD_TEXTURE_BY_DIRECTION[this.currentDirection]);
     if (direction) {
-      this.currentDirection = direction;
-      this.lastMoveAt = this.time.now;
-      this.player.setFlipX(direction === 'left');
-      this.player.anims.play(WALK_ANIM_BY_DIRECTION[direction], true);
-    } else if (this.time.now - this.lastMoveAt < DIRECTION_HOLD_MS) {
-      // Hueco corto sin ninguna tecla activa (probable cambio de direccion
-      // en curso): seguir mostrando la caminata de la ultima direccion en
-      // vez de cortar a idle — ver DIRECTION_HOLD_MS.
-      this.player.setFlipX(this.currentDirection === 'left');
-      this.player.anims.play(WALK_ANIM_BY_DIRECTION[this.currentDirection], true);
+      this.walkWobblePhaseMs += delta;
+      const wobble = Math.sin((this.walkWobblePhaseMs / 1000) * WALK_WOBBLE_HZ * Math.PI * 2);
+      this.player.setAngle(wobble * WALK_WOBBLE_DEG);
     } else {
-      this.player.anims.stop();
-      this.player.setFlipX(this.currentDirection === 'left');
-      this.player.setTexture(SEGURIDAD_ATLAS.key, IDLE_FRAME_BY_DIRECTION[this.currentDirection]);
+      this.walkWobblePhaseMs = 0;
+      this.player.setAngle(0);
     }
 
     this.updateStairsZones();
@@ -386,9 +387,8 @@ export default class MainScene extends Phaser.Scene {
     if (!wants || time < this.nextAttackAt) return;
 
     this.nextAttackAt = time + ATTACK_REQUEST_MS;
-    const facing = FACING_RADIANS[this.facing];
-    requestAttack(Math.round(this.player.x), Math.round(this.player.y), facing);
-    this.drawSwing(facing);
+    requestAttack(Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
+    this.drawSwing(this.facingAngle);
   }
 
   drawSwing(facing) {
@@ -401,8 +401,8 @@ export default class MainScene extends Phaser.Scene {
   }
 
   spawnDashTrail() {
-    const ghost = this.add.sprite(this.player.x, this.player.y, this.player.texture.key, this.player.frame.name);
-    ghost.setDepth(this.player.depth - 1).setAlpha(0.45).setTint(0x7ec8ff).setFlipX(this.player.flipX);
+    const ghost = this.add.sprite(this.player.x, this.player.y, this.player.texture.key);
+    ghost.setDepth(this.player.depth - 1).setAlpha(0.45).setTint(0x7ec8ff);
     this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
   }
 
@@ -447,9 +447,16 @@ export default class MainScene extends Phaser.Scene {
 
       if (withinRange && !zone.inRange) {
         zone.inRange = true;
-        requestMissionComplete(zone.missionId, px, py);
+        if (zone.missionId === SECURITY_MISSION_ID) {
+          setNearMission(zone);
+        } else {
+          requestMissionComplete(zone.missionId, px, py);
+        }
       } else if (!withinRange && zone.inRange) {
         zone.inRange = false;
+        if (zone.missionId === SECURITY_MISSION_ID) {
+          setNearMission(null);
+        }
       }
     });
   }
@@ -457,25 +464,31 @@ export default class MainScene extends Phaser.Scene {
   /**
    * Cambia la textura de cada puerta a abierta/cerrada segun la distancia
    * al jugador — sin fisica ni overlap, es puramente visual (las puertas ya
-   * son caminables en ambos estados).
+   * son caminables en ambos estados, la puerta cerrada bloquea de verdad —
+   * ver el listener de onStateChange en createFoodItems que sincroniza
+   * textura + colision con lo que confirma el backend).
+   *
+   * El abrir/cerrar ya no es automatico por proximidad: ahora es una accion
+   * del jugador (boton E, ver Hud.jsx) — esto solo decide cual puerta ofrece
+   * esa interaccion.
    */
   updateDoorProximity() {
     const px = this.player.x;
     const py = this.player.y;
+    let closest = null;
+    let closestDistSq = Infinity;
 
     this.doors.forEach((door) => {
       const dx = px - door.x;
       const dy = py - door.y;
-      const withinRange = dx * dx + dy * dy <= DOOR_PROXIMITY_PX * DOOR_PROXIMITY_PX;
-
-      if (withinRange && !door.open) {
-        door.open = true;
-        door.image.setTexture('v2_door_madera_open');
-      } else if (!withinRange && door.open) {
-        door.open = false;
-        door.image.setTexture('v2_door_madera');
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= DOOR_PROXIMITY_PX * DOOR_PROXIMITY_PX && distSq < closestDistSq) {
+        closest = door;
+        closestDistSq = distSq;
       }
     });
+
+    setNearDoor(closest);
   }
 
   /**
@@ -615,11 +628,16 @@ export default class MainScene extends Phaser.Scene {
           deco.orientation === 'down'
             ? deco.y * TILE + 48 // top alineado con el techo de la fila de pared
             : (deco.y + 1) * TILE - 48; // bottom alineado con el piso de la fila de pared
-        const image = this.add.image(cx, cy, 'v2_door_madera').setDepth(8);
-        // Las puertas son caminables: no se agregan a `solids`. Se guarda la
-        // referencia para actualizar textura abierta/cerrada por proximidad
-        // (ver updateDoorProximity).
-        this.doors.push({ image, x: cx, y: cy, open: false });
+        const image = this.add.image(cx, cy, 'v2_door_madera_open').setDepth(8);
+        // Siempre se agrega a `solids` (asi el cuerpo fisico existe desde el
+        // arranque) pero con el body deshabilitado — el backend manda todas
+        // las puertas abiertas al empezar. Abrir/cerrar despues solo
+        // prende/apaga ese body (ver el listener de onStateChange abajo),
+        // nunca se agrega/quita del grupo — es la forma estandar de Arcade
+        // Physics de togglear colision sin recrear el cuerpo cada vez.
+        this.solids.add(image);
+        image.body.enable = false;
+        this.doors.push({ image, x: cx, y: cy, open: true, doorId: deco.doorId });
       }
     });
   }
@@ -646,118 +664,4 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
-  createAnimations() {
-    const key = SEGURIDAD_ATLAS.key;
-
-    this.anims.create({
-      key: 'down_idle',
-      frames: this.anims.generateFrameNames(key, { prefix: 'down_idle_', start: 0, end: 3 }),
-      frameRate: 4,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'up_idle',
-      frames: this.anims.generateFrameNames(key, { prefix: 'up_idle_', start: 0, end: 3 }),
-      frameRate: 4,
-      repeat: -1,
-    });
-    // Ciclos reducidos a 6 frames: la lamina fuente es una hoja de
-    // referencia de personaje (multiples angulos), no un ciclo de caminata
-    // diseñado — algunos indices de cada bloque de 8 muestran un angulo
-    // distinto (de frente/de espaldas colado en el ciclo) y rompian la
-    // fluidez. Diagnostico completo y frames descartados documentados en
-    // ARCHITECTURE.md.
-    this.anims.create({
-      key: 'right',
-      frames: this.anims.generateFrameNames(key, { prefix: 'right_', start: 2, end: 7 }),
-      frameRate: 10,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'down',
-      frames: this.anims.generateFrameNames(key, { prefix: 'down_', frames: [0, 1, 2, 3, 5, 6] }),
-      frameRate: 10,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'up',
-      frames: this.anims.generateFrameNames(key, { prefix: 'up_', start: 2, end: 7 }),
-      frameRate: 10,
-      repeat: -1,
-    });
-    // 'left' reutiliza los frames de 'right' con flipX en vez de una
-    // animacion propia (ver WALK_ANIM_BY_DIRECTION / update()).
-  }
-
-  // --- Placeholder de respaldo (comentado) ------------------------------
-  // Genera una capsula de color con un indicador de direccion, numerada
-  // exactamente igual a como Phaser numera un spritesheet cargado desde
-  // archivo. Util para aislar bugs de input/fisica del problema de arte,
-  // sin depender de los atlas reales. Para reactivar: descomentar esto,
-  // el import de spriteConfig arriba, y los bloques "Placeholder de
-  // respaldo" en preload()/create().
-  //
-  // generatePlaceholderSpritesheet() {
-  //   const { key, frameWidth, frameHeight, framesPerDirection, rowOrder, color } = SEGURIDAD_SPRITE;
-  //   const cols = framesPerDirection;
-  //   const rows = rowOrder.length;
-  //   const sheetWidth = frameWidth * cols;
-  //   const sheetHeight = frameHeight * rows;
-  //
-  //   const gfx = this.make.graphics({ x: 0, y: 0, add: false });
-  //
-  //   rowOrder.forEach((direction, row) => {
-  //     for (let col = 0; col < cols; col += 1) {
-  //       const cx = col * frameWidth + frameWidth / 2;
-  //       const cy = row * frameHeight + frameHeight / 2;
-  //       const bob = Math.sin((col / cols) * Math.PI * 2) * 3;
-  //
-  //       gfx.fillStyle(color, 1);
-  //       gfx.fillRoundedRect(
-  //         cx - frameWidth * 0.28,
-  //         cy - frameHeight * 0.36 + bob,
-  //         frameWidth * 0.56,
-  //         frameHeight * 0.62,
-  //         6,
-  //       );
-  //
-  //       gfx.fillStyle(0xe8c39e, 1);
-  //       gfx.fillCircle(cx, cy - frameHeight * 0.28 + bob, frameWidth * 0.22);
-  //
-  //       gfx.fillStyle(0xffffff, 1);
-  //       const indicator = MainScene.directionIndicatorOffset(direction, frameWidth, frameHeight);
-  //       gfx.fillTriangle(
-  //         cx + indicator.x, cy + indicator.y - 4,
-  //         cx + indicator.x - 4, cy + indicator.y + 4,
-  //         cx + indicator.x + 4, cy + indicator.y + 4,
-  //       );
-  //     }
-  //   });
-  //
-  //   gfx.generateTexture(key, sheetWidth, sheetHeight);
-  //   gfx.destroy();
-  //
-  //   const texture = this.textures.get(key);
-  //   let frameIndex = 0;
-  //   rowOrder.forEach((_, row) => {
-  //     for (let col = 0; col < cols; col += 1) {
-  //       texture.add(frameIndex, 0, col * frameWidth, row * frameHeight, frameWidth, frameHeight);
-  //       frameIndex += 1;
-  //     }
-  //   });
-  // }
-  //
-  // static directionIndicatorOffset(direction, frameWidth, frameHeight) {
-  //   switch (direction) {
-  //     case 'up':
-  //       return { x: 0, y: -frameHeight * 0.32 };
-  //     case 'left':
-  //       return { x: -frameWidth * 0.3, y: 0 };
-  //     case 'right':
-  //       return { x: frameWidth * 0.3, y: 0 };
-  //     case 'down':
-  //     default:
-  //       return { x: 0, y: frameHeight * 0.18 };
-  //   }
-  // }
 }

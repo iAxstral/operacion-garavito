@@ -29,10 +29,17 @@ public class GameSession {
     private static final double SHOP_RANGE_PX = 110; // mismo orden que PICKUP_RANGE_PX
     private static final double MISSION_RANGE_PX = 90;
     private static final long MISSION_COOLDOWN_MS = 60_000;
+    private static final double DOOR_INTERACT_RANGE_PX = 90;
 
     // --- Zombis (ver GAMEPLAY.md) ---
     private static final int GARAVITOS_PER_ZOMBIE = 1;
-    private static final double ATTACK_HALF_ARC_RAD = Math.toRadians(45);
+    // 45 grados de semiarco (90 en total) mas la granularidad de 4 direcciones
+    // del cliente hacian que golpear algo que no estuviera EXACTAMENTE en un
+    // eje cardinal (ej. un zombi en diagonal mientras el jugador corria en
+    // diagonal) cayera justo en el borde del cono y fallara la mayoria de las
+    // veces — de ahi el reporte de "el ataque no hace nada". 55 grados de
+    // semiarco (110 en total) le da margen sin volverlo un golpe en 360.
+    private static final double ATTACK_HALF_ARC_RAD = Math.toRadians(55);
 
     /**
      * Como pega el jugador segun con que. Desarmado SIEMPRE se puede pegar:
@@ -45,8 +52,8 @@ public class GameSession {
     private record Melee(int damage, double range, long cooldownMs, double knockback) {
     }
 
-    private static final Melee UNARMED = new Melee(1, 48, 700, 170);
-    private static final Melee ARMED = new Melee(2, 62, 400, 280);
+    private static final Melee UNARMED = new Melee(1, 56, 700, 170);
+    private static final Melee ARMED = new Melee(2, 70, 400, 280);
     private static final double CONTACT_RANGE_PX = 40;
     private static final double SEPARATION_RADIUS_PX = 26;
     private static final double SEPARATION_FORCE = 90;
@@ -134,7 +141,8 @@ public class GameSession {
     public List<PlayerState> playerStates() {
         return players.values().stream()
                 .map(p -> new PlayerState(p.getPlayerId(), p.getRole(), p.getHealth(), p.getGaravitos(),
-                        p.inventorySnapshot(), Math.round(p.getX()), Math.round(p.getY()), p.getLifeState()))
+                        p.inventorySnapshot(), Math.round(p.getX()), Math.round(p.getY()), p.getLifeState(),
+                        p.isInvulnerable()))
                 .toList();
     }
 
@@ -345,6 +353,51 @@ public class GameSession {
     }
 
     /**
+     * Abre la tarea de una mision (popup estilo "among us"): valida rol y
+     * cooldown (sin consumirlo todavia, eso lo hace attemptCompleteMission
+     * al terminar la tarea) y, si esta libre, vuelve al jugador inmune a los
+     * zombis mientras dura el minijuego — la idea es que resolver la tarea
+     * no compita con que te muerdan al mismo tiempo.
+     */
+    public MissionResult attemptStartMission(String playerId, String missionId) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return MissionResult.rejected("unknown_player");
+        }
+
+        MissionZone mission = MissionCatalog.byId(missionId);
+        if (mission == null) {
+            return MissionResult.rejected("unknown_mission");
+        }
+        if (!mission.role().equals(player.getRole())) {
+            return MissionResult.rejected("wrong_role");
+        }
+
+        Long lastCompletedAt = missionCooldowns.get(missionId);
+        if (lastCompletedAt != null && System.currentTimeMillis() - lastCompletedAt < MISSION_COOLDOWN_MS) {
+            return MissionResult.rejected("on_cooldown");
+        }
+
+        player.setInvulnerable(true);
+        return MissionResult.ok(0);
+    }
+
+    /**
+     * Cierra la tarea sin completarla (el jugador salio del popup antes de
+     * tiempo): siempre le quita la inmunidad, sin importar en que quedo la
+     * mision.
+     */
+    public MissionResult attemptCancelMission(String playerId, String missionId) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return MissionResult.rejected("unknown_player");
+        }
+
+        player.setInvulnerable(false);
+        return MissionResult.ok(0);
+    }
+
+    /**
      * Completar una mision: reclamo atomico del "turno" de cooldown con
      * Map.compute (no putIfAbsent — a diferencia de un item del mapa, una
      * mision se puede volver a reclamar despues del cooldown, no una sola
@@ -355,6 +408,10 @@ public class GameSession {
         if (player == null) {
             return MissionResult.rejected("unknown_player");
         }
+        // La tarea (si la habia) termino aca pase lo que pase: el popup se
+        // cierra del lado del cliente en cuanto llama a este metodo, asi que
+        // la inmunidad no se debe quedar pegada por un rechazo posterior.
+        player.setInvulnerable(false);
 
         MissionZone mission = MissionCatalog.byId(missionId);
         if (mission == null) {
@@ -393,6 +450,40 @@ public class GameSession {
         return new HashSet<>(claimedItems.keySet());
     }
 
+    /**
+     * Abre/cierra una puerta. Bloquea el paso de los zombis (via FloorGrid,
+     * usado en tick()) mientras esta cerrada; el cliente hace lo mismo del
+     * lado del jugador agregando/quitando la puerta de sus solidos de Phaser
+     * al recibir el nuevo estado (ver MainScene.js).
+     */
+    public DoorToggleResult attemptToggleDoor(String playerId, String doorId, double x, double y) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return DoorToggleResult.rejected("unknown_player");
+        }
+
+        DoorCatalog.DoorSpec spec = DoorCatalog.byId(doorId);
+        if (spec == null) {
+            return DoorToggleResult.rejected("unknown_door");
+        }
+
+        double dx = x - spec.centerX();
+        double dy = y - spec.centerY();
+        if (Math.sqrt(dx * dx + dy * dy) > DOOR_INTERACT_RANGE_PX) {
+            return DoorToggleResult.rejected("too_far");
+        }
+
+        boolean nowOpen = !floor.isDoorOpen(doorId);
+        floor.setDoorOpen(doorId, nowOpen);
+        return DoorToggleResult.ok(nowOpen);
+    }
+
+    public List<DoorState> doorStates() {
+        return DoorCatalog.DOORS.stream()
+                .map(spec -> new DoorState(spec.doorId(), floor.isDoorOpen(spec.doorId())))
+                .toList();
+    }
+
     /** @throws IllegalArgumentException si role no es uno de los 4 roles validos */
     public void submitDecision(String role, String action) {
         roundCoordinator.submitDecision(role, action);
@@ -400,5 +491,27 @@ public class GameSession {
 
     public RoundState currentRoundView() {
         return roundCoordinator.currentStateView();
+    }
+
+    /**
+     * Vuelve la partida entera al estado de arranque: oleada 1, sin zombis,
+     * jugadores a full vida/sin inventario, misiones e items sin reclamar,
+     * puertas abiertas, ronda 1. Lo dispara GameController.join() en cada
+     * join — hoy eso equivale a "el jugador recargo la pagina", porque
+     * SEGURIDAD es el unico rol jugable este sprint (ver gameSync.js) y por
+     * lo tanto el unico que se une. Si mas adelante varios roles se unen de
+     * forma independiente (multijugador real), esto hay que revisarlo: un
+     * segundo jugador uniendose a mitad de partida no deberia borrarle el
+     * progreso al resto del equipo.
+     */
+    public void resetGame() {
+        zombies.clear();
+        waveDirector.resetRun(System.currentTimeMillis());
+        claimedItems.clear();
+        missionCooldowns.clear();
+        floor.resetDoors();
+        players.values().forEach(Player::reset);
+        roundCoordinator.reset();
+        wipedRun = false;
     }
 }

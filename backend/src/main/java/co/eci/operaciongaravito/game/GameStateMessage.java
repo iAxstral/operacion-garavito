@@ -14,5 +14,6 @@ public record GameStateMessage(
         LastEvent lastEvent,
         RoundState round,
         List<ZombieState> zombies,
-        WaveState wave) {
+        WaveState wave,
+        List<DoorState> doors) {
 }

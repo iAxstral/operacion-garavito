@@ -12,7 +12,7 @@ import { socketService } from '../services/socketService';
 const GAME_ID = 'default';
 const MY_ROLE = 'SEGURIDAD'; // unico rol jugable en este sprint
 
-let latestState = { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null };
+let latestState = { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [] };
 
 // Cadencia del reporte de posicion. 10 Hz alcanza para que los zombis
 // persigan de forma continua; el umbral en pixeles evita gastar mensajes
@@ -24,6 +24,7 @@ let lastSentX = null;
 let lastSentY = null;
 const listeners = new Set();
 let joined = false;
+let topicSubscription = null;
 
 // Vendedor cercano (proximidad, igual patron que las puertas): lo escribe
 // MainScene.js en su loop de update, lo lee Hud.jsx para mostrar "Presiona
@@ -31,6 +32,22 @@ let joined = false;
 // puramente local del cliente (no viene del backend).
 let nearVendor = null;
 const vendorListeners = new Set();
+
+// Zona de mision con tarea propia (por ahora solo Seguridad) en rango: mismo
+// patron que nearVendor, lo escribe MainScene.js y lo lee el componente del
+// popup para saber cuando ofrecer "Presiona E".
+let nearMission = null;
+const missionListeners = new Set();
+
+// Mientras hay una tarea de mision abierta el jugador no debe poder moverse
+// ni atacar (ver SecurityMission.jsx) — MainScene.js lo consulta en cada
+// frame de update().
+let inputLocked = false;
+
+// Puerta en rango de interaccion (mismo patron que nearVendor/nearMission):
+// lo escribe MainScene.js, lo lee Hud.jsx para el hint de "Presiona E".
+let nearDoor = null;
+const doorListeners = new Set();
 
 function notify() {
   listeners.forEach((callback) => callback(latestState));
@@ -69,7 +86,7 @@ export function ensureJoined() {
   if (!socketService.client?.connected) return;
   joined = true;
 
-  socketService.subscribe(`/topic/game/${GAME_ID}`, (body) => {
+  topicSubscription = socketService.subscribe(`/topic/game/${GAME_ID}`, (body) => {
     // El tick de zombis difunde 8 veces por segundo con lastEvent en null, así
     // que tomar el payload tal cual borraba cualquier aviso ("inventario
     // lleno", "muy lejos") a los 125 ms — antes de que el HUD alcanzara a
@@ -83,6 +100,29 @@ export function ensureJoined() {
     notify();
   });
   socketService.publish(`/app/game/${GAME_ID}/join`, { role: MY_ROLE });
+}
+
+/**
+ * Vuelve al estado "todavia no me uni": se llama al salir al menu principal
+ * (ver App.jsx), para que la proxima vez que se entre a jugar ensureJoined()
+ * mande un /join real de nuevo — eso es lo que hace que el backend reinicie
+ * la partida (ver GameController.join / GameSession.resetGame). El socket
+ * STOMP en si no se desconecta: es un singleton compartido con
+ * ConnectionStatus.jsx, no hace falta tirarlo abajo solo para volver al menu.
+ */
+export function leaveGame() {
+  topicSubscription?.unsubscribe();
+  topicSubscription = null;
+  joined = false;
+  latestState = { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [] };
+  lastMoveSentAt = 0;
+  lastSentX = null;
+  lastSentY = null;
+  inputLocked = false;
+  setNearVendor(null);
+  setNearMission(null);
+  setNearDoor(null);
+  notify();
 }
 
 /**
@@ -138,6 +178,67 @@ export function requestMissionComplete(missionId, x, y) {
   socketService.publish(`/app/game/${GAME_ID}/mission/complete`, { playerId: MY_ROLE, missionId, x, y });
 }
 
+/** Abre la tarea: el backend valida rol/cooldown y, si esta libre, vuelve al jugador inmune. */
+export function requestMissionStart(missionId) {
+  socketService.publish(`/app/game/${GAME_ID}/mission/start`, { playerId: MY_ROLE, missionId });
+}
+
+/** Cierra la tarea sin completarla — el backend le quita la inmunidad igual. */
+export function requestMissionCancel(missionId) {
+  socketService.publish(`/app/game/${GAME_ID}/mission/cancel`, { playerId: MY_ROLE, missionId });
+}
+
+/** Llamado por MainScene en cada frame con la zona de mision en rango, o null. */
+export function setNearMission(mission) {
+  if (nearMission?.missionId === mission?.missionId) return; // sin cambios, no molestar a los listeners
+  nearMission = mission;
+  missionListeners.forEach((callback) => callback(nearMission));
+}
+
+export function getNearMission() {
+  return nearMission;
+}
+
+export function onNearMissionChange(callback) {
+  missionListeners.add(callback);
+  callback(nearMission);
+  return () => missionListeners.delete(callback);
+}
+
+export function setInputLocked(locked) {
+  inputLocked = locked;
+}
+
+export function isInputLocked() {
+  return inputLocked;
+}
+
+/** x/y: posicion del jugador, para que el backend valide que este cerca de esa puerta. */
+export function requestDoorToggle(doorId, x, y) {
+  socketService.publish(`/app/game/${GAME_ID}/door/toggle`, { playerId: MY_ROLE, doorId, x, y });
+}
+
+/** Llamado por MainScene en cada frame con la puerta en rango, o null. */
+export function setNearDoor(door) {
+  if (nearDoor?.doorId === door?.doorId) return; // sin cambios, no molestar a los listeners
+  nearDoor = door;
+  doorListeners.forEach((callback) => callback(nearDoor));
+}
+
+export function getNearDoor() {
+  return nearDoor;
+}
+
+export function onNearDoorChange(callback) {
+  doorListeners.add(callback);
+  callback(nearDoor);
+  return () => doorListeners.delete(callback);
+}
+
+export function getDoors() {
+  return latestState.doors ?? [];
+}
+
 /** Llamado por MainScene en cada frame con el vendedor en rango, o null. */
 export function setNearVendor(vendor) {
   if (nearVendor?.vendorId === vendor?.vendorId) return; // sin cambios, no molestar a los listeners
@@ -162,11 +263,18 @@ if (import.meta.env.DEV) {
     getLatestState,
     getMyPlayerState,
     ensureJoined,
+    leaveGame,
     requestPickup,
     submitDecision,
     purchaseItem,
     requestMissionComplete,
+    requestMissionStart,
+    requestMissionCancel,
     getNearVendor,
+    getNearMission,
+    requestDoorToggle,
+    getNearDoor,
+    getDoors,
     requestAttack,
     reportPosition,
     getZombies,

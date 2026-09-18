@@ -44,6 +44,14 @@ class SchoolState {
         return new SchoolStateView(budget, population, infrastructureHealth, security, happiness);
     }
 
+    void reset() {
+        budget = 100;
+        population = 100;
+        infrastructureHealth = 100;
+        security = 100;
+        happiness = 100;
+    }
+
     private static int clamp(int value) {
         return Math.max(0, Math.min(100, value));
     }

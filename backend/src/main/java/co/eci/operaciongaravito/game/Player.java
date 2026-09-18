@@ -29,6 +29,8 @@ public class Player {
     private volatile double y = 800;
     private volatile PlayerLifeState lifeState = PlayerLifeState.ALIVE;
     private volatile long attackReadyAt = 0;
+    /** True mientras el jugador esta dentro de una tarea de mision (ver GameSession.attemptStartMission). */
+    private volatile boolean invulnerable = false;
 
     public Player(String role) {
         this.playerId = role;
@@ -67,6 +69,14 @@ public class Player {
         return lifeState == PlayerLifeState.ALIVE;
     }
 
+    public boolean isInvulnerable() {
+        return invulnerable;
+    }
+
+    public void setInvulnerable(boolean invulnerable) {
+        this.invulnerable = invulnerable;
+    }
+
     public void reportPosition(double x, double y) {
         this.x = x;
         this.y = y;
@@ -78,7 +88,7 @@ public class Player {
      * "castigar" un cuerpo y pasen al siguiente objetivo.
      */
     public synchronized boolean takeDamage(int amount) {
-        if (lifeState == PlayerLifeState.DOWNED) {
+        if (lifeState == PlayerLifeState.DOWNED || invulnerable) {
             return false;
         }
         health = Math.max(0, health - amount);
@@ -151,5 +161,17 @@ public class Player {
 
     public synchronized List<InventorySlot> inventorySnapshot() {
         return new ArrayList<>(inventory);
+    }
+
+    /** Vuelve al jugador a como arranca una partida nueva (ver GameSession.resetGame). */
+    public synchronized void reset() {
+        health = 100;
+        garavitos = 0;
+        inventory.clear();
+        x = 608;
+        y = 800;
+        lifeState = PlayerLifeState.ALIVE;
+        attackReadyAt = 0;
+        invulnerable = false;
     }
 }

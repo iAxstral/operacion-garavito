@@ -11,7 +11,7 @@ package co.eci.operaciongaravito.game;
  */
 public class Zombie {
 
-    private static final int CONTACT_DAMAGE = 10;
+    private static final int CONTACT_DAMAGE = 2;
     private static final long CONTACT_COOLDOWN_MS = 600;
 
     private final String id;

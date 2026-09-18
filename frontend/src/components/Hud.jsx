@@ -6,6 +6,9 @@ import {
   onStateChange,
   submitDecision,
   onNearVendorChange,
+  onNearDoorChange,
+  requestDoorToggle,
+  isInputLocked,
   purchaseItem,
 } from '../game/gameSync';
 import { REWARD_GARAVITOS } from '../game/missionCatalog';
@@ -27,6 +30,7 @@ const REJECTION_MESSAGES = {
   wrong_role: 'Esa misión no es de tu rol',
   on_cooldown: 'Esa misión ya se completó hace poco, espera un poco',
   unknown_mission: 'Esa misión no existe',
+  unknown_door: 'Esa puerta no existe',
 };
 
 function healthColor(health) {
@@ -42,6 +46,7 @@ export default function Hud() {
   const [roundBanner, setRoundBanner] = useState(null);
   const [nearVendor, setNearVendorState] = useState(null);
   const [shopOpen, setShopOpen] = useState(false);
+  const [nearDoor, setNearDoorState] = useState(null);
 
   useEffect(() => {
     socketService.connect({ onConnect: () => ensureJoined() });
@@ -53,6 +58,8 @@ export default function Hud() {
     if (!vendor) setShopOpen(false); // el jugador se alejo: cerrar el menu si estaba abierto
   }), []);
 
+  useEffect(() => onNearDoorChange(setNearDoorState), []);
+
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === 'Tab' || event.key === 'm' || event.key === 'M') {
@@ -60,9 +67,19 @@ export default function Hud() {
         setPanelOpen((open) => !open);
         return;
       }
+      // Con una tarea de mision abierta (SecurityMission.jsx) el jugador
+      // esta inmovilizado — ninguna de estas interacciones deberia disparar
+      // mientras tanto.
+      if (isInputLocked()) return;
+
       if ((event.key === 'e' || event.key === 'E') && nearVendor) {
         event.preventDefault();
         setShopOpen((open) => !open);
+        return;
+      }
+      if ((event.key === 'e' || event.key === 'E') && nearDoor) {
+        event.preventDefault();
+        requestDoorToggle(nearDoor.doorId, nearDoor.x, nearDoor.y);
         return;
       }
       if (event.key === 'Escape' && shopOpen) {
@@ -71,14 +88,19 @@ export default function Hud() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [nearVendor, shopOpen]);
+  }, [nearVendor, nearDoor, shopOpen]);
 
   useEffect(() => {
     const event = state.lastEvent;
     if (!event || event.playerId !== getMyRole()) return undefined;
 
     let message = null;
-    if (event.type === 'PICKUP_REJECTED' || event.type === 'PURCHASE_REJECTED' || event.type === 'MISSION_REJECTED') {
+    if (
+      event.type === 'PICKUP_REJECTED'
+      || event.type === 'PURCHASE_REJECTED'
+      || event.type === 'MISSION_REJECTED'
+      || event.type === 'DOOR_REJECTED'
+    ) {
       message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo completar la acción';
     } else if (event.type === 'PURCHASE_SUCCESS') {
       message = '¡Compra exitosa!';
@@ -112,6 +134,9 @@ export default function Hud() {
   const inventory = me?.inventory ?? [];
   const slots = [...inventory, ...Array(5 - inventory.length).fill(null)];
   const inventoryFull = inventory.length >= 5;
+
+  const nearDoorState = state.doors?.find((d) => d.doorId === nearDoor?.doorId);
+  const nearDoorOpen = nearDoorState?.open ?? true;
 
   const handleBuy = (item) => {
     if (!nearVendor) return;
@@ -154,6 +179,12 @@ export default function Hud() {
       {nearVendor && !shopOpen && (
         <div className="hud-interact-hint">
           Presiona <strong>E</strong> — {nearVendor.label}
+        </div>
+      )}
+
+      {nearDoor && (
+        <div className="hud-interact-hint">
+          Presiona <strong>E</strong> — {nearDoorOpen ? 'Cerrar' : 'Abrir'} puerta
         </div>
       )}
 

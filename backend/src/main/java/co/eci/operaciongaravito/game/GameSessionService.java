@@ -100,7 +100,8 @@ public class GameSessionService {
                 event,
                 session.currentRoundView(),
                 session.zombieStates(),
-                session.waveState()
+                session.waveState(),
+                session.doorStates()
         );
         messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }
@@ -116,7 +117,8 @@ public class GameSessionService {
                 null,
                 round,
                 session.zombieStates(),
-                session.waveState()
+                session.waveState(),
+                session.doorStates()
         );
         messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }

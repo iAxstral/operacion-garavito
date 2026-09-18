@@ -34,6 +34,11 @@ public class GameController {
         LastEvent event;
         try {
             Player player = session.getOrCreatePlayer(request.role());
+            // Reiniciar en cada join (no solo la primera vez) es lo que hace
+            // que recargar la pagina reinicie la partida — ver el javadoc de
+            // resetGame() sobre por que esto es seguro solo mientras
+            // SEGURIDAD siga siendo el unico rol jugable.
+            session.resetGame();
             event = LastEvent.joinOk(player.getPlayerId());
         } catch (IllegalArgumentException ex) {
             event = LastEvent.joinRejected("invalid_role");
@@ -64,6 +69,40 @@ public class GameController {
                 : LastEvent.purchaseRejected(request.playerId(), request.itemId(), result.reason());
 
         broadcast(gameId, session, event);
+    }
+
+    @MessageMapping("/game/{gameId}/door/toggle")
+    public void toggleDoor(@DestinationVariable String gameId, DoorToggleRequest request) {
+        GameSession session = sessionService.getOrCreate(gameId);
+        DoorToggleResult result = session.attemptToggleDoor(
+                request.playerId(), request.doorId(), request.x(), request.y());
+
+        // Igual que /attack: si no paso nada (rechazo) hay que avisarle a
+        // quien pidio el toggle; si funciono, el nuevo estado de la puerta ya
+        // viaja en `doors` del broadcast normal, no hace falta un evento aparte.
+        LastEvent event = result.success()
+                ? null
+                : LastEvent.doorRejected(request.playerId(), request.doorId(), result.reason());
+        broadcast(gameId, session, event);
+    }
+
+    @MessageMapping("/game/{gameId}/mission/start")
+    public void startMission(@DestinationVariable String gameId, MissionStartRequest request) {
+        GameSession session = sessionService.getOrCreate(gameId);
+        MissionResult result = session.attemptStartMission(request.playerId(), request.missionId());
+
+        LastEvent event = result.success()
+                ? LastEvent.missionStarted(request.playerId(), request.missionId())
+                : LastEvent.missionRejected(request.playerId(), request.missionId(), result.reason());
+
+        broadcast(gameId, session, event);
+    }
+
+    @MessageMapping("/game/{gameId}/mission/cancel")
+    public void cancelMission(@DestinationVariable String gameId, MissionStartRequest request) {
+        GameSession session = sessionService.getOrCreate(gameId);
+        session.attemptCancelMission(request.playerId(), request.missionId());
+        broadcast(gameId, session, LastEvent.missionCancelled(request.playerId(), request.missionId()));
     }
 
     @MessageMapping("/game/{gameId}/mission/complete")
@@ -128,7 +167,8 @@ public class GameController {
                 lastEvent,
                 session.currentRoundView(),
                 session.zombieStates(),
-                session.waveState()
+                session.waveState(),
+                session.doorStates()
         );
         messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }

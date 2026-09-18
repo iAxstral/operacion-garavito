@@ -56,4 +56,19 @@ public record LastEvent(String type, String playerId, String itemId, String reas
     public static LastEvent missionRejected(String playerId, String missionId, String reason) {
         return new LastEvent("MISSION_REJECTED", playerId, missionId, reason);
     }
+
+    /** Se abrio el popup de la tarea (el jugador ya quedo inmune, ver GameSession.attemptStartMission). */
+    public static LastEvent missionStarted(String playerId, String missionId) {
+        return new LastEvent("MISSION_STARTED", playerId, missionId, null);
+    }
+
+    /** El jugador cerro el popup sin completar la tarea. */
+    public static LastEvent missionCancelled(String playerId, String missionId) {
+        return new LastEvent("MISSION_CANCELLED", playerId, missionId, null);
+    }
+
+    // itemId se reutiliza como doorId aca, mismo criterio que en las misiones.
+    public static LastEvent doorRejected(String playerId, String doorId, String reason) {
+        return new LastEvent("DOOR_REJECTED", playerId, doorId, reason);
+    }
 }

@@ -57,6 +57,18 @@ public class RoundCoordinator {
         return new RoundState(state.number(), state.schoolState(), false);
     }
 
+    /** Vuelve a la ronda 1 con el estado de la escuela en sus valores iniciales (ver GameSession.resetGame). */
+    public void reset() {
+        synchronized (resolveLock) {
+            decisions.clear();
+            schoolState.reset();
+            roundNumber = 1;
+            currentRoundResolved = false;
+            currentState = new RoundState(roundNumber, schoolState.toSnapshot(), false);
+            scheduleTimeout();
+        }
+    }
+
     public void submitDecision(String role, String action) {
         Role.valueOf(role); // lanza IllegalArgumentException si el rol no es valido
         decisions.put(role, action);

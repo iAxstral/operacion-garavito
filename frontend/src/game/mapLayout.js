@@ -176,7 +176,7 @@ export function buildFloorLayout({ hasUpStairs = true, hasDownStairs = false } =
   outlineWallRect(grid, aula.x, aula.y, aula.w, aula.h);
   const aulaDoorRow = aula.y + aula.h - 1;
   setFloor(grid, DOOR_COL_AULA, aulaDoorRow);
-  decorations.push({ type: 'door', x: DOOR_COL_AULA, y: aulaDoorRow, orientation: 'down' });
+  decorations.push({ type: 'door', doorId: 'door-aula', x: DOOR_COL_AULA, y: aulaDoorRow, orientation: 'down' });
   labels.push({ x: aula.x * TILE, y: (aula.y - 1) * TILE + 20, text: 'Aula F-104' });
 
   const topConnectorRow = aula.y + aula.h;
@@ -241,7 +241,7 @@ export function buildFloorLayout({ hasUpStairs = true, hasDownStairs = false } =
   fillFloorRect(grid, terraza.x, terraza.y, terraza.w, terraza.h);
   outlineWallRect(grid, terraza.x, terraza.y, terraza.w, terraza.h);
   setFloor(grid, DOOR_COL_AULA, terraza.y);
-  decorations.push({ type: 'door', x: DOOR_COL_AULA, y: terraza.y, orientation: 'up' });
+  decorations.push({ type: 'door', doorId: 'door-terraza', x: DOOR_COL_AULA, y: terraza.y, orientation: 'up' });
   labels.push({ x: terraza.x * TILE, y: (terraza.y - 1) * TILE + 20, text: 'Terraza' });
 
   // --- CAFETERIA (abajo del vestibulo, sala nueva para 4 jugadores) -------
@@ -253,7 +253,7 @@ export function buildFloorLayout({ hasUpStairs = true, hasDownStairs = false } =
   fillFloorRect(grid, cafeteria.x, cafeteria.y, cafeteria.w, cafeteria.h);
   outlineWallRect(grid, cafeteria.x, cafeteria.y, cafeteria.w, cafeteria.h);
   setFloor(grid, DOOR_COL_CAFETERIA, cafeteria.y);
-  decorations.push({ type: 'door', x: DOOR_COL_CAFETERIA, y: cafeteria.y, orientation: 'up' });
+  decorations.push({ type: 'door', doorId: 'door-cafeteria', x: DOOR_COL_CAFETERIA, y: cafeteria.y, orientation: 'up' });
   labels.push({ x: cafeteria.x * TILE, y: (cafeteria.y - 1) * TILE + 20, text: 'Cafetería' });
 
   // --- Mobiliario placeholder (rectangulos de color; se reemplaza despues) ---

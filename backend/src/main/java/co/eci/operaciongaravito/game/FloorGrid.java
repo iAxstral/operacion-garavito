@@ -8,6 +8,9 @@ import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Geometria caminable del piso, para que los zombis no atraviesen las paredes.
@@ -23,11 +26,18 @@ public final class FloorGrid {
     public static final int TILE = 64;
 
     private static final String RESOURCE = "/floor1.grid";
-    private static final FloorGrid FLOOR_1 = load();
+    private static final char[][] TEMPLATE = loadTemplate();
 
     private final char[][] cells;
     private final int cols;
     private final int rows;
+    // Puertas: estado mutable POR PARTIDA (una GameSession = un FloorGrid
+    // propio, ver floor1() mas abajo). Una puerta cerrada bloquea tanto el
+    // pathing de zombis (distanceField/fits) como, del lado del cliente, la
+    // colision del jugador (ver MainScene.js) — asi que esto necesita vivir
+    // en la copia de CADA partida, no en un unico grid estatico compartido.
+    private final Map<String, int[]> doorCells = new ConcurrentHashMap<>(); // doorId -> {col, row}
+    private final Set<String> closedDoors = ConcurrentHashMap.newKeySet();
 
     private FloorGrid(char[][] cells) {
         this.cells = cells;
@@ -35,11 +45,56 @@ public final class FloorGrid {
         this.cols = rows == 0 ? 0 : cells[0].length;
     }
 
+    /** Una copia propia de la plantilla estatica: cada partida puede tener sus puertas en un estado distinto. */
     public static FloorGrid floor1() {
-        return FLOOR_1;
+        char[][] copy = new char[TEMPLATE.length][];
+        for (int i = 0; i < TEMPLATE.length; i++) {
+            copy[i] = TEMPLATE[i].clone();
+        }
+        FloorGrid grid = new FloorGrid(copy);
+        DoorCatalog.DOORS.forEach(spec -> grid.registerDoor(spec.doorId(), spec.col(), spec.row()));
+        return grid;
     }
 
-    private static FloorGrid load() {
+    public void registerDoor(String doorId, int col, int row) {
+        doorCells.put(doorId, new int[] { col, row });
+    }
+
+    /** Todas las puertas empiezan abiertas: mismo comportamiento (siempre caminable) que antes de que existiera este control. */
+    public boolean isDoorOpen(String doorId) {
+        return !closedDoors.contains(doorId);
+    }
+
+    public void setDoorOpen(String doorId, boolean open) {
+        if (!doorCells.containsKey(doorId)) {
+            return;
+        }
+        if (open) {
+            closedDoors.remove(doorId);
+        } else {
+            closedDoors.add(doorId);
+        }
+    }
+
+    /** Todas las puertas vuelven a abiertas (ver GameSession.resetGame). */
+    public void resetDoors() {
+        closedDoors.clear();
+    }
+
+    private boolean isClosedDoorCell(int col, int row) {
+        if (closedDoors.isEmpty()) {
+            return false;
+        }
+        for (String doorId : closedDoors) {
+            int[] pos = doorCells.get(doorId);
+            if (pos != null && pos[0] == col && pos[1] == row) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static char[][] loadTemplate() {
         try (InputStream in = FloorGrid.class.getResourceAsStream(RESOURCE)) {
             if (in == null) {
                 throw new IllegalStateException("falta el recurso " + RESOURCE
@@ -54,7 +109,7 @@ public final class FloorGrid {
                 }
                 rows.add(line.toCharArray());
             }
-            return new FloorGrid(rows.toArray(char[][]::new));
+            return rows.toArray(char[][]::new);
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
@@ -68,14 +123,14 @@ public final class FloorGrid {
         return rows * TILE;
     }
 
-    /** True si ese punto en pixeles cae en una celda por la que se puede pasar. */
+    /** True si ese punto en pixeles cae en una celda por la que se puede pasar (pared no, puerta cerrada tampoco). */
     public boolean isWalkable(double x, double y) {
         int col = (int) Math.floor(x / TILE);
         int row = (int) Math.floor(y / TILE);
         if (col < 0 || row < 0 || row >= rows || col >= cells[row].length) {
             return false;
         }
-        return cells[row][col] != '#';
+        return cells[row][col] != '#' && !isClosedDoorCell(col, row);
     }
 
     /**
@@ -110,7 +165,7 @@ public final class FloorGrid {
         int startCol = (int) Math.floor(fromX / TILE);
         int startRow = (int) Math.floor(fromY / TILE);
         if (startRow < 0 || startRow >= rows || startCol < 0 || startCol >= cells[startRow].length
-                || cells[startRow][startCol] == '#') {
+                || cells[startRow][startCol] == '#' || isClosedDoorCell(startCol, startRow)) {
             return distance;
         }
 
@@ -128,7 +183,7 @@ public final class FloorGrid {
                 if (row < 0 || row >= rows || col < 0 || col >= cells[row].length) {
                     continue;
                 }
-                if (cells[row][col] == '#' || distance[row][col] != -1) {
+                if (cells[row][col] == '#' || distance[row][col] != -1 || isClosedDoorCell(col, row)) {
                     continue;
                 }
                 distance[row][col] = distance[current[1]][current[0]] + 1;
