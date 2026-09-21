@@ -6,10 +6,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Fija las invariantes de la curva que no se pueden verificar a ojo jugando:
- * que la dificultad suba de verdad y que nunca se vuelva injusta.
- */
 class WaveCurveTest {
 
     @Test

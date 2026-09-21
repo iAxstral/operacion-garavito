@@ -3,15 +3,6 @@ package co.eci.operaciongaravito.game;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Estado de un jugador dentro de una {@link GameSession}. playerId == role:
- * cada partida tiene exactamente 4 roles fijos y unicos, asi que el rol ya
- * sirve como identificador sin necesitar un sistema de cuentas/autenticacion.
- *
- * Las mutaciones (agregar item, curar) son synchronized: aunque un solo
- * jugador rara vez dispara dos acciones en el mismo instante, es barato
- * garantizar que no se corrompa la lista de inventario si llegara a pasar.
- */
 public class Player {
 
     public static final int MAX_INVENTORY_SLOTS = 5;
@@ -19,17 +10,16 @@ public class Player {
     private final String playerId;
     private final String role;
     private volatile int health = 100;
-    private volatile int garavitos = 0; // se gana con misiones y zombis, no arranca con saldo
+    private volatile int garavitos = 0;
     private final List<InventorySlot> inventory = new ArrayList<>();
 
-    // Posicion reportada por el cliente (ver /game/{id}/move). El servidor la
-    // necesita de forma continua para que los zombis puedan perseguir; hasta
-    // el primer reporte vale el spawn del piso 1 (mapLayout.js).
+    private volatile int floor = 1;
     private volatile double x = 608;
     private volatile double y = 800;
     private volatile PlayerLifeState lifeState = PlayerLifeState.ALIVE;
     private volatile long attackReadyAt = 0;
-    /** True mientras el jugador esta dentro de una tarea de mision (ver GameSession.attemptStartMission). */
+    private volatile long chargedReadyAt = 0;
+
     private volatile boolean invulnerable = false;
 
     public Player(String role) {
@@ -51,6 +41,10 @@ public class Player {
 
     public int getGaravitos() {
         return garavitos;
+    }
+
+    public int getFloor() {
+        return floor;
     }
 
     public double getX() {
@@ -82,11 +76,12 @@ public class Player {
         this.y = y;
     }
 
-    /**
-     * Daño recibido de un zombi. Devuelve si el golpe se aplico: un jugador
-     * ya caido no vuelve a recibir daño, para que los zombis dejen de
-     * "castigar" un cuerpo y pasen al siguiente objetivo.
-     */
+    public void reportPosition(int floor, double x, double y) {
+        this.floor = floor;
+        this.x = x;
+        this.y = y;
+    }
+
     public synchronized boolean takeDamage(int amount) {
         if (lifeState == PlayerLifeState.DOWNED || invulnerable) {
             return false;
@@ -98,19 +93,40 @@ public class Player {
         return true;
     }
 
-    /** Levanta al jugador al terminar la oleada. */
     public synchronized void revive(int toHealth) {
         health = Math.max(health, toHealth);
         lifeState = PlayerLifeState.ALIVE;
     }
 
-    /** True si el arma ya salio de cooldown; reserva el proximo golpe. */
     public synchronized boolean tryConsumeAttackCooldown(long now, long cooldownMs) {
         if (now < attackReadyAt) {
             return false;
         }
         attackReadyAt = now + cooldownMs;
         return true;
+    }
+
+    public synchronized boolean tryConsumeChargedCooldown(long now, long cooldownMs) {
+        if (now < chargedReadyAt) {
+            return false;
+        }
+        chargedReadyAt = now + cooldownMs;
+        return true;
+    }
+
+    public long chargedReadyInMs(long now) {
+        return Math.max(0, chargedReadyAt - now);
+    }
+
+    public synchronized InventorySlot consumeFood(String itemId) {
+        for (int i = 0; i < inventory.size(); i++) {
+            InventorySlot slot = inventory.get(i);
+            if (slot.itemId().equals(itemId) && slot.type() == ItemType.FOOD) {
+                inventory.remove(i);
+                return slot;
+            }
+        }
+        return null;
     }
 
     public synchronized boolean hasWeapon() {
@@ -133,17 +149,7 @@ public class Player {
         garavitos += amount;
     }
 
-    /**
-     * Compra atomica: chequea saldo + cupo de inventario, descuenta, agrega
-     * el item y (si aplica) cura, todo en una sola seccion critica. Los
-     * Garavitos y el inventario son estado *individual* de este jugador —
-     * no compiten con otros jugadores como si pasa con los items del mapa
-     * (ver GameSession.attemptPickup) — asi que alcanza con el lock
-     * intrinseco de este objeto: dos compras casi simultaneas del MISMO
-     * jugador se serializan aca, sin bloquear a los demas jugadores (cada
-     * uno tiene su propio Player, su propio lock).
-     */
-    public synchronized PurchaseResult purchase(int price, InventorySlot slot, int healAmount) {
+    public synchronized PurchaseResult purchase(int price, InventorySlot slot) {
         if (garavitos < price) {
             return PurchaseResult.rejected("insufficient_garavitos");
         }
@@ -153,9 +159,6 @@ public class Player {
 
         garavitos -= price;
         inventory.add(slot);
-        if (healAmount > 0) {
-            health = Math.min(100, health + healAmount);
-        }
         return PurchaseResult.ok();
     }
 
@@ -163,15 +166,16 @@ public class Player {
         return new ArrayList<>(inventory);
     }
 
-    /** Vuelve al jugador a como arranca una partida nueva (ver GameSession.resetGame). */
     public synchronized void reset() {
         health = 100;
         garavitos = 0;
         inventory.clear();
+        floor = 1;
         x = 608;
         y = 800;
         lifeState = PlayerLifeState.ALIVE;
         attackReadyAt = 0;
+        chargedReadyAt = 0;
         invulnerable = false;
     }
 }

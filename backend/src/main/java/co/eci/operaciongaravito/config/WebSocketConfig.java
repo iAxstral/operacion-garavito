@@ -7,11 +7,6 @@ import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBr
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
 
-/**
- * STOMP over WebSocket scaffolding for the game client. Sprint 1 only wires the
- * endpoint and broker so the frontend can confirm connectivity; round/decision
- * messaging is added when the RoundCoordinator lands.
- */
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {

@@ -1,6 +1,5 @@
 package co.eci.operaciongaravito.game;
 
-/** Resultado de un intento de pickup. {@code reason} es null cuando success=true. */
 public record PickupResult(boolean success, String reason) {
 
     public static PickupResult ok() {

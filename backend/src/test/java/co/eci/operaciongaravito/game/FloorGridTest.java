@@ -6,15 +6,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * La grilla se genera desde mapLayout.js, asi que estas pruebas son la red
- * que avisa si alguien cambio el mapa y no volvio a correr el exportador:
- * los puntos de referencia (spawn, misiones, vendedores) tienen que seguir
- * cayendo en piso caminable.
- */
 class FloorGridTest {
 
-    private final FloorGrid floor = FloorGrid.floor1();
+    private final FloorGrid floor = FloorGrid.forFloor(1);
 
     @Test
     @DisplayName("el mapa tiene el tamaño que declara mapLayout.js")
@@ -30,10 +24,10 @@ class FloorGridTest {
     }
 
     @Test
-    @DisplayName("todas las zonas de mision son alcanzables")
+    @DisplayName("todas las zonas de mision son alcanzables en su piso")
     void missionZonesAreWalkable() {
         MissionCatalog.ZONES.forEach(zone ->
-                assertTrue(floor.isWalkable(zone.x(), zone.y()),
+                assertTrue(FloorGrid.forFloor(zone.floor()).isWalkable(zone.x(), zone.y()),
                         "la mision " + zone.missionId() + " quedo dentro de una pared"));
     }
 
@@ -41,7 +35,7 @@ class FloorGridTest {
     @DisplayName("los vendedores son alcanzables")
     void vendorsAreWalkable() {
         ShopCatalog.VENDORS.forEach(vendor ->
-                assertTrue(floor.isWalkable(vendor.x(), vendor.y()),
+                assertTrue(FloorGrid.forFloor(vendor.floor()).isWalkable(vendor.x(), vendor.y()),
                         "el vendedor " + vendor.vendorId() + " quedo dentro de una pared"));
     }
 
@@ -51,6 +45,25 @@ class FloorGridTest {
         ZombieSpawnCatalog.POINTS.forEach(point ->
                 assertTrue(floor.fits(point.x(), point.y(), 12),
                         "el spawn (" + point.x() + "," + point.y() + ") no tiene holgura"));
+    }
+
+    @Test
+    @DisplayName("los items del mundo son alcanzables en su piso")
+    void worldItemsAreWalkable() {
+        WorldItemCatalog.defaultCatalog().values().forEach(item ->
+                assertTrue(FloorGrid.forFloor(item.floor()).isWalkable(item.x(), item.y()),
+                        "el item " + item.itemId() + " quedo dentro de una pared"));
+    }
+
+    @Test
+    @DisplayName("cada piso tiene sus puertas y las misiones se reparten en los tres pisos")
+    void floorsHaveDoorsAndMissions() {
+        for (int floorNumber = 1; floorNumber <= FloorGrid.FLOOR_COUNT; floorNumber++) {
+            final int current = floorNumber;
+            assertTrue(FloorGrid.forFloor(current).doors().size() >= 4);
+            assertTrue(MissionCatalog.ZONES.stream().anyMatch(zone -> zone.floor() == current),
+                    "el piso " + current + " no tiene misiones");
+        }
     }
 
     @Test
@@ -71,14 +84,12 @@ class FloorGridTest {
     @Test
     @DisplayName("un zombi del aula encuentra el camino hasta el vestibulo")
     void zombiesNavigateBetweenRooms() {
-        // Sin campo de distancias, este zombi se clava contra la pared que
-        // separa el aula del vestibulo y nunca llega: es exactamente el caso
-        // que se veia en vivo (zombis parados a 300px del jugador).
+
         double playerX = 608;
         double playerY = 800;
         int[][] field = floor.distanceField(playerX, playerY);
 
-        Zombie zombie = new Zombie("z1", 736, 288, 2, 150);
+        Zombie zombie = new Zombie("z1", 1, 736, 288, 2, 150);
         for (int i = 0; i < 900; i++) {
             zombie.step(floor, field, playerX, playerY, 0, 0, 0.066, 0);
         }
@@ -92,16 +103,15 @@ class FloorGridTest {
     @DisplayName("el campo de distancias marca inalcanzable lo que esta tapiado")
     void unreachableCellsAreMarked() {
         int[][] field = floor.distanceField(608, 800);
-        // La esquina (0,0) es pared: nunca puede tener distancia.
+
         assertTrue(field[0][0] == -1);
     }
 
     @Test
     @DisplayName("un zombi no atraviesa una pared persiguiendo al jugador")
     void zombiesDoNotWalkThroughWalls() {
-        // Zombi en el corredor central, objetivo al otro lado de la pared de
-        // arriba: la componente vertical tiene que quedar bloqueada.
-        Zombie zombie = new Zombie("z1", 800, 736, 2, 150);
+
+        Zombie zombie = new Zombie("z1", 1, 800, 736, 2, 150);
         double startY = zombie.getY();
 
         for (int i = 0; i < 120; i++) {

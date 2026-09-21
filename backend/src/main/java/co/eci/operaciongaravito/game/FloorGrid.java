@@ -12,55 +12,65 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
-/**
- * Geometria caminable del piso, para que los zombis no atraviesen las paredes.
- *
- * El mapa se define en el frontend (mapLayout.js); este recurso lo genera
- * {@code frontend/scripts/export-floor-grid.mjs} a partir de ahi. Es la unica
- * pieza duplicada entre front y back que NO se mantiene a mano, justamente
- * porque una grilla de 40x30 copiada a mano se desincroniza al primer cambio.
- * Si cambia mapLayout.js hay que volver a correr ese script.
- */
 public final class FloorGrid {
 
     public static final int TILE = 64;
 
-    private static final String RESOURCE = "/floor1.grid";
-    private static final char[][] TEMPLATE = loadTemplate();
+    public static final int FLOOR_COUNT = 3;
+
+    public record DoorSpec(String doorId, int col, int row) {
+        public double centerX() {
+            return col * TILE + TILE / 2.0;
+        }
+
+        public double centerY() {
+            return row * TILE + TILE / 2.0;
+        }
+    }
+
+    private record Template(char[][] cells, List<DoorSpec> doors) {
+    }
+
+    private static final Template[] TEMPLATES = loadTemplates();
 
     private final char[][] cells;
     private final int cols;
     private final int rows;
-    // Puertas: estado mutable POR PARTIDA (una GameSession = un FloorGrid
-    // propio, ver floor1() mas abajo). Una puerta cerrada bloquea tanto el
-    // pathing de zombis (distanceField/fits) como, del lado del cliente, la
-    // colision del jugador (ver MainScene.js) — asi que esto necesita vivir
-    // en la copia de CADA partida, no en un unico grid estatico compartido.
-    private final Map<String, int[]> doorCells = new ConcurrentHashMap<>(); // doorId -> {col, row}
+
+    private final Map<String, int[]> doorCells = new ConcurrentHashMap<>();
     private final Set<String> closedDoors = ConcurrentHashMap.newKeySet();
 
-    private FloorGrid(char[][] cells) {
+    private final List<DoorSpec> doors;
+
+    private FloorGrid(char[][] cells, List<DoorSpec> doors) {
         this.cells = cells;
+        this.doors = doors;
         this.rows = cells.length;
         this.cols = rows == 0 ? 0 : cells[0].length;
     }
 
-    /** Una copia propia de la plantilla estatica: cada partida puede tener sus puertas en un estado distinto. */
-    public static FloorGrid floor1() {
-        char[][] copy = new char[TEMPLATE.length][];
-        for (int i = 0; i < TEMPLATE.length; i++) {
-            copy[i] = TEMPLATE[i].clone();
+    public static FloorGrid forFloor(int floor) {
+        if (floor < 1 || floor > FLOOR_COUNT) {
+            throw new IllegalArgumentException("piso inexistente: " + floor);
         }
-        FloorGrid grid = new FloorGrid(copy);
-        DoorCatalog.DOORS.forEach(spec -> grid.registerDoor(spec.doorId(), spec.col(), spec.row()));
+        Template template = TEMPLATES[floor - 1];
+        char[][] copy = new char[template.cells().length][];
+        for (int i = 0; i < copy.length; i++) {
+            copy[i] = template.cells()[i].clone();
+        }
+        FloorGrid grid = new FloorGrid(copy, template.doors());
+        template.doors().forEach(spec -> grid.registerDoor(spec.doorId(), spec.col(), spec.row()));
         return grid;
+    }
+
+    public List<DoorSpec> doors() {
+        return doors;
     }
 
     public void registerDoor(String doorId, int col, int row) {
         doorCells.put(doorId, new int[] { col, row });
     }
 
-    /** Todas las puertas empiezan abiertas: mismo comportamiento (siempre caminable) que antes de que existiera este control. */
     public boolean isDoorOpen(String doorId) {
         return !closedDoors.contains(doorId);
     }
@@ -76,7 +86,6 @@ public final class FloorGrid {
         }
     }
 
-    /** Todas las puertas vuelven a abiertas (ver GameSession.resetGame). */
     public void resetDoors() {
         closedDoors.clear();
     }
@@ -94,22 +103,36 @@ public final class FloorGrid {
         return false;
     }
 
-    private static char[][] loadTemplate() {
-        try (InputStream in = FloorGrid.class.getResourceAsStream(RESOURCE)) {
+    private static Template[] loadTemplates() {
+        Template[] templates = new Template[FLOOR_COUNT];
+        for (int floor = 1; floor <= FLOOR_COUNT; floor++) {
+            templates[floor - 1] = loadTemplate("/floor" + floor + ".grid");
+        }
+        return templates;
+    }
+
+    private static Template loadTemplate(String resource) {
+        try (InputStream in = FloorGrid.class.getResourceAsStream(resource)) {
             if (in == null) {
-                throw new IllegalStateException("falta el recurso " + RESOURCE
+                throw new IllegalStateException("falta el recurso " + resource
                         + " — correr frontend/scripts/export-floor-grid.mjs");
             }
             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
             List<char[]> rows = new ArrayList<>();
+            List<DoorSpec> doors = new ArrayList<>();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isBlank() || line.startsWith("#GENERADO") || line.startsWith("# ")) {
-                    continue; // cabecera del generador
+                    continue;
+                }
+                if (line.startsWith("door ")) {
+                    String[] parts = line.split(" ");
+                    doors.add(new DoorSpec(parts[1], Integer.parseInt(parts[2]), Integer.parseInt(parts[3])));
+                    continue;
                 }
                 rows.add(line.toCharArray());
             }
-            return rows.toArray(char[][]::new);
+            return new Template(rows.toArray(char[][]::new), List.copyOf(doors));
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }
@@ -123,7 +146,6 @@ public final class FloorGrid {
         return rows * TILE;
     }
 
-    /** True si ese punto en pixeles cae en una celda por la que se puede pasar (pared no, puerta cerrada tampoco). */
     public boolean isWalkable(double x, double y) {
         int col = (int) Math.floor(x / TILE);
         int row = (int) Math.floor(y / TILE);
@@ -133,11 +155,6 @@ public final class FloorGrid {
         return cells[row][col] != '#' && !isClosedDoorCell(col, row);
     }
 
-    /**
-     * True si un cuerpo circular de ese radio cabe centrado en el punto. Se
-     * prueban los cuatro extremos y no solo el centro: con solo el centro, un
-     * zombi se incrusta medio cuerpo dentro de la pared antes de frenar.
-     */
     public boolean fits(double x, double y, double radius) {
         return isWalkable(x - radius, y - radius)
                 && isWalkable(x + radius, y - radius)
@@ -145,16 +162,6 @@ public final class FloorGrid {
                 && isWalkable(x + radius, y + radius);
     }
 
-    /**
-     * Mapa de distancias (en celdas) desde un punto hasta cada celda caminable,
-     * por BFS. -1 = inalcanzable.
-     *
-     * Hace falta porque perseguir en linea recta no funciona en un edificio:
-     * un zombi que sale del aula y ve al jugador en el vestibulo se clava
-     * contra la pared intermedia y no llega nunca. Con este campo, cada zombi
-     * solo mira a que celda vecina le conviene pasar, sin calcular una ruta
-     * propia. La grilla es de 40x30, asi que recalcularlo por tick es barato.
-     */
     public int[][] distanceField(double fromX, double fromY) {
         int[][] distance = new int[rows][];
         for (int row = 0; row < rows; row++) {
@@ -193,14 +200,6 @@ public final class FloorGrid {
         return distance;
     }
 
-    /**
-     * Hacia donde moverse desde ese punto para acercarse al origen del campo.
-     * Devuelve un vector unitario, o {0,0} si ya se llego o no hay ruta.
-     *
-     * Se apunta al CENTRO de la celda vecina, no en diagonal libre: eso es lo
-     * que mantiene al zombi en el medio del pasillo en vez de rozar las
-     * esquinas y quedarse trabado en ellas.
-     */
     public double[] flowDirection(int[][] distance, double x, double y) {
         int col = (int) Math.floor(x / TILE);
         int row = (int) Math.floor(y / TILE);

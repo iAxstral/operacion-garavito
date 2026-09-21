@@ -4,20 +4,12 @@ import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * Maquina de estados de las oleadas: spawneando → limpiando → respiro.
- *
- * Decide *cuando* spawnear; {@link WaveCurve} decide *que tan dura* es la
- * oleada y {@link ZombieSpawnCatalog} *donde* puede aparecer un zombi. La
- * llama unicamente el hilo del tick de {@link GameSession}, asi que su estado
- * interno no necesita sincronizacion.
- */
 public class WaveDirector {
 
     private enum Phase { RESTING, SPAWNING, CLEARING }
 
-    /** Un zombi nunca aparece mas cerca que esto de un jugador vivo. */
     private static final double MIN_SPAWN_DISTANCE_PX = 320;
+    public static final int FIRST_HAUNTED_FLOOR = 2;
 
     private int wave;
     private WaveBlueprint blueprint;
@@ -41,16 +33,10 @@ public class WaveDirector {
         return (int) Math.max(0, Math.ceil((nextEventAt - now) / 1000.0));
     }
 
-    /** Zombis que aun se le deben a esta oleada: en pie mas los no spawneados. */
     public int remaining(int alive) {
         return blueprint == null ? 0 : alive + (blueprint.total() - spawned);
     }
 
-    /**
-     * Avanza la oleada. Devuelve el zombi a agregar en este tick, o null.
-     * Devolver como mucho uno por tick es intencional: mantiene la cadencia
-     * de spawn aunque el tick se atrase, en vez de vomitar la oleada entera.
-     */
     public Zombie update(long now, int alive, Collection<Player> players) {
         switch (phase) {
             case RESTING -> {
@@ -81,16 +67,10 @@ public class WaveDirector {
         return null;
     }
 
-    /**
-     * Corta la corrida y vuelve a empezar desde la oleada 1. Se usa cuando cae
-     * el equipo completo: perder el progreso de oleadas es el costo de morir.
-     * Antes esto reintentaba la misma oleada, que en la practica hacia que
-     * morir no costara nada.
-     */
     public void resetRun(long now) {
         phase = Phase.RESTING;
         nextEventAt = now + WaveCurve.WAVE_REST_MS;
-        wave = 0; // startWave sumara 1
+        wave = 0;
         spawned = 0;
     }
 
@@ -103,10 +83,13 @@ public class WaveDirector {
     }
 
     private Zombie spawnZombie(Collection<Player> players) {
-        ZombieSpawnCatalog.SpawnPoint point = pickSpawnPoint(players);
+        List<Player> alive = players.stream().filter(Player::isAlive).toList();
         ThreadLocalRandom random = ThreadLocalRandom.current();
+        int floor = pickZombieFloor(alive, random);
+        ZombieSpawnCatalog.SpawnPoint point = pickSpawnPoint(alive.stream().filter(p -> p.getFloor() == floor).toList());
         return new Zombie(
                 "z" + (++zombieSequence),
+                floor,
                 point.x(),
                 point.y(),
                 WaveCurve.rollHealth(blueprint, random.nextDouble()),
@@ -114,14 +97,18 @@ public class WaveDirector {
         );
     }
 
-    /**
-     * Elige el punto de spawn mas lejano posible entre los que estan a una
-     * distancia decente de todos los jugadores vivos. Si ninguno califica
-     * (jugadores repartidos por todo el piso), cae en el que maximiza la
-     * distancia al jugador mas cercano — nunca aparece encima de nadie.
-     */
-    private ZombieSpawnCatalog.SpawnPoint pickSpawnPoint(Collection<Player> players) {
-        List<Player> alive = players.stream().filter(Player::isAlive).toList();
+    private int pickZombieFloor(List<Player> alive, ThreadLocalRandom random) {
+        List<Integer> hauntedWithPlayers = alive.stream()
+                .map(Player::getFloor)
+                .filter(floor -> floor >= FIRST_HAUNTED_FLOOR)
+                .toList();
+        if (!hauntedWithPlayers.isEmpty()) {
+            return hauntedWithPlayers.get(random.nextInt(hauntedWithPlayers.size()));
+        }
+        return FIRST_HAUNTED_FLOOR + random.nextInt(FloorGrid.FLOOR_COUNT - FIRST_HAUNTED_FLOOR + 1);
+    }
+
+    private ZombieSpawnCatalog.SpawnPoint pickSpawnPoint(List<Player> alive) {
         if (alive.isEmpty()) {
             return ZombieSpawnCatalog.POINTS.get(
                     ThreadLocalRandom.current().nextInt(ZombieSpawnCatalog.POINTS.size()));
@@ -140,8 +127,6 @@ public class WaveDirector {
             }
         }
 
-        // Entre los que superan el minimo, se sortea para que la horda no
-        // entre siempre por la misma esquina.
         List<ZombieSpawnCatalog.SpawnPoint> acceptable = ZombieSpawnCatalog.POINTS.stream()
                 .filter(candidate -> alive.stream().allMatch(player ->
                         Math.hypot(candidate.x() - player.getX(), candidate.y() - player.getY()) >= MIN_SPAWN_DISTANCE_PX))

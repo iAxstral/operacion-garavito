@@ -1,6 +1,5 @@
 package co.eci.operaciongaravito.game;
 
-/** Resultado de un intento de completar una mision. */
 public record MissionResult(boolean success, String reason, int rewardGaravitos) {
 
     public static MissionResult ok(int rewardGaravitos) {
