@@ -17,18 +17,13 @@ export default function ConnectionStatus() {
           setLastEcho(payload.text);
         });
       },
-      // Fires both when the backend is unreachable and when an open
-      // connection drops; stompjs keeps retrying every reconnectDelay.
+
       onDisconnect: () => setStatus('disconnected'),
       onError: () => setStatus('error'),
     });
 
     return () => {
-      // Ojo: NO se llama a socketService.disconnect() aca. El socket es un
-      // singleton compartido — Hud.jsx y MainScene.js (via gameSync) tambien
-      // dependen de que siga activo. Desconectarlo cuando ESTE componente se
-      // desmonta rompia a los demas consumidores (visible sobre todo con el
-      // doble mount/unmount de React StrictMode en dev).
+
       subscriptionRef.current?.unsubscribe();
     };
   }, []);

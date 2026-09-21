@@ -1,24 +1,12 @@
 import { useEffect, useState } from 'react';
 import { onStateChange, setInputLocked } from '../game/gameSync';
 
-/**
- * Pantalla de derrota: se dispara con el evento TEAM_WIPED del backend (cae
- * el equipo completo — con un solo rol jugable este sprint, eso es "el
- * jugador murio"). Para entonces el backend YA reinicio la partida (oleada
- * 1, vida llena, ver GameSession.resetGame/tick) — este popup solo bloquea
- * el control hasta que el jugador decide seguir o volver al menu, para que
- * la muerte se sienta como un evento y no como un parpadeo de vida.
- */
 export default function GameOverScreen({ onExitToMenu }) {
   const [lastEvent, setLastEvent] = useState(null);
   const [visible, setVisible] = useState(false);
 
   useEffect(() => onStateChange((state) => setLastEvent(state.lastEvent)), []);
 
-  // Depender de la REFERENCIA de lastEvent (no de su tipo) es lo que evita
-  // reabrir este popup en cada broadcast de zombis mientras el evento de
-  // wipe sigue siendo el "ultimo" conservado — mismo bug que ya se dio en
-  // SecurityMission.jsx con MISSION_STARTED.
   useEffect(() => {
     if (lastEvent?.type !== 'TEAM_WIPED') return;
     setVisible(true);

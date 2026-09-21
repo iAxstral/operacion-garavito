@@ -1,9 +1,4 @@
-/**
- * Pantalla de arranque: ambientada con la misma textura de pared del mapa y
- * el sprite real de Seguridad (nada de arte nuevo) para que se sienta parte
- * del mismo juego y no una pantalla de carga generica. El juego (socket,
- * join, Phaser) recien arranca cuando se aprieta "Jugar" — ver App.jsx.
- */
+
 export default function MainMenu({ onPlay }) {
   return (
     <div className="main-menu">
@@ -21,9 +16,10 @@ export default function MainMenu({ onPlay }) {
 
         <div className="main-menu-controls">
           <span><strong>WASD</strong> moverse</span>
-          <span><strong>J</strong> / clic atacar</span>
+          <span><strong>Q</strong> ataque básico</span>
+          <span><strong>C</strong> ataque cargado</span>
           <span><strong>Shift</strong> dash</span>
-          <span><strong>E</strong> interactuar</span>
+          <span><strong>E</strong> interactuar / inventario</span>
         </div>
       </div>
     </div>

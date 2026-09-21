@@ -9,19 +9,6 @@ import {
   setInputLocked,
 } from '../game/gameSync';
 
-/**
- * Tarea estilo "among us" de la mision de Seguridad: un popup con una
- * "ventana" de camaras (canvas) donde se acercan zombis desde el borde hacia
- * el centro y hay que dispararles con el mouse (una mira en vez de cursor)
- * antes de que lleguen. A las 10 bajas se cierra sola y se completa la
- * mision de verdad (recompensa + cooldown los maneja el backend, igual que
- * el resto de las misiones).
- *
- * Mientras el popup esta abierto el jugador queda inmune (lo decide el
- * backend, ver GameSession.attemptStartMission) y con el movimiento
- * bloqueado en el cliente (gameSync.setInputLocked) — no se puede jugar la
- * tarea y esquivar zombis reales al mismo tiempo.
- */
 const KILLS_TARGET = 10;
 const WINDOW_W = 420;
 const WINDOW_H = 260;
@@ -49,7 +36,6 @@ function drawScene(ctx, zombies, now, mouse) {
   ctx.fillStyle = '#0b120b';
   ctx.fillRect(0, 0, WINDOW_W, WINDOW_H);
 
-  // Viñeta simple para que se lea como una camara, no como un fondo plano.
   const gradient = ctx.createRadialGradient(
     WINDOW_W / 2, WINDOW_H / 2, WINDOW_H * 0.25,
     WINDOW_W / 2, WINDOW_H / 2, WINDOW_H * 0.75,
@@ -95,7 +81,7 @@ function drawScene(ctx, zombies, now, mouse) {
 
 export default function SecurityMission() {
   const [nearMission, setNearMissionState] = useState(null);
-  const [phase, setPhase] = useState('closed'); // 'closed' | 'active' | 'success'
+  const [phase, setPhase] = useState('closed');
   const [kills, setKills] = useState(0);
   const [lastEvent, setLastEvent] = useState(null);
 
@@ -107,23 +93,13 @@ export default function SecurityMission() {
   const nextSpawnAtRef = useRef(0);
   const activeMissionRef = useRef(null);
 
-  useEffect(() => onNearMissionChange(setNearMissionState), []);
+  useEffect(
+    () => onNearMissionChange((mission) => setNearMissionState(mission?.missionId === 'mission-seguridad' ? mission : null)),
+    [],
+  );
 
-  // Solo se guarda la referencia al evento, no el estado completo: asi el
-  // efecto de abajo (que reacciona a *cambios* de lastEvent) no se cuelga de
-  // un objeto que cambia 8 veces por segundo con cada tick de zombis.
   useEffect(() => onStateChange((state) => setLastEvent(state.lastEvent)), []);
 
-  // Confirmacion del backend de que la tarea abrio (o de que se rechazo,
-  // ej. todavia en cooldown — ese aviso ya lo muestra Hud.jsx como toast).
-  //
-  // Depender de la REFERENCIA de lastEvent (no de un valor derivado de ella)
-  // es lo que importa aca: gameSync conserva el mismo objeto lastEvent entre
-  // ticks hasta que llega un evento nuevo de verdad (ver gameSync.js), asi
-  // que sin esta condicion de guarda este efecto se re-ejecutaba en CADA
-  // broadcast de zombis (8/s) mientras la tarea seguia abierta, reseteando
-  // el contador de bajas a 0 apenas despues de cada disparo — el "cuenta 1 y
-  // baja al instante a 0" reportado.
   useEffect(() => {
     const event = lastEvent;
     if (!event || event.playerId !== getMyRole() || event.itemId !== 'mission-seguridad') return;
@@ -138,7 +114,7 @@ export default function SecurityMission() {
       setPhase('closed');
       setInputLocked(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+
   }, [lastEvent]);
 
   useEffect(() => {
@@ -171,15 +147,9 @@ export default function SecurityMission() {
     }, SUCCESS_CLOSE_DELAY_MS);
   }, []);
 
-  // Bucle del minijuego: solo corre mientras la tarea esta activa. Al pasar
-  // a 'success' o 'closed' este efecto se limpia solo (cancela el rAF), no
-  // hace falta un flag aparte para "pausarlo".
   useEffect(() => {
     if (phase !== 'active') return undefined;
 
-    // kills/killsRef ya se resetearon al recibir MISSION_STARTED (arriba):
-    // hacerlo tambien aca violaria la regla de no llamar setState de forma
-    // sincronica dentro de un efecto.
     zombiesRef.current = [];
     nextSpawnAtRef.current = performance.now() + 350;
 
@@ -199,9 +169,6 @@ export default function SecurityMission() {
         });
       }
 
-      // Los que llegaron al centro sin que les disparen simplemente se
-      // pierden de vista — esta tarea no tiene condicion de fallo, solo
-      // premia acertar los 10 disparos.
       zombiesRef.current = zombiesRef.current.filter((z) => zombiePose(z, now).progress < 1);
 
       const ctx = canvasRef.current?.getContext('2d');
