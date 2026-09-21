@@ -1,24 +1,9 @@
 import Phaser from 'phaser';
 
-/**
- * Dibuja los zombis que manda el servidor.
- *
- * El cliente no decide nada sobre ellos: no los mueve, no los mata, no
- * resuelve colisiones. Solo recibe posiciones a 8 Hz e **interpola** hacia la
- * ultima conocida, que es lo que hace que 8 paquetes por segundo se vean
- * fluidos a 60 fps. Sin esa interpolacion la horda avanzaria a saltos.
- */
-
 const TEXTURE = 'zombie';
 const TOUGH_TEXTURE = 'zombie-teso';
 const TOUGH_HEALTH = 4;
 
-/**
- * Que tan rapido el sprite alcanza la posicion que reporto el servidor.
- * Mas alto responde antes pero deja ver el salto entre paquetes; mas bajo
- * suaviza pero el zombi se dibuja "atrasado" respecto de donde el servidor
- * cree que esta — que es lo que decide si una mordida se siente justa.
- */
 const LERP_PER_SECOND = 12;
 
 function bakeTexture(scene, key, { body, rot, w, h }) {
@@ -34,7 +19,7 @@ function bakeTexture(scene, key, { body, rot, w, h }) {
   g.fillStyle(0x1d2417, 1);
   g.fillCircle(w * 0.42, h * 0.22, 2.2);
   g.fillCircle(w * 0.58, h * 0.22, 2.2);
-  // Brazos al frente: la silueta tiene que leerse de un vistazo en movimiento.
+
   g.fillStyle(rot, 1);
   g.fillRect(w * 0.06, h * 0.42, w * 0.16, h * 0.12);
   g.fillRect(w * 0.78, h * 0.42, w * 0.16, h * 0.12);
@@ -52,7 +37,6 @@ export default class ZombieLayer {
     bakeTexture(scene, TOUGH_TEXTURE, { body: 0x6b3838, rot: 0xa86a6a, w: 34, h: 48 });
   }
 
-  /** Reconcilia la lista de sprites con la que acaba de llegar del servidor. */
   sync(zombieStates) {
     const seen = new Set();
 
@@ -72,9 +56,6 @@ export default class ZombieLayer {
       entry.health = state.health;
     });
 
-    // Un zombi que dejo de venir en el estado es uno que murio: el servidor
-    // lo retira recien un tick despues de matarlo, justamente para que aca
-    // alcance a verse la muerte en vez de desaparecer de golpe.
     this.sprites.forEach((entry, id) => {
       if (!seen.has(id)) {
         this.kill(entry);
@@ -91,8 +72,6 @@ export default class ZombieLayer {
     const shadow = this.scene.add.ellipse(state.x, state.y + 16, tough ? 28 : 22, 9, 0x000000, 0.28);
     shadow.setDepth(1);
 
-    // Bamboleo desincronizado: si todos usan la misma fase, la oleada camina
-    // como banda marcial.
     this.scene.tweens.add({
       targets: sprite,
       angle: { from: -6, to: 6 },
@@ -135,8 +114,7 @@ export default class ZombieLayer {
       const { sprite } = entry;
       sprite.x += (entry.targetX - sprite.x) * t;
       sprite.y += (entry.targetY - sprite.y) * t;
-      // Profundidad por Y, igual que el jugador, para que un zombi que pasa
-      // por arriba quede detras y no encima.
+
       sprite.setDepth(sprite.y);
       sprite.setFlipX(entry.targetX < sprite.x);
       entry.shadow.setPosition(sprite.x, sprite.y + (entry.tough ? 20 : 16));

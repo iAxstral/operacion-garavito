@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
-import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout } from './mapLayout';
+import { TILE, MAP_COLS, MAP_ROWS, FLOOR_COUNT, buildFloorLayout } from './mapLayout';
+import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { MISSION_ZONES, MISSION_RANGE_PX } from './missionCatalog';
 import {
-  ensureJoined,
+  changeFloor,
+  getLatestState,
+  getMyRole,
   getZombies,
   isInputLocked,
   onStateChange,
@@ -14,40 +17,34 @@ import {
   setNearVendor,
   setNearMission,
   setNearDoor,
+  setNearStairs,
+  touchInput,
   requestMissionComplete,
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
 
-// Dash: unico recurso defensivo antes de conseguir un arma. La
-// invulnerabilidad es lo que lo vuelve una herramienta y no solo una forma
-// de ir mas rapido.
 const DASH_SPEED = 420;
 const DASH_MS = 180;
 const DASH_COOLDOWN_MS = 1200;
 
-// El servidor valida su propio cooldown de ataque; este solo evita inundar
-// el socket con golpes que van a ser rechazados.
 const ATTACK_REQUEST_MS = 400;
+const CHARGED_COOLDOWN_MS = 6000;
+const CHARGED_RADIUS = 150;
+const FLOOR_FADE_MS = 180;
+const TOUCH_DEADZONE = 0.3;
+const REMOTE_LERP_PER_SECOND = 10;
 
 const FACING_RADIANS = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
 
-// Caja de colision del jugador: solo los pies. Bastante mas angosta que un
-// tile (64) para que quepa por los vanos de puerta sin pelear con el borde.
 const PLAYER_BODY_WIDTH = 30;
 const PLAYER_BODY_HEIGHT = 18;
-/** Cuanto sube la caja desde el borde inferior del frame. */
+
 const PLAYER_BODY_FOOT_INSET = 6;
 
 const MAP_PIXEL_WIDTH = MAP_COLS * TILE;
 const MAP_PIXEL_HEIGHT = MAP_ROWS * TILE;
 const PLAYER_SPEED = 160;
 
-// Solo hay UNA pose fija por direccion (sin frames de ciclo de caminata, ver
-// SEGURIDAD_TEXTURE_BY_DIRECTION): sin esto el personaje se desliza por el
-// piso como un cartel pegado, sin ningun indicio de que esta caminando. Un
-// balanceo leve (rotacion, no posicion — no le pega en nada a la caja de
-// colision, que ignora la rotacion del sprite) alcanza para que se sienta
-// vivo sin necesitar frames de arte nuevos.
 const WALK_WOBBLE_HZ = 3;
 const WALK_WOBBLE_DEG = 2.5;
 
@@ -67,42 +64,25 @@ const TILE_TEXTURE_FILES = {
   v2_banca: 'v2_banca_64x32.png',
 };
 
-// Distancia (px) del jugador al centro de una puerta para ofrecer la
-// interaccion "Presiona E" (abrir/cerrar) — un poco mas de un tile.
 const DOOR_PROXIMITY_PX = 90;
 
-// Tipos de celda del grid que bloquean el paso del jugador. 'floor'/'stair'/
-// 'landing' son caminables; puertas y baranda se resuelven en 'decorations'
-// porque se dibujan sobre una celda de piso, no la reemplazan.
 const SOLID_GRID_TYPES = new Set(['wall', 'glass']);
 
-// El rellano reutiliza la textura de piso pero con un tinte, para que se
-// note como una plataforma aparte sin necesitar un asset nuevo.
 const LANDING_TINT = 0xbfe0e6;
 
 const STAIRS_ARROW_GLYPH = { up: '▲', down: '▼' };
 
-// Placeholder de color por tipo de item recolectable (mismo criterio que el
-// HUD en Hud.jsx) — se reemplaza por sprites reales mas adelante.
 const ITEM_TYPE_COLORS = { WEAPON: 0x8a3b3b, FOOD: 0x3b8a4e, AMMO: 0x8a7a3b };
 
-// Unica mision con tarea propia por ahora (el resto sigue con el patron
-// viejo de "completar al pisar"): abre el popup con el minijuego en vez de
-// completarse sola al entrar en rango — ver SecurityMission.jsx.
-const SECURITY_MISSION_ID = 'mission-seguridad';
+const INTERACTIVE_MISSIONS = new Set(['mission-seguridad', 'mission-salud', 'mission-economia', 'mission-infraestructura']);
 
-// 4 fotos fijas (una pose por direccion, sin ciclo de caminata) en vez del
-// atlas auto-detectado anterior: ese atlas armaba el ciclo mezclando poses de
-// angulos distintos dentro de una misma lamina de referencia, lo que se veia
-// como si el personaje "diera vueltas" al caminar. Con una textura estatica
-// por direccion ese problema no puede volver a aparecer — no hay frames que
-// mezclar, solo un cambio de textura al girar (ver build_seguridad_static_
-// sprites.py).
-const SEGURIDAD_TEXTURE_BY_DIRECTION = {
-  down: 'seguridad_down',
-  up: 'seguridad_up',
-  right: 'seguridad_right',
-  left: 'seguridad_left',
+const DIRECTIONS = ['down', 'up', 'right', 'left'];
+
+const ROLE_ACCENT = {
+  SEGURIDAD: 0x7ec8ff,
+  SALUD: 0x9bf0b8,
+  ECONOMIA: 0xffd36b,
+  INFRAESTRUCTURA: 0xffa45c,
 };
 
 export default class MainScene extends Phaser.Scene {
@@ -120,9 +100,8 @@ export default class MainScene extends Phaser.Scene {
     this.missionZones = [];
     this.unsubscribeGameState = null;
     this.zombieLayer = null;
-    // Angulo continuo (no uno de 4 direcciones) hacia donde apunta el golpe:
-    // ver el comentario en updateAttack sobre por que el golpe fallaba en
-    // diagonal cuando esto estaba atado a 'facing' de 4 valores.
+    this.remotePlayers = new Map();
+
     this.facingAngle = FACING_RADIANS.down;
     this.walkWobblePhaseMs = 0;
     this.dashUntil = 0;
@@ -130,11 +109,30 @@ export default class MainScene extends Phaser.Scene {
     this.dashVx = 0;
     this.dashVy = 0;
     this.nextAttackAt = 0;
+    this.chargedReadyAt = 0;
+    this.floor = 1;
+    this.spawnOverride = null;
+    this.changingFloor = false;
+    this.spritePrefix = 'seguridad';
+  }
+
+  init(data) {
+    this.remotePlayers = new Map();
+    this.floor = data?.floor ?? 1;
+    this.spawnOverride = data?.spawn ?? null;
+    this.changingFloor = false;
+    this.spritePrefix = roleInfo(getMyRole()).spritePrefix;
+  }
+
+  roleTexture(direction) {
+    return `${this.spritePrefix}_${direction}`;
   }
 
   preload() {
-    Object.values(SEGURIDAD_TEXTURE_BY_DIRECTION).forEach((key) => {
-      this.load.image(key, `/sprites/${key}.png`);
+    ROLE_CATALOG.forEach(({ spritePrefix }) => {
+      DIRECTIONS.forEach((direction) => {
+        this.load.image(`${spritePrefix}_${direction}`, `/sprites/${spritePrefix}_${direction}.png`);
+      });
     });
 
     Object.entries(TILE_TEXTURE_FILES).forEach(([key, file]) => {
@@ -147,24 +145,16 @@ export default class MainScene extends Phaser.Scene {
   }
 
   create() {
-    // Piso 1 por ahora: solo tiene escalera de subida (sin piso -1 al que
-    // bajar). El cambio de piso real todavia no esta conectado.
-    const layout = buildFloorLayout({ hasUpStairs: true, hasDownStairs: false });
+
+    const layout = buildFloorLayout({ floor: this.floor });
     this.createMap(layout);
 
-    this.player = this.physics.add.sprite(
-      layout.spawn.x,
-      layout.spawn.y,
-      SEGURIDAD_TEXTURE_BY_DIRECTION.down,
-    );
+    const spawn = this.spawnOverride ?? layout.spawn;
+    this.player = this.physics.add.sprite(spawn.x, spawn.y, this.roleTexture('down'));
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
-    // El sprite mide 57x132: sin esto el cuerpo de colision es TODO el
-    // sprite (cabeza y aire incluidos), mas del doble de alto que un tile de
-    // 64, asi que el personaje no cabe por una puerta y choca "con la
-    // cabeza". La caja va solo en los pies, que es lo estandar en top-down:
-    // lo que colisiona es donde el personaje pisa.
+
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
       (this.player.width - PLAYER_BODY_WIDTH) / 2,
@@ -178,7 +168,11 @@ export default class MainScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.dashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
-    this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+    this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+    this.attackAltKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+    this.chargedKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+    this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.input.keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.Q, Phaser.Input.Keyboard.KeyCodes.C]);
     this.input.mouse?.disableContextMenu();
     this.zombieLayer = new ZombieLayer(this);
     this.wasd = this.input.keyboard.addKeys({
@@ -191,58 +185,61 @@ export default class MainScene extends Phaser.Scene {
     this.createFoodItems();
     this.createVendors();
     this.createMissionZones();
-    ensureJoined();
+    changeFloor(this.floor, Math.round(spawn.x), Math.round(spawn.y));
+    this.cameras.main.fadeIn(FLOOR_FADE_MS);
+    this.showFloorBanner(layout.name);
     this.events.once('shutdown', () => {
       this.unsubscribeGameState?.();
       setNearVendor(null);
+      setNearStairs(null);
     });
   }
 
-  /**
-   * NPC de la vendedora + maquina expendedora: sprites estaticos en
-   * posiciones fijas (VENDORS en shopCatalog.js). Solidos (no se puede
-   * caminar sobre ellos) — la interaccion es por proximidad, no por
-   * overlap fisico (ver updateVendorProximity).
-   */
+  showFloorBanner(name) {
+    const banner = this.add
+      .text(this.scale.width / 2, 70, name, {
+        fontFamily: 'sans-serif',
+        fontSize: '30px',
+        fontStyle: 'bold',
+        color: '#f2fbe2',
+        stroke: '#0b120b',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(100);
+    this.tweens.add({ targets: banner, alpha: 0, delay: 1200, duration: 700, onComplete: () => banner.destroy() });
+  }
+
   createVendors() {
-    this.vendors = VENDORS.map((vendor) => {
+    this.vendors = VENDORS.filter((vendor) => vendor.floor === this.floor).map((vendor) => {
       const image = this.add.image(vendor.x, vendor.y, vendor.sprite).setDepth(6);
       this.solids.add(image);
       return { ...vendor, inRange: false };
     });
   }
 
-  /**
-   * Zonas de mision (una por rol): se completan automaticamente al
-   * pisarlas, mismo patron de "disparar en el flanco de entrada" que la
-   * comida y las escaleras — no solidas, no requieren tecla.
-   */
   createMissionZones() {
-    this.missionZones = MISSION_ZONES.map((zone) => {
+    this.missionZones = MISSION_ZONES.filter((zone) => zone.floor === this.floor).map((zone) => {
+      const mine = zone.role === getMyRole();
       this.add
-        .text(zone.x, zone.y, `Misión\n(${zone.role})`, {
+        .text(zone.x, zone.y, `Misión (${roleInfo(zone.role).name})\n${zone.room}`, {
           fontFamily: 'sans-serif',
           fontSize: '11px',
           color: '#ffffff',
           align: 'center',
-          backgroundColor: '#5b3fa0',
+          backgroundColor: mine ? '#5b3fa0' : '#3a3a44',
           padding: { x: 4, y: 3 },
         })
         .setOrigin(0.5)
         .setDepth(4)
-        .setAlpha(0.85);
-      return { ...zone, inRange: false };
+        .setAlpha(mine ? 0.95 : 0.55);
+      return { ...zone, mine, inRange: false };
     });
   }
 
-  /**
-   * Items de comida de la Cafeteria: placeholder de color, no solidos.
-   * `applyClaimedItems` oculta los que el backend ya marco como reclamados
-   * (por este jugador o por otro) — la unica fuente de verdad de "que
-   * queda en el mapa" es el broadcast, no un estado local aparte.
-   */
   createFoodItems() {
-    this.foodItems = FOOD_ITEMS.map((item) => {
+    this.foodItems = FOOD_ITEMS.filter((item) => item.floor === this.floor).map((item) => {
       const rect = this.add
         .rectangle(item.x, item.y, 26, 26, ITEM_TYPE_COLORS[item.type])
         .setStrokeStyle(2, 0x1f5c2e)
@@ -254,11 +251,6 @@ export default class MainScene extends Phaser.Scene {
       const claimed = new Set(state.claimedItemIds);
       this.foodItems.forEach((food) => food.rect.setVisible(!claimed.has(food.itemId)));
 
-      // Estado de puertas: el backend es la unica fuente de verdad (asi
-      // decide tambien si un zombi puede pasar). Cerrada = mismo trato que
-      // una pared para el jugador: se prende el body que ya existe desde
-      // renderDecorations (ver ese comentario sobre por que nunca se
-      // agrega/quita del grupo).
       (state.doors ?? []).forEach((doorState) => {
         const door = this.doors.find((d) => d.doorId === doorState.doorId);
         if (!door || door.open === doorState.open) return;
@@ -274,7 +266,7 @@ export default class MainScene extends Phaser.Scene {
     const py = this.player.y;
 
     this.foodItems.forEach((food) => {
-      if (!food.rect.visible) return; // ya reclamado, no hay nada que recoger
+      if (!food.rect.visible) return;
 
       const dx = px - food.x;
       const dy = py - food.y;
@@ -289,24 +281,71 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
+  zombiesOnFloor() {
+    return getZombies().filter((zombie) => zombie.floor === this.floor);
+  }
+
+  syncRemotePlayers(delta) {
+    const seen = new Set();
+
+    getLatestState().players.forEach((state) => {
+      if (state.playerId === getMyRole() || state.floor !== this.floor) return;
+      seen.add(state.playerId);
+
+      let entry = this.remotePlayers.get(state.playerId);
+      const prefix = roleInfo(state.role).spritePrefix;
+      if (!entry) {
+        const sprite = this.add.sprite(state.x, state.y, `${prefix}_down`).setDepth(9);
+        const label = this.add
+          .text(state.x, state.y, roleInfo(state.role).name, {
+            fontFamily: 'sans-serif',
+            fontSize: '11px',
+            color: '#ffffff',
+            backgroundColor: 'rgba(0,0,0,0.55)',
+            padding: { x: 4, y: 1 },
+          })
+          .setOrigin(0.5, 1)
+          .setDepth(11);
+        entry = { sprite, label, prefix };
+        this.remotePlayers.set(state.playerId, entry);
+      }
+
+      const dx = state.x - entry.sprite.x;
+      const dy = state.y - entry.sprite.y;
+      if (Math.hypot(dx, dy) > 3) {
+        const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+        entry.sprite.setTexture(`${entry.prefix}_${direction}`);
+      }
+      const blend = Math.min(1, (delta / 1000) * REMOTE_LERP_PER_SECOND);
+      entry.sprite.x += dx * blend;
+      entry.sprite.y += dy * blend;
+      entry.sprite.setAlpha(state.lifeState === 'DOWNED' ? 0.4 : 1);
+      entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
+    });
+
+    this.remotePlayers.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      entry.sprite.destroy();
+      entry.label.destroy();
+      this.remotePlayers.delete(id);
+    });
+  }
+
   update(time, delta) {
     if (!this.player) return;
+    this.syncRemotePlayers(delta);
 
-    // Con una tarea de mision abierta (ver SecurityMission.jsx) el jugador
-    // queda inmune en el backend Y quieto en el cliente — estilo Among Us,
-    // el mapa/los zombis siguen corriendo alrededor, pero no se puede
-    // caminar ni atacar mientras el popup esta abierto.
     if (isInputLocked()) {
       this.player.setVelocity(0, 0);
-      this.zombieLayer.sync(getZombies());
+      this.zombieLayer.sync(this.zombiesOnFloor());
       this.zombieLayer.update(delta);
       return;
     }
 
-    const up = this.cursors.up.isDown || this.wasd.up.isDown;
-    const down = this.cursors.down.isDown || this.wasd.down.isDown;
-    const left = this.cursors.left.isDown || this.wasd.left.isDown;
-    const right = this.cursors.right.isDown || this.wasd.right.isDown;
+    const up = this.cursors.up.isDown || this.wasd.up.isDown || touchInput.moveY < -TOUCH_DEADZONE;
+    const down = this.cursors.down.isDown || this.wasd.down.isDown || touchInput.moveY > TOUCH_DEADZONE;
+    const left = this.cursors.left.isDown || this.wasd.left.isDown || touchInput.moveX < -TOUCH_DEADZONE;
+    const right = this.cursors.right.isDown || this.wasd.right.isDown || touchInput.moveX > TOUCH_DEADZONE;
 
     let vx = (right ? 1 : 0) - (left ? 1 : 0);
     let vy = (down ? 1 : 0) - (up ? 1 : 0);
@@ -317,30 +356,24 @@ export default class MainScene extends Phaser.Scene {
     if (up) direction = direction ?? 'up';
     else if (down) direction = direction ?? 'down';
 
-    // Normalizar es lo que hace que la diagonal vaya igual de rapido que la
-    // horizontal: con velocidad por eje, moverse en diagonal daba ~41% extra.
     const magnitude = Math.hypot(vx, vy);
     if (magnitude > 0) {
       vx = (vx / magnitude) * PLAYER_SPEED;
       vy = (vy / magnitude) * PLAYER_SPEED;
-      // Angulo real de movimiento (incluye diagonales), no uno de los 4
-      // valores de FACING_RADIANS — es lo que le llega al backend como
-      // 'facing' para decidir que golpea el ataque.
+
       this.facingAngle = Math.atan2(vy, vx);
     }
 
     if (direction) this.currentDirection = direction;
 
     if (time < this.dashUntil) {
-      // Durante el dash se conserva la velocidad que se fijo al arrancarlo,
-      // aunque el jugador suelte las teclas.
+
       this.player.setVelocity(this.dashVx, this.dashVy);
     } else {
       this.player.setVelocity(vx, vy);
 
-      if (this.dashKey.isDown && time >= this.dashReadyAt) {
-        // vx/vy ya vienen escalados a PLAYER_SPEED, asi que dividir devuelve
-        // el vector unitario. Sin teclas, el dash sale hacia donde se mira.
+      if ((this.dashKey.isDown || touchInput.dash) && time >= this.dashReadyAt) {
+
         const dx = magnitude > 0 ? vx / PLAYER_SPEED : Math.cos(this.facingAngle);
         const dy = magnitude > 0 ? vy / PLAYER_SPEED : Math.sin(this.facingAngle);
         this.dashVx = dx * DASH_SPEED;
@@ -353,14 +386,10 @@ export default class MainScene extends Phaser.Scene {
 
     reportPosition(Math.round(this.player.x), Math.round(this.player.y), time);
     this.updateAttack(time);
-    this.zombieLayer.sync(getZombies());
+    this.zombieLayer.sync(this.zombiesOnFloor());
     this.zombieLayer.update(delta);
 
-    // Una sola pose fija por direccion (ver SEGURIDAD_TEXTURE_BY_DIRECTION):
-    // no hay ciclo que animar ni flip que aplicar (izquierda y derecha ya
-    // son arte distinto, no un espejo) — el balanceo de abajo es lo unico
-    // que distingue caminar de estar quieto.
-    this.player.setTexture(SEGURIDAD_TEXTURE_BY_DIRECTION[this.currentDirection]);
+    this.player.setTexture(this.roleTexture(this.currentDirection));
     if (direction) {
       this.walkWobblePhaseMs += delta;
       const wobble = Math.sin((this.walkWobblePhaseMs / 1000) * WALK_WOBBLE_HZ * Math.PI * 2);
@@ -371,24 +400,54 @@ export default class MainScene extends Phaser.Scene {
     }
 
     this.updateStairsZones();
+    this.updateChargedAttack(time);
     this.updateDoorProximity();
     this.updateFoodProximity();
     this.updateVendorProximity();
     this.updateMissionProximity();
   }
 
-  /**
-   * Pide un golpe al servidor y lo anima localmente. El arco que se dibuja es
-   * solo feedback: quien decide si algo fue golpeado es el backend, que valida
-   * arma, cooldown, alcance y angulo.
-   */
   updateAttack(time) {
-    const wants = this.attackKey.isDown || this.input.activePointer.leftButtonDown();
+    const wants = this.attackKey.isDown
+      || this.attackAltKey.isDown
+      || touchInput.attack
+      || (!this.input.activePointer.wasTouch && this.input.activePointer.leftButtonDown());
     if (!wants || time < this.nextAttackAt) return;
 
     this.nextAttackAt = time + ATTACK_REQUEST_MS;
-    requestAttack(Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
+    requestAttack('BASIC', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
     this.drawSwing(this.facingAngle);
+  }
+
+  updateChargedAttack(time) {
+    const pressed = Phaser.Input.Keyboard.JustDown(this.chargedKey) || touchInput.charged;
+    touchInput.charged = false;
+    if (!pressed || time < this.chargedReadyAt) return;
+
+    this.chargedReadyAt = time + CHARGED_COOLDOWN_MS;
+    requestAttack('CHARGED', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
+    this.drawShockwave();
+  }
+
+  drawShockwave() {
+    const accent = ROLE_ACCENT[getMyRole()] ?? 0xffffff;
+    const ring = this.add.graphics();
+    ring.setDepth(this.player.y + 1);
+    ring.lineStyle(6, accent, 0.9);
+    ring.strokeCircle(0, 0, CHARGED_RADIUS);
+    ring.fillStyle(accent, 0.18);
+    ring.fillCircle(0, 0, CHARGED_RADIUS);
+    ring.setPosition(this.player.x, this.player.y);
+    ring.setScale(0.15);
+    this.tweens.add({
+      targets: ring,
+      scale: 1,
+      alpha: 0,
+      duration: 420,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    this.cameras.main.shake(160, 0.004);
   }
 
   drawSwing(facing) {
@@ -406,11 +465,6 @@ export default class MainScene extends Phaser.Scene {
     this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
   }
 
-  /**
-   * A diferencia de las puertas (puramente visual), aca la proximidad
-   * decide si Hud.jsx ofrece la interaccion "Presiona E" — se notifica via
-   * gameSync.setNearVendor, que ya deduplica si no hay cambios.
-   */
   updateVendorProximity() {
     const px = this.player.x;
     const py = this.player.y;
@@ -430,12 +484,6 @@ export default class MainScene extends Phaser.Scene {
     setNearVendor(closest);
   }
 
-  /**
-   * Mismo patron de flanco de entrada que la comida: se envia el pickup
-   * una vez al entrar al rango, no en cada frame. El backend valida rol y
-   * cooldown — este cliente no necesita saber de antemano si la mision es
-   * del rol propio, el rechazo "wrong_role" del backend ya lo cubre.
-   */
   updateMissionProximity() {
     const px = this.player.x;
     const py = this.player.y;
@@ -447,31 +495,21 @@ export default class MainScene extends Phaser.Scene {
 
       if (withinRange && !zone.inRange) {
         zone.inRange = true;
-        if (zone.missionId === SECURITY_MISSION_ID) {
+        if (!zone.mine) return;
+        if (INTERACTIVE_MISSIONS.has(zone.missionId)) {
           setNearMission(zone);
         } else {
           requestMissionComplete(zone.missionId, px, py);
         }
       } else if (!withinRange && zone.inRange) {
         zone.inRange = false;
-        if (zone.missionId === SECURITY_MISSION_ID) {
+        if (zone.mine && INTERACTIVE_MISSIONS.has(zone.missionId)) {
           setNearMission(null);
         }
       }
     });
   }
 
-  /**
-   * Cambia la textura de cada puerta a abierta/cerrada segun la distancia
-   * al jugador — sin fisica ni overlap, es puramente visual (las puertas ya
-   * son caminables en ambos estados, la puerta cerrada bloquea de verdad —
-   * ver el listener de onStateChange en createFoodItems que sincroniza
-   * textura + colision con lo que confirma el backend).
-   *
-   * El abrir/cerrar ya no es automatico por proximidad: ahora es una accion
-   * del jugador (boton E, ver Hud.jsx) — esto solo decide cual puerta ofrece
-   * esa interaccion.
-   */
   updateDoorProximity() {
     const px = this.player.x;
     const py = this.player.y;
@@ -491,14 +529,9 @@ export default class MainScene extends Phaser.Scene {
     setNearDoor(closest);
   }
 
-  /**
-   * Zonas de escalera (subida y/o bajada, segun el piso): solo marcan el
-   * overlap por ahora (sin cambio de piso real todavia). Cada una se
-   * dispara una vez al entrar y una vez al salir, en vez de repetir el
-   * mensaje en cada frame que el jugador se queda parado ahi.
-   */
   updateStairsZones() {
     const body = this.player.body;
+    let active = null;
 
     this.stairsZones.forEach((stairs) => {
       const { rect } = stairs;
@@ -508,15 +541,30 @@ export default class MainScene extends Phaser.Scene {
         body.y < rect.y + rect.h &&
         body.y + body.height > rect.y;
 
-      if (overlapping && !stairs.active) {
-        stairs.active = true;
-        stairs.label.setVisible(true);
-        // eslint-disable-next-line no-console
-        console.log(`[MainScene] Jugador sobre la escalera de ${stairs.kind === 'up' ? 'subida' : 'bajada'} — cambio de piso pendiente de implementar`);
-      } else if (!overlapping && stairs.active) {
-        stairs.active = false;
-        stairs.label.setVisible(false);
-      }
+      stairs.label.setVisible(overlapping);
+      if (overlapping) active = stairs;
+    });
+
+    setNearStairs(active ? { kind: active.kind } : null);
+
+    const pressed = Phaser.Input.Keyboard.JustDown(this.interactKey);
+    if (pressed && active && !this.changingFloor) {
+      this.travel(active.kind);
+    }
+  }
+
+  travel(kind) {
+    const target = kind === 'up' ? this.floor + 1 : this.floor - 1;
+    if (target < 1 || target > FLOOR_COUNT) return;
+
+    const arrival = buildFloorLayout({ floor: target });
+    const spawn = (kind === 'up' ? arrival.downStairs : arrival.upStairs).arrivalSpawn;
+
+    this.changingFloor = true;
+    this.player.setVelocity(0, 0);
+    this.cameras.main.fadeOut(FLOOR_FADE_MS);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.restart({ floor: target, spawn });
     });
   }
 
@@ -541,8 +589,8 @@ export default class MainScene extends Phaser.Scene {
             stairs.zone.x,
             stairs.zone.y - 22,
             kind === 'up'
-              ? '¡Escaleras arriba! (cambio de piso próximamente)'
-              : '¡Escaleras abajo! (cambio de piso próximamente)',
+              ? `Presiona E — subir al piso ${this.floor + 1}`
+              : `Presiona E — bajar al piso ${this.floor - 1}`,
             {
               fontFamily: 'sans-serif',
               fontSize: '13px',
@@ -583,7 +631,7 @@ export default class MainScene extends Phaser.Scene {
     decorations.forEach((deco) => {
       if (deco.type === 'column') {
         const cx = deco.x * TILE + TILE / 2;
-        const cy = deco.y * TILE + TILE; // el sprite mide 2 tiles (128px) de alto
+        const cy = deco.y * TILE + TILE;
         const image = this.add.image(cx, cy, 'v2_columna').setDepth(5);
         this.solids.add(image);
         return;
@@ -622,19 +670,13 @@ export default class MainScene extends Phaser.Scene {
 
       if (deco.type === 'door') {
         const cx = deco.x * TILE + TILE / 2;
-        // La puerta mide 1.5 tiles (96px): sobresale medio tile hacia el
-        // lado del vestibulo/conector, igual que en la referencia visual.
+
         const cy =
           deco.orientation === 'down'
-            ? deco.y * TILE + 48 // top alineado con el techo de la fila de pared
-            : (deco.y + 1) * TILE - 48; // bottom alineado con el piso de la fila de pared
+            ? deco.y * TILE + 48
+            : (deco.y + 1) * TILE - 48;
         const image = this.add.image(cx, cy, 'v2_door_madera_open').setDepth(8);
-        // Siempre se agrega a `solids` (asi el cuerpo fisico existe desde el
-        // arranque) pero con el body deshabilitado — el backend manda todas
-        // las puertas abiertas al empezar. Abrir/cerrar despues solo
-        // prende/apaga ese body (ver el listener de onStateChange abajo),
-        // nunca se agrega/quita del grupo — es la forma estandar de Arcade
-        // Physics de togglear colision sin recrear el cuerpo cada vez.
+
         this.solids.add(image);
         image.body.enable = false;
         this.doors.push({ image, x: cx, y: cy, open: true, doorId: deco.doorId });

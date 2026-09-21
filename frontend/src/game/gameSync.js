@@ -1,22 +1,21 @@
-/**
- * Puente compartido entre React (Hud.jsx) y Phaser (MainScene.js) para el
- * estado de vida/inventario: ambos importan este modulo en vez de pasarse
- * props/callbacks entre un componente React y una escena de Phaser.
- *
- * Un solo topic (/topic/game/{gameId}) para join y pickup — el mismo que
- * usara a futuro el RoundCoordinator, con un campo `lastEvent` mas en el
- * payload en vez de un canal aparte.
- */
+
 import { socketService } from '../services/socketService';
 
-const GAME_ID = 'default';
-const MY_ROLE = 'SEGURIDAD'; // unico rol jugable en este sprint
+const CLIENT_ID = Math.random().toString(36).slice(2, 10);
+const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+const EVENT_TIMEOUT_MS = 6000;
 
-let latestState = { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [] };
+let gameId = null;
+let myRole = 'SEGURIDAD';
+let currentFloor = 1;
 
-// Cadencia del reporte de posicion. 10 Hz alcanza para que los zombis
-// persigan de forma continua; el umbral en pixeles evita gastar mensajes
-// mientras el jugador esta quieto, que es buena parte del tiempo.
+function emptyState() {
+  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null };
+}
+
+let latestState = emptyState();
+const eventWaiters = new Set();
+
 const MOVE_REPORT_MS = 100;
 const MOVE_REPORT_MIN_PX = 4;
 let lastMoveSentAt = 0;
@@ -26,39 +25,39 @@ const listeners = new Set();
 let joined = false;
 let topicSubscription = null;
 
-// Vendedor cercano (proximidad, igual patron que las puertas): lo escribe
-// MainScene.js en su loop de update, lo lee Hud.jsx para mostrar "Presiona
-// E" y el menu correspondiente. No es parte de latestState porque es
-// puramente local del cliente (no viene del backend).
 let nearVendor = null;
 const vendorListeners = new Set();
 
-// Zona de mision con tarea propia (por ahora solo Seguridad) en rango: mismo
-// patron que nearVendor, lo escribe MainScene.js y lo lee el componente del
-// popup para saber cuando ofrecer "Presiona E".
 let nearMission = null;
 const missionListeners = new Set();
 
-// Mientras hay una tarea de mision abierta el jugador no debe poder moverse
-// ni atacar (ver SecurityMission.jsx) — MainScene.js lo consulta en cada
-// frame de update().
 let inputLocked = false;
 
-// Puerta en rango de interaccion (mismo patron que nearVendor/nearMission):
-// lo escribe MainScene.js, lo lee Hud.jsx para el hint de "Presiona E".
 let nearDoor = null;
 const doorListeners = new Set();
+
+let nearStairs = null;
 
 function notify() {
   listeners.forEach((callback) => callback(latestState));
 }
 
 export function getGameId() {
-  return GAME_ID;
+  return gameId;
 }
 
 export function getMyRole() {
-  return MY_ROLE;
+  return myRole;
+}
+
+export const touchInput = { moveX: 0, moveY: 0, attack: false, dash: false, charged: false };
+
+export function isTouchDevice() {
+  return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+}
+
+export function getCurrentFloor() {
+  return currentFloor;
 }
 
 export function getLatestState() {
@@ -66,69 +65,119 @@ export function getLatestState() {
 }
 
 export function getMyPlayerState() {
-  return latestState.players.find((p) => p.playerId === MY_ROLE) ?? null;
+  return latestState.players.find((p) => p.playerId === myRole) ?? null;
 }
 
-/** Se llama con el estado actual inmediatamente, y de nuevo en cada broadcast. */
 export function onStateChange(callback) {
   listeners.add(callback);
   callback(latestState);
   return () => listeners.delete(callback);
 }
 
-/** Idempotente: solo se une/suscribe una vez, sin importar cuantas veces se llame. */
-export function ensureJoined() {
-  if (joined) return;
-  // client.active se pone en true casi de inmediato al llamar activate(),
-  // antes de que el handshake STOMP realmente termine — connected es la
-  // senal real. Si todavia no esta listo, se reintenta desde connect's
-  // onConnect (que solo dispara cuando connected pasa a true).
-  if (!socketService.client?.connected) return;
-  joined = true;
-
-  topicSubscription = socketService.subscribe(`/topic/game/${GAME_ID}`, (body) => {
-    // El tick de zombis difunde 8 veces por segundo con lastEvent en null, así
-    // que tomar el payload tal cual borraba cualquier aviso ("inventario
-    // lleno", "muy lejos") a los 125 ms — antes de que el HUD alcanzara a
-    // mostrarlo. Un evento se conserva hasta que llegue OTRO evento real; se
-    // mantiene la misma referencia para que los efectos de React no lo
-    // vuelvan a disparar.
-    latestState = {
-      ...body,
-      lastEvent: body.lastEvent ?? latestState.lastEvent,
-    };
-    notify();
+function awaitEvent(predicate) {
+  return new Promise((resolve, reject) => {
+    const waiter = { predicate, resolve };
+    eventWaiters.add(waiter);
+    setTimeout(() => {
+      if (eventWaiters.delete(waiter)) reject(new Error('timeout'));
+    }, EVENT_TIMEOUT_MS);
   });
-  socketService.publish(`/app/game/${GAME_ID}/join`, { role: MY_ROLE });
 }
 
-/**
- * Vuelve al estado "todavia no me uni": se llama al salir al menu principal
- * (ver App.jsx), para que la proxima vez que se entre a jugar ensureJoined()
- * mande un /join real de nuevo — eso es lo que hace que el backend reinicie
- * la partida (ver GameController.join / GameSession.resetGame). El socket
- * STOMP en si no se desconecta: es un singleton compartido con
- * ConnectionStatus.jsx, no hace falta tirarlo abajo solo para volver al menu.
- */
-export function leaveGame() {
+function handleMessage(body) {
+  latestState = {
+    ...body,
+    lastEvent: body.lastEvent ?? latestState.lastEvent,
+  };
+  if (body.lastEvent) {
+    eventWaiters.forEach((waiter) => {
+      if (waiter.predicate(body.lastEvent)) {
+        eventWaiters.delete(waiter);
+        waiter.resolve(body.lastEvent);
+      }
+    });
+  }
+  notify();
+}
+
+export function generateLobbyCode() {
+  return Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('');
+}
+
+export async function openLobby(code, create) {
+  await socketService.whenConnected();
+  resetLocalState();
+  gameId = code;
+  topicSubscription = socketService.subscribe(`/topic/game/${code}`, handleMessage);
+
+  const reply = awaitEvent((event) => event.playerId === CLIENT_ID
+    && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED'));
+  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create });
+
+  let event;
+  try {
+    event = await reply;
+  } catch (error) {
+    closeTopic();
+    throw error;
+  }
+  if (event.type === 'LOBBY_REJECTED') {
+    closeTopic();
+    throw new Error(event.reason);
+  }
+  return code;
+}
+
+export async function joinAs(role) {
+  const reply = awaitEvent((event) => (event.type === 'JOIN_OK' && event.itemId === CLIENT_ID)
+    || (event.type === 'JOIN_REJECTED' && event.playerId === CLIENT_ID));
+  socketService.publish(`/app/game/${gameId}/join`, { role, clientId: CLIENT_ID });
+
+  const event = await reply;
+  if (event.type === 'JOIN_REJECTED') throw new Error(event.reason);
+  myRole = role;
+  joined = true;
+  return role;
+}
+
+export function startGame() {
+  socketService.publish(`/app/game/${gameId}/start`, { playerId: myRole });
+}
+
+export function getLobbyCode() {
+  return gameId;
+}
+
+function closeTopic() {
   topicSubscription?.unsubscribe();
   topicSubscription = null;
+  gameId = null;
   joined = false;
-  latestState = { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [] };
+}
+
+function resetLocalState() {
+  latestState = emptyState();
+  eventWaiters.clear();
   lastMoveSentAt = 0;
   lastSentX = null;
   lastSentY = null;
+  currentFloor = 1;
   inputLocked = false;
   setNearVendor(null);
   setNearMission(null);
   setNearDoor(null);
+  setNearStairs(null);
+}
+
+export function leaveGame() {
+  if (joined && socketService.isConnected()) {
+    socketService.publish(`/app/game/${gameId}/leave`, { playerId: myRole });
+  }
+  closeTopic();
+  resetLocalState();
   notify();
 }
 
-/**
- * Reporta la posicion al servidor, que la necesita para que los zombis
- * persigan. Se llama en cada frame; este modulo decide si toca mandar.
- */
 export function reportPosition(x, y, now) {
   if (!joined || !socketService.client?.connected) return;
   if (now - lastMoveSentAt < MOVE_REPORT_MS) return;
@@ -139,13 +188,24 @@ export function reportPosition(x, y, now) {
   lastMoveSentAt = now;
   lastSentX = x;
   lastSentY = y;
-  socketService.publish(`/app/game/${GAME_ID}/move`, { playerId: MY_ROLE, x, y });
+  socketService.publish(`/app/game/${gameId}/move`, { playerId: myRole, floor: currentFloor, x, y });
 }
 
-/** `facing` en radianes. El servidor valida arma, cooldown, alcance y arco. */
-export function requestAttack(x, y, facing) {
-  if (!socketService.client?.connected) return;
-  socketService.publish(`/app/game/${GAME_ID}/attack`, { playerId: MY_ROLE, x, y, facing });
+export function changeFloor(floor, x, y) {
+  currentFloor = floor;
+  lastSentX = x;
+  lastSentY = y;
+  if (!joined || !socketService.client?.connected) return;
+  socketService.publish(`/app/game/${gameId}/move`, { playerId: myRole, floor, x, y });
+}
+
+export function requestAttack(type, x, y, facing) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/attack`, { playerId: myRole, type, x, y, facing });
+}
+
+export function requestUseItem(itemId) {
+  socketService.publish(`/app/game/${gameId}/use`, { playerId: myRole, itemId });
 }
 
 export function getZombies() {
@@ -157,40 +217,31 @@ export function getWave() {
 }
 
 export function requestPickup(itemId, x, y) {
-  socketService.publish(`/app/game/${GAME_ID}/pickup`, { playerId: MY_ROLE, itemId, x, y });
+  socketService.publish(`/app/game/${gameId}/pickup`, { playerId: myRole, itemId, x, y });
 }
 
-/**
- * Envia la decision de este jugador para la ronda actual al
- * RoundCoordinator del backend. `action` es un placeholder de texto libre
- * por ahora (ej. 'placeholder_action') — el catalogo real de acciones por
- * rol todavia no esta definido.
- */
 export function submitDecision(action) {
-  socketService.publish(`/app/game/${GAME_ID}/decide`, { playerId: MY_ROLE, action });
+  socketService.publish(`/app/game/${gameId}/decide`, { playerId: myRole, action });
 }
 
 export function purchaseItem(itemId, x, y) {
-  socketService.publish(`/app/game/${GAME_ID}/purchase`, { playerId: MY_ROLE, itemId, x, y });
+  socketService.publish(`/app/game/${gameId}/purchase`, { playerId: myRole, itemId, x, y });
 }
 
 export function requestMissionComplete(missionId, x, y) {
-  socketService.publish(`/app/game/${GAME_ID}/mission/complete`, { playerId: MY_ROLE, missionId, x, y });
+  socketService.publish(`/app/game/${gameId}/mission/complete`, { playerId: myRole, missionId, x, y });
 }
 
-/** Abre la tarea: el backend valida rol/cooldown y, si esta libre, vuelve al jugador inmune. */
 export function requestMissionStart(missionId) {
-  socketService.publish(`/app/game/${GAME_ID}/mission/start`, { playerId: MY_ROLE, missionId });
+  socketService.publish(`/app/game/${gameId}/mission/start`, { playerId: myRole, missionId });
 }
 
-/** Cierra la tarea sin completarla — el backend le quita la inmunidad igual. */
 export function requestMissionCancel(missionId) {
-  socketService.publish(`/app/game/${GAME_ID}/mission/cancel`, { playerId: MY_ROLE, missionId });
+  socketService.publish(`/app/game/${gameId}/mission/cancel`, { playerId: myRole, missionId });
 }
 
-/** Llamado por MainScene en cada frame con la zona de mision en rango, o null. */
 export function setNearMission(mission) {
-  if (nearMission?.missionId === mission?.missionId) return; // sin cambios, no molestar a los listeners
+  if (nearMission?.missionId === mission?.missionId) return;
   nearMission = mission;
   missionListeners.forEach((callback) => callback(nearMission));
 }
@@ -213,14 +264,12 @@ export function isInputLocked() {
   return inputLocked;
 }
 
-/** x/y: posicion del jugador, para que el backend valide que este cerca de esa puerta. */
 export function requestDoorToggle(doorId, x, y) {
-  socketService.publish(`/app/game/${GAME_ID}/door/toggle`, { playerId: MY_ROLE, doorId, x, y });
+  socketService.publish(`/app/game/${gameId}/door/toggle`, { playerId: myRole, doorId, x, y });
 }
 
-/** Llamado por MainScene en cada frame con la puerta en rango, o null. */
 export function setNearDoor(door) {
-  if (nearDoor?.doorId === door?.doorId) return; // sin cambios, no molestar a los listeners
+  if (nearDoor?.doorId === door?.doorId) return;
   nearDoor = door;
   doorListeners.forEach((callback) => callback(nearDoor));
 }
@@ -235,13 +284,21 @@ export function onNearDoorChange(callback) {
   return () => doorListeners.delete(callback);
 }
 
+export function setNearStairs(stairs) {
+  if (nearStairs?.kind === stairs?.kind) return;
+  nearStairs = stairs;
+}
+
+export function getNearStairs() {
+  return nearStairs;
+}
+
 export function getDoors() {
   return latestState.doors ?? [];
 }
 
-/** Llamado por MainScene en cada frame con el vendedor en rango, o null. */
 export function setNearVendor(vendor) {
-  if (nearVendor?.vendorId === vendor?.vendorId) return; // sin cambios, no molestar a los listeners
+  if (nearVendor?.vendorId === vendor?.vendorId) return;
   nearVendor = vendor;
   vendorListeners.forEach((callback) => callback(nearVendor));
 }
@@ -256,13 +313,13 @@ export function onNearVendorChange(callback) {
   return () => vendorListeners.delete(callback);
 }
 
-// Conveniencia de dev: inspeccionar el estado sincronizado desde la consola
-// del navegador, igual que window.__phaserGame en GameCanvas.jsx.
 if (import.meta.env.DEV) {
   window.__gameSync = {
     getLatestState,
     getMyPlayerState,
-    ensureJoined,
+    joinAs,
+    openLobby,
+    startGame,
     leaveGame,
     requestPickup,
     submitDecision,
@@ -276,6 +333,8 @@ if (import.meta.env.DEV) {
     getNearDoor,
     getDoors,
     requestAttack,
+    requestUseItem,
+    changeFloor,
     reportPosition,
     getZombies,
     getWave,

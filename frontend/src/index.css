@@ -50,10 +50,6 @@
   }
 }
 
-/* Este proyecto es solo el juego (no una landing con contenido alrededor):
- * sin esto, el ancho fijo/borde/padding heredados de la plantilla base de
- * Vite dejaban al juego encogido en una columna centrada con bordes vacios
- * a los costados en vez de ocupar toda la pantalla. */
 html,
 body {
   margin: 0;

@@ -12,10 +12,7 @@ export default function GameCanvas() {
     gameRef.current = new Phaser.Game({
       type: Phaser.AUTO,
       parent: containerRef.current,
-      // RESIZE (no un ancho/alto fijo): el canvas ocupa exactamente lo que
-      // mida su contenedor, que a su vez llena el viewport via CSS (ver
-      // App.css) — asi la resolucion se ajusta a cualquier pantalla sin
-      // dejar bordes negros ni recortar el juego dentro de un recuadro fijo.
+
       scale: {
         mode: Phaser.Scale.RESIZE,
         width: '100%',
@@ -29,9 +26,6 @@ export default function GameCanvas() {
       scene: [MainScene],
     });
 
-    // Conveniencia de dev: acceso rapido a la instancia de Phaser desde la
-    // consola del navegador (debug de camara/escena). No se incluye en build
-    // de produccion.
     if (import.meta.env.DEV) {
       window.__phaserGame = gameRef.current;
     }

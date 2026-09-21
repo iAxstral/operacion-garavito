@@ -1,18 +1,4 @@
-/**
- * Piso del Edificio F: un unico tilemap continuo estilo "Among Us" — varias
- * salas conectadas a un vestibulo central, sin escenas ni pantallas de carga
- * entre ellas. Este modulo solo describe la geometria (que celda es piso/
- * pared/vidrio/etc, donde van las decoraciones); MainScene.js es quien la
- * convierte en objetos de Phaser (imagenes + cuerpos fisicos).
- *
- * Todo esta en unidades de tile (TILE px cada una). (0,0) = esquina
- * superior izquierda del mapa.
- *
- * `buildFloorLayout({ hasUpStairs, hasDownStairs })` genera el mismo layout
- * de salas para cualquier piso — Piso 1/2/3 son placeholders identicos en
- * arquitectura, solo cambia que extremos del vestibulo tienen escalera
- * (ver ARCHITECTURE.md, seccion "Sistema de pisos").
- */
+
 
 export const TILE = 64;
 export const MAP_COLS = 40;
@@ -26,8 +12,6 @@ const FLOOR_VARIANTS = [
   'v2_floor_terrazo_var4',
 ];
 
-// Variante deterministica (no aleatoria) para que el patron de piso no
-// cambie entre recargas, pero rompa la repeticion visual de un tile unico.
 function floorVariant(x, y) {
   const idx = (x * 31 + y * 17) % FLOOR_VARIANTS.length;
   return FLOOR_VARIANTS[idx];
@@ -53,9 +37,6 @@ function setStair(grid, x, y) {
   grid[y][x] = { type: 'stair', texture: 'v2_escalera' };
 }
 
-// El "rellano" reutiliza el piso normal pero con un tinte distinto (ver
-// MainScene.renderGridTiles) — no hace falta un asset nuevo para que se
-// note como una plataforma aparte del piso comun.
 function setLanding(grid, x, y) {
   grid[y][x] = { type: 'landing', texture: floorVariant(x, y) };
 }
@@ -68,8 +49,6 @@ function fillFloorRect(grid, x0, y0, w, h) {
   }
 }
 
-// Pinta solo el perimetro de un rectangulo como pared (se espera que el
-// interior ya este lleno de piso via fillFloorRect).
 function outlineWallRect(grid, x0, y0, w, h) {
   const x1 = x0 + w - 1;
   const y1 = y0 + h - 1;
@@ -83,19 +62,11 @@ function outlineWallRect(grid, x0, y0, w, h) {
   }
 }
 
-/**
- * Bloque de escalera "grande": franja de escalones (2..3 tiles) + rellano
- * (2 tiles) antes de la transicion, ocupando toda la altura de piso del
- * vestibulo. `direction` es 'right' (escalera pegada al vidrio derecho,
- * subida) o 'left' (escalera pegada al remate izquierdo, bajada) — solo
- * cambia el orden visual (rellano-escalones vs escalones-rellano) y de que
- * lado se dibuja el indicador.
- */
 function buildStairsBlock(grid, decorations, labels, { hub, direction, kind }) {
   const stepsWidth = 3;
   const landingWidth = 2;
   const floorTop = hub.y + 1;
-  const floorBottom = hub.y + hub.h - 2; // ultima fila de piso (inclusive)
+  const floorBottom = hub.y + hub.h - 2;
 
   let stepsX0;
   let landingX0;
@@ -103,8 +74,7 @@ function buildStairsBlock(grid, decorations, labels, { hub, direction, kind }) {
   let glassX = null;
 
   if (direction === 'right') {
-    // [...corredor] [escalones x3] [rellano x2] [vidrio] — se sube primero,
-    // se llega al rellano, y de ahi al umbral de vidrio (transicion).
+
     glassX = hub.x + hub.w - 1;
     landingX0 = glassX - landingWidth;
     stepsX0 = landingX0 - stepsWidth;
@@ -113,7 +83,7 @@ function buildStairsBlock(grid, decorations, labels, { hub, direction, kind }) {
       setGlass(grid, glassX, y);
     }
   } else {
-    // [remate] [escalones x3] [rellano x2] [...corredor]
+
     stepsX0 = hub.x + 1;
     landingX0 = stepsX0 + stepsWidth;
     railingX = landingX0 + landingWidth;
@@ -138,7 +108,7 @@ function buildStairsBlock(grid, decorations, labels, { hub, direction, kind }) {
     type: 'stairs-arrow',
     x: stepsX0 + Math.floor(stepsWidth / 2),
     y: floorTop + Math.floor((floorBottom - floorTop) / 2),
-    kind, // 'up' | 'down' — decide el glifo (▲ / ▼)
+    kind,
   });
 
   const labelX = direction === 'right' ? stepsX0 - 1 : stepsX0;
@@ -151,9 +121,7 @@ function buildStairsBlock(grid, decorations, labels, { hub, direction, kind }) {
       w: stepsWidth * TILE,
       h: (floorBottom - floorTop + 1) * TILE,
     },
-    // Punto de llegada al usar esta escalera desde el otro piso: un tile
-    // sobre el rellano, ya fuera de la zona de overlap de los escalones
-    // (para no re-disparar la transicion apenas se llega).
+
     arrivalSpawn: {
       x: (landingX0 + Math.floor(landingWidth / 2)) * TILE + TILE / 2,
       y: (floorTop + Math.floor((floorBottom - floorTop) / 2)) * TILE + TILE / 2,
@@ -161,44 +129,232 @@ function buildStairsBlock(grid, decorations, labels, { hub, direction, kind }) {
   };
 }
 
-const DOOR_COL_AULA = 9; // aula (arriba) <-> vestibulo <-> terraza (abajo)
-const DOOR_COL_CAFETERIA = 27; // vestibulo <-> cafeteria (abajo)
+export const FLOOR_COUNT = 3;
 
-export function buildFloorLayout({ hasUpStairs = true, hasDownStairs = false } = {}) {
+const COL_LEFT = 9;
+const COL_RIGHT = 27;
+
+const FURNITURE_COLORS = {
+  desk: 0x8a5a34,
+  table: 0x6b4a2f,
+  chair: 0xb8895a,
+  cafeTable: 0x7a3b2e,
+  rack: 0x3c3f45,
+  crate: 0x5b6b3a,
+  bench: 0xdfe6ea,
+  shelf: 0x6a4327,
+  machine: 0x4a5560,
+  server: 0x22303a,
+  seat: 0x7a2e3b,
+  stage: 0x4b3b6b,
+};
+
+function tiles(cols, rows, w, h, color) {
+  const out = [];
+  cols.forEach((col) => {
+    rows.forEach((row) => {
+      out.push({ x: col * TILE + TILE / 2, y: row * TILE + TILE / 2, w, h, color });
+    });
+  });
+  return out;
+}
+
+function tableWithChairs(col, row, size, chairOffsets, color) {
+  const cx = col * TILE + TILE / 2;
+  const cy = row * TILE + TILE / 2;
+  const out = [{ x: cx, y: cy, w: size, h: size, color }];
+  chairOffsets.forEach(([dx, dy]) => {
+    out.push({ x: cx + dx, y: cy + dy, w: 15, h: 15, color: FURNITURE_COLORS.chair });
+  });
+  return out;
+}
+
+const FOUR_CHAIRS = [[-28, 0], [28, 0], [0, -28], [0, 28]];
+const TWO_CHAIRS = [[-24, 0], [24, 0]];
+
+const ROOM_TOP_LEFT = { side: 'top', x: 6, w: 8, h: 7, doorCol: COL_LEFT };
+const ROOM_TOP_RIGHT = { side: 'top', x: 22, w: 10, h: 7, doorCol: COL_RIGHT };
+const ROOM_BOTTOM_LEFT = { side: 'bottom', x: 6, w: 8, h: 7, doorCol: COL_LEFT };
+const ROOM_BOTTOM_RIGHT = { side: 'bottom', x: 23, w: 10, h: 8, doorCol: COL_RIGHT };
+
+const FLOORS = {
+  1: {
+    name: 'Piso 1',
+    rooms: [
+      {
+        ...ROOM_TOP_LEFT,
+        id: 'aula',
+        label: 'Aula F-104',
+        furniture: () => tiles([8, 10, 12], [3, 4, 5], 36, 24, FURNITURE_COLORS.desk),
+      },
+      {
+        ...ROOM_TOP_RIGHT,
+        id: 'profesores',
+        label: 'Sala de Profesores',
+        furniture: () => [
+          ...tiles([24, 26, 28, 30], [3], 40, 26, FURNITURE_COLORS.desk),
+          ...tiles([24, 30], [5], 40, 26, FURNITURE_COLORS.desk),
+        ],
+      },
+      {
+        ...ROOM_BOTTOM_LEFT,
+        id: 'terraza',
+        label: 'Terraza',
+        furniture: () => [
+          ...tableWithChairs(8, 18, 40, FOUR_CHAIRS, FURNITURE_COLORS.table),
+          ...tableWithChairs(11, 20, 40, FOUR_CHAIRS, FURNITURE_COLORS.table),
+        ],
+      },
+      {
+        ...ROOM_BOTTOM_RIGHT,
+        id: 'cafeteria',
+        label: 'Cafetería',
+        furniture: () => [24, 30].flatMap((col) =>
+          [18, 21].flatMap((row) => tableWithChairs(col, row, 32, TWO_CHAIRS, FURNITURE_COLORS.cafeTable)),
+        ),
+      },
+    ],
+  },
+  2: {
+    name: 'Piso 2',
+    rooms: [
+      {
+        ...ROOM_TOP_LEFT,
+        id: 'biblioteca',
+        label: 'Biblioteca',
+        furniture: () => [
+          ...tiles([7, 8, 9, 10, 11, 12], [2], 60, 26, FURNITURE_COLORS.shelf),
+          ...tiles([7, 8, 11, 12], [4], 52, 30, FURNITURE_COLORS.table),
+        ],
+      },
+      {
+        ...ROOM_TOP_RIGHT,
+        id: 'reuniones',
+        label: 'Sala de Reuniones',
+        furniture: () => [
+          ...tiles([25, 26, 27, 28], [4], 60, 44, FURNITURE_COLORS.table),
+          ...tiles([25, 26, 27, 28], [3, 5], 30, 12, FURNITURE_COLORS.chair),
+        ],
+      },
+      {
+        ...ROOM_BOTTOM_LEFT,
+        id: 'estudio',
+        label: 'Sala de Estudio',
+        furniture: () => [
+          ...tableWithChairs(8, 18, 40, FOUR_CHAIRS, FURNITURE_COLORS.table),
+          ...tableWithChairs(11, 18, 40, FOUR_CHAIRS, FURNITURE_COLORS.table),
+          ...tableWithChairs(11, 20, 40, FOUR_CHAIRS, FURNITURE_COLORS.table),
+        ],
+      },
+      {
+        ...ROOM_BOTTOM_RIGHT,
+        id: 'armero',
+        label: 'Armero',
+        furniture: () => [
+          ...tiles([24, 25, 26], [17], 56, 24, FURNITURE_COLORS.rack),
+          ...tiles([24, 25, 26, 28, 29, 30, 31], [22], 56, 24, FURNITURE_COLORS.rack),
+          ...tiles([30, 31], [20, 21], 44, 40, FURNITURE_COLORS.crate),
+        ],
+      },
+    ],
+  },
+  3: {
+    name: 'Piso 3',
+    rooms: [
+      {
+        ...ROOM_TOP_LEFT,
+        id: 'laboratorio',
+        label: 'Laboratorio Biomédico',
+        furniture: () => [
+          ...tiles([7, 8], [3], 60, 30, FURNITURE_COLORS.bench),
+          ...tiles([11, 12], [5], 60, 30, FURNITURE_COLORS.bench),
+          ...tiles([12], [3], 40, 40, FURNITURE_COLORS.machine),
+        ],
+      },
+      {
+        ...ROOM_TOP_RIGHT,
+        id: 'servidores',
+        label: 'Sala de Servidores',
+        furniture: () => [
+          ...tiles([24, 25, 26, 28, 29, 30], [2], 44, 28, FURNITURE_COLORS.server),
+          ...tiles([24, 25, 29, 30], [4], 44, 28, FURNITURE_COLORS.server),
+        ],
+      },
+      {
+        ...ROOM_BOTTOM_LEFT,
+        id: 'auditorio',
+        label: 'Auditorio',
+        furniture: () => [
+          ...tiles([8, 9, 10, 11, 12], [17], 56, 22, FURNITURE_COLORS.stage),
+          ...tiles([7, 8, 11, 12], [19, 21], 40, 24, FURNITURE_COLORS.seat),
+        ],
+      },
+      {
+        ...ROOM_BOTTOM_RIGHT,
+        id: 'maquinas',
+        label: 'Sala de Máquinas',
+        furniture: () => [
+          ...tiles([24, 25, 26], [17], 56, 40, FURNITURE_COLORS.machine),
+          ...tiles([29, 30, 31], [17], 56, 40, FURNITURE_COLORS.machine),
+          ...tiles([28, 29, 30, 31], [22], 56, 34, FURNITURE_COLORS.machine),
+          ...tiles([24], [20, 21], 40, 40, FURNITURE_COLORS.crate),
+        ],
+      },
+    ],
+  },
+};
+
+function buildRoom(grid, decorations, furniture, labels, floor, room) {
+  const isTop = room.side === 'top';
+  const y = isTop ? 1 : 16;
+  const box = { x: room.x, y, w: room.w, h: room.h };
+  fillFloorRect(grid, box.x, box.y, box.w, box.h);
+  outlineWallRect(grid, box.x, box.y, box.w, box.h);
+
+  const doorRow = isTop ? box.y + box.h - 1 : box.y;
+  setFloor(grid, room.doorCol, doorRow);
+  decorations.push({
+    type: 'door',
+    doorId: `f${floor}-${room.id}`,
+    x: room.doorCol,
+    y: doorRow,
+    orientation: isTop ? 'down' : 'up',
+  });
+
+  const connectorRow = isTop ? 8 : 15;
+  setFloor(grid, room.doorCol, connectorRow);
+  setWall(grid, room.doorCol - 1, connectorRow);
+  setWall(grid, room.doorCol + 1, connectorRow);
+
+  labels.push({ x: box.x * TILE, y: (box.y - 1) * TILE + 20, text: room.label });
+  furniture.push(...room.furniture());
+}
+
+export function buildFloorLayout({ floor = 1 } = {}) {
+  const config = FLOORS[floor];
+  const hasUpStairs = floor < FLOOR_COUNT;
+  const hasDownStairs = floor > 1;
+
   const grid = createEmptyGrid(MAP_COLS, MAP_ROWS);
   const decorations = [];
   const furniture = [];
   const labels = [];
 
-  // --- AULA F-104 (arriba del vestibulo) ---------------------------------
-  const aula = { x: 6, y: 1, w: 8, h: 7 };
-  fillFloorRect(grid, aula.x, aula.y, aula.w, aula.h);
-  outlineWallRect(grid, aula.x, aula.y, aula.w, aula.h);
-  const aulaDoorRow = aula.y + aula.h - 1;
-  setFloor(grid, DOOR_COL_AULA, aulaDoorRow);
-  decorations.push({ type: 'door', doorId: 'door-aula', x: DOOR_COL_AULA, y: aulaDoorRow, orientation: 'down' });
-  labels.push({ x: aula.x * TILE, y: (aula.y - 1) * TILE + 20, text: 'Aula F-104' });
+  config.rooms.forEach((room) => buildRoom(grid, decorations, furniture, labels, floor, room));
 
-  const topConnectorRow = aula.y + aula.h;
-  setFloor(grid, DOOR_COL_AULA, topConnectorRow);
-  setWall(grid, DOOR_COL_AULA - 1, topConnectorRow);
-  setWall(grid, DOOR_COL_AULA + 1, topConnectorRow);
-
-  // --- VESTIBULO CENTRAL (hub) — ensanchado a 4 filas de piso -------------
-  const hub = { x: 0, y: topConnectorRow + 1, w: MAP_COLS, h: 6 };
+  const hub = { x: 0, y: 9, w: MAP_COLS, h: 6 };
   fillFloorRect(grid, hub.x, hub.y, hub.w, hub.h);
   for (let x = hub.x; x < hub.x + hub.w; x += 1) {
     setWall(grid, x, hub.y);
     setWall(grid, x, hub.y + hub.h - 1);
   }
-  setFloor(grid, DOOR_COL_AULA, hub.y);
-  setFloor(grid, DOOR_COL_AULA, hub.y + hub.h - 1);
-  setFloor(grid, DOOR_COL_CAFETERIA, hub.y + hub.h - 1);
+  [COL_LEFT, COL_RIGHT].forEach((col) => {
+    setFloor(grid, col, hub.y);
+    setFloor(grid, col, hub.y + hub.h - 1);
+  });
 
-  labels.push({ x: (hub.x + 14) * TILE, y: (hub.y - 1) * TILE + 20, text: 'Vestíbulo central' });
+  labels.push({ x: (hub.x + 14) * TILE, y: (hub.y - 1) * TILE + 20, text: `Vestíbulo central — ${config.name}` });
 
-  // Extremo izquierdo: "zona de banos" (piso 1, sin escalera de bajada) o
-  // escalera de bajada (pisos 2/3).
   let downStairs = null;
   if (hasDownStairs) {
     downStairs = buildStairsBlock(grid, decorations, labels, { hub, direction: 'left', kind: 'down' });
@@ -210,8 +366,6 @@ export function buildFloorLayout({ hasUpStairs = true, hasDownStairs = false } =
     decorations.push({ type: 'bench', x: hub.x + 3, y: hub.y + 2 });
   }
 
-  // Extremo derecho: escalera de subida (piso 1/2) o remate de vidrio liso
-  // sin escalera (piso 3, no hay a donde subir).
   let upStairs = null;
   if (hasUpStairs) {
     upStairs = buildStairsBlock(grid, decorations, labels, { hub, direction: 'right', kind: 'up' });
@@ -222,8 +376,6 @@ export function buildFloorLayout({ hasUpStairs = true, hasDownStairs = false } =
     }
   }
 
-  // Columnas a lo largo de la pared superior, separadas cada 6-7 tiles,
-  // evitando ambas puertas y los extremos de escalera.
   [6, 13, 19, 25, 31].forEach((x) => {
     decorations.push({ type: 'column', x, y: hub.y });
   });
@@ -231,86 +383,20 @@ export function buildFloorLayout({ hasUpStairs = true, hasDownStairs = false } =
   decorations.push({ type: 'bench', x: 14, y: hub.y + hub.h - 2 });
   decorations.push({ type: 'bench', x: 21, y: hub.y + 1 });
 
-  // --- TERRAZA (abajo del vestibulo, bajo la puerta de aula) --------------
-  const bottomConnectorRow = hub.y + hub.h;
-  setFloor(grid, DOOR_COL_AULA, bottomConnectorRow);
-  setWall(grid, DOOR_COL_AULA - 1, bottomConnectorRow);
-  setWall(grid, DOOR_COL_AULA + 1, bottomConnectorRow);
-
-  const terraza = { x: 6, y: bottomConnectorRow + 1, w: 8, h: 7 };
-  fillFloorRect(grid, terraza.x, terraza.y, terraza.w, terraza.h);
-  outlineWallRect(grid, terraza.x, terraza.y, terraza.w, terraza.h);
-  setFloor(grid, DOOR_COL_AULA, terraza.y);
-  decorations.push({ type: 'door', doorId: 'door-terraza', x: DOOR_COL_AULA, y: terraza.y, orientation: 'up' });
-  labels.push({ x: terraza.x * TILE, y: (terraza.y - 1) * TILE + 20, text: 'Terraza' });
-
-  // --- CAFETERIA (abajo del vestibulo, sala nueva para 4 jugadores) -------
-  setFloor(grid, DOOR_COL_CAFETERIA, bottomConnectorRow);
-  setWall(grid, DOOR_COL_CAFETERIA - 1, bottomConnectorRow);
-  setWall(grid, DOOR_COL_CAFETERIA + 1, bottomConnectorRow);
-
-  const cafeteria = { x: 23, y: bottomConnectorRow + 1, w: 10, h: 8 };
-  fillFloorRect(grid, cafeteria.x, cafeteria.y, cafeteria.w, cafeteria.h);
-  outlineWallRect(grid, cafeteria.x, cafeteria.y, cafeteria.w, cafeteria.h);
-  setFloor(grid, DOOR_COL_CAFETERIA, cafeteria.y);
-  decorations.push({ type: 'door', doorId: 'door-cafeteria', x: DOOR_COL_CAFETERIA, y: cafeteria.y, orientation: 'up' });
-  labels.push({ x: cafeteria.x * TILE, y: (cafeteria.y - 1) * TILE + 20, text: 'Cafetería' });
-
-  // --- Mobiliario placeholder (rectangulos de color; se reemplaza despues) ---
-  // Pupitres del aula: grilla 3x3, evitando la columna de la puerta.
-  [8, 10, 12].forEach((x) => {
-    [3, 4, 5].forEach((y) => {
-      furniture.push({ x: x * TILE + TILE / 2, y: y * TILE + TILE / 2, w: 36, h: 24, color: 0x8a5a34 });
-    });
-  });
-
-  // Mesas + sillas de la terraza (2 mesas), evitando la columna de la puerta.
-  [
-    { x: 8, y: 16 },
-    { x: 11, y: 18 },
-  ].forEach(({ x, y }) => {
-    const cx = x * TILE + TILE / 2;
-    const cy = y * TILE + TILE / 2;
-    furniture.push({ x: cx, y: cy, w: 40, h: 40, color: 0x6b4a2f });
-    [
-      [-28, 0],
-      [28, 0],
-      [0, -28],
-      [0, 28],
-    ].forEach(([dx, dy]) => {
-      furniture.push({ x: cx + dx, y: cy + dy, w: 16, h: 16, color: 0xb8895a });
-    });
-  });
-
-  // Mesas de la cafeteria: grilla 3x2, evitando la columna de la puerta y
-  // manteniendo margen con las paredes.
-  [24, 27, 30].forEach((x) => {
-    if (x === DOOR_COL_CAFETERIA) return;
-    [18, 21].forEach((y) => {
-      const cx = x * TILE + TILE / 2;
-      const cy = y * TILE + TILE / 2;
-      furniture.push({ x: cx, y: cy, w: 32, h: 32, color: 0x7a3b2e });
-      [
-        [-24, 0],
-        [24, 0],
-      ].forEach(([dx, dy]) => {
-        furniture.push({ x: cx + dx, y: cy + dy, w: 14, h: 14, color: 0xb8895a });
-      });
-    });
-  });
-
   const spawn = {
-    x: DOOR_COL_AULA * TILE + TILE / 2,
+    x: COL_LEFT * TILE + TILE / 2,
     y: (hub.y + 3) * TILE + TILE / 2,
   };
 
   return {
+    floor,
+    name: config.name,
     grid,
     decorations,
     furniture,
     labels,
     spawn,
-    upStairs, // null en el piso mas alto (sin subida)
-    downStairs, // null en el piso 1 (sin bajada)
+    upStairs,
+    downStairs,
   };
 }
