@@ -19,7 +19,7 @@ import { CAFETERIA_MENU } from '../game/shopCatalog';
 import { roleInfo } from '../game/roleCatalog';
 import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
 
-const MAP_CELL_PX = 16;
+const MAP_CELL_PX = 12;
 
 const PLACEHOLDER_ACTION = 'placeholder_action';
 
@@ -375,29 +375,74 @@ export default function Hud() {
       {waveBanner && <div className="hud-wave-banner">{waveBanner}</div>}
 
       {mapOpen && (
-        <div className="map-modal">
+        <div className="map-modal map-modal--overview">
           <h3>Mapa — Piso {floor}</h3>
-          <canvas
-            ref={mapCanvasRef}
-            width={MAP_COLS * MAP_CELL_PX}
-            height={MAP_ROWS * MAP_CELL_PX}
-            className="map-canvas"
-          />
-          <div className="map-legend">
-            <span><i className="map-legend-dot map-legend-dot--me" /> Tú</span>
-            <span><i className="map-legend-dot map-legend-dot--mate" /> Compañeros</span>
-            <span><i className="map-legend-dot map-legend-dot--mission" /> {role.missionIcon} Tu misión</span>
+          <div className="map-overview-grid">
+            <div className="map-overview-col map-overview-col--map">
+              <canvas
+                ref={mapCanvasRef}
+                width={MAP_COLS * MAP_CELL_PX}
+                height={MAP_ROWS * MAP_CELL_PX}
+                className="map-canvas"
+              />
+              <div className="map-legend">
+                <span><i className="map-legend-dot map-legend-dot--me" /> Tú</span>
+                <span><i className="map-legend-dot map-legend-dot--mate" /> Compañeros</span>
+                <span><i className="map-legend-dot map-legend-dot--mission" /> {role.missionIcon} Tu misión</span>
+              </div>
+              {myMissionOnThisFloor && (
+                <p className="map-mission-note">
+                  Sigue la estela punteada hasta {role.missionIcon} Misión, en este piso.
+                </p>
+              )}
+              {myMissionElsewhere && (
+                <p className="map-mission-note">
+                  Tu misión no está en este piso: sube o baja al piso {myMissionElsewhere.floor}.
+                </p>
+              )}
+            </div>
+
+            <div className="map-overview-col map-overview-col--team">
+              <h4>Equipo</h4>
+              {others.length === 0 && <p className="team-panel-empty">Nadie más conectado todavía.</p>}
+              {others.map((p) => (
+                <div key={p.playerId} className="team-panel-row">
+                  <strong>{roleInfo(p.role).name}</strong> — {p.health} / 100
+                  <div className="hud-health-bar hud-health-bar--small">
+                    <div className="hud-health-fill" style={{ width: `${p.health}%`, background: healthColor(p.health) }} />
+                  </div>
+                </div>
+              ))}
+              <div className="team-panel-row team-panel-row--me">
+                <strong>Tú ({role.name})</strong> — {health} / 100
+                <div className="hud-health-bar hud-health-bar--small">
+                  <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="map-overview-col map-overview-col--inventory">
+              <h4>Inventario</h4>
+              {inventory.length === 0 && <p className="inventory-empty">Vacío. Recoge comida o compra objetos.</p>}
+              <div className="inventory-list">
+                {inventory.map((slot, i) => (
+                  <div key={`${slot.itemId}-${i}`} className="inventory-row">
+                    <span className="inventory-swatch" style={{ background: TYPE_COLORS[slot.type] }}>
+                      {itemIcon(slot.itemId) && <img src={itemIcon(slot.itemId)} alt="" className="inventory-icon" />}
+                    </span>
+                    <span className="inventory-name">{slot.itemName}</span>
+                    {slot.type === 'FOOD' ? (
+                      <button type="button" className="inventory-use" onClick={() => requestUseItem(slot.itemId)}>
+                        Comer +{healFor(slot.itemId)}
+                      </button>
+                    ) : (
+                      <span className="inventory-tag">{slot.type === 'WEAPON' ? 'Arma equipada' : 'Munición'}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-          {myMissionOnThisFloor && (
-            <p className="map-mission-note">
-              Sigue la estela punteada hasta {role.missionIcon} Misión, en este piso.
-            </p>
-          )}
-          {myMissionElsewhere && (
-            <p className="map-mission-note">
-              Tu misión no está en este piso: sube o baja al piso {myMissionElsewhere.floor}.
-            </p>
-          )}
           <p className="shop-hint">M / Esc para cerrar</p>
         </div>
       )}

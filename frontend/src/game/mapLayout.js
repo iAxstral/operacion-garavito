@@ -206,8 +206,16 @@ const ROOM_BOTTOM_RIGHT = { side: 'bottom', x: 23, w: 10, h: 8, doorCol: COL_RIG
 // Salas izquierdas del piso 1, mas angostas que las genericas de arriba: dejan libre la
 // franja central (columnas 10-21) para el patio circular del Edificio C. Solo se usan en el
 // piso 1; los pisos 2 y 3 siguen con ROOM_TOP_LEFT/ROOM_BOTTOM_LEFT sin cambios.
-const ROOM_TOP_LEFT_C = { side: 'top', x: 3, w: 7, h: 7, doorCol: COL_LEFT };
-const ROOM_BOTTOM_LEFT_C = { side: 'bottom', x: 3, w: 7, h: 7, doorCol: COL_LEFT };
+//
+// OJO: su doorCol NO puede ser COL_LEFT (9), porque estas salas terminan justo en la
+// columna 9 (x0=3, w=7 -> x1=9): esa columna ya es la pared derecha de la sala, asi que
+// la puerta quedaria en la esquina, pegada solo al pasillo del vestibulo y aislada del
+// piso interior de la sala (bug real: la puerta se veia pero no se podia entrar). Por
+// eso usan una columna interior propia (7), y el vestibulo abre su pared exactamente en
+// la columna que cada sala declara como doorCol (ver mas abajo), no en COL_LEFT fijo.
+const ROOM_DOOR_COL_C = 7;
+const ROOM_TOP_LEFT_C = { side: 'top', x: 3, w: 7, h: 7, doorCol: ROOM_DOOR_COL_C };
+const ROOM_BOTTOM_LEFT_C = { side: 'bottom', x: 3, w: 7, h: 7, doorCol: ROOM_DOOR_COL_C };
 
 const FLOORS = {
   1: {
@@ -461,7 +469,10 @@ export function buildFloorLayout({ floor = 1 } = {}) {
       setHerringboneFloor(grid, x, y);
     }
   }
-  [COL_LEFT, COL_RIGHT].forEach((col) => {
+  // El vestibulo abre su pared justo en la columna que cada sala de este piso declara
+  // como doorCol (no en COL_LEFT/COL_RIGHT fijos): asi la abertura siempre cae donde el
+  // conector de buildRoom realmente la espera, sea cual sea el ancho de la sala.
+  [...new Set(config.rooms.map((room) => room.doorCol))].forEach((col) => {
     setFloor(grid, col, hub.y);
     setFloor(grid, col, hub.y + hub.h - 1);
   });

@@ -363,8 +363,46 @@
   display: block;
   border: 1px solid rgba(255, 255, 255, 0.25);
   border-radius: 4px;
-  max-width: 80vw;
-  max-height: 60vh;
+  max-width: 100%;
+  max-height: 52vh;
+}
+
+.map-modal--overview {
+  max-width: 92vw;
+  max-height: 88vh;
+  overflow: auto;
+}
+
+.map-overview-grid {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.map-overview-col {
+  min-width: 150px;
+}
+
+.map-overview-col h4 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+
+.map-overview-col--team,
+.map-overview-col--inventory {
+  max-width: 220px;
+}
+
+.map-overview-col--team .team-panel-row {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.team-panel-row--me {
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .map-legend {
