@@ -340,6 +340,69 @@
   color: #e8c34a;
 }
 
+.map-modal {
+  z-index: 40;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(15, 15, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 8px;
+  padding: 16px 20px;
+  pointer-events: auto;
+  text-align: center;
+}
+
+.map-modal h3 {
+  margin: 0 0 10px;
+  font-size: 16px;
+}
+
+.map-canvas {
+  display: block;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  max-width: 80vw;
+  max-height: 60vh;
+}
+
+.map-legend {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 10px;
+  font-size: 11px;
+  opacity: 0.85;
+}
+
+.map-legend-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.map-legend-dot--me {
+  background: #4fc3f7;
+}
+
+.map-legend-dot--mate {
+  background: rgba(210, 210, 210, 0.8);
+}
+
+.map-legend-dot--mission {
+  background: #ffd666;
+}
+
+.map-mission-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #ffd666;
+}
+
 .shop-hint {
   margin: 12px 0 0;
   font-size: 11px;
@@ -1120,7 +1183,8 @@ body {
 @media (max-height: 460px) {
   .mission-modal,
   .inventory-modal,
-  .shop-modal {
+  .shop-modal,
+  .map-modal {
     transform: translate(-50%, -50%) scale(0.78);
   }
 }

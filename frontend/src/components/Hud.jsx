@@ -13,10 +13,13 @@ import {
   isInputLocked,
   purchaseItem,
 } from '../game/gameSync';
-import { REWARD_GARAVITOS } from '../game/missionCatalog';
+import { MISSION_ZONES, REWARD_GARAVITOS } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
 import { CAFETERIA_MENU } from '../game/shopCatalog';
 import { roleInfo } from '../game/roleCatalog';
+import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
+
+const MAP_CELL_PX = 16;
 
 const PLACEHOLDER_ACTION = 'placeholder_action';
 
@@ -65,10 +68,109 @@ export default function Hud() {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [waveBanner, setWaveBanner] = useState(null);
   const announcedWaveRef = useRef(0);
+  const [mapOpen, setMapOpen] = useState(false);
+  const mapCanvasRef = useRef(null);
+  const stateRef = useRef(state);
+  const floorLayoutCacheRef = useRef({ floor: null, layout: null });
 
   useEffect(() => {
     return onStateChange(setState);
   }, []);
+
+  useEffect(() => {
+    stateRef.current = state;
+  }, [state]);
+
+  // Mapa (tecla M): dibuja el piso actual en un canvas y una estela punteada
+  // desde el jugador hasta su propia misión, si está en este piso.
+  useEffect(() => {
+    if (!mapOpen) return undefined;
+
+    let rafId;
+    const draw = () => {
+      const canvas = mapCanvasRef.current;
+      if (!canvas) {
+        rafId = requestAnimationFrame(draw);
+        return;
+      }
+      const ctx = canvas.getContext('2d');
+      const liveState = stateRef.current;
+      const myRole = getMyRole();
+      const me = liveState.players.find((p) => p.playerId === myRole);
+      const myFloor = me?.floor ?? 1;
+
+      if (floorLayoutCacheRef.current.floor !== myFloor) {
+        floorLayoutCacheRef.current = { floor: myFloor, layout: buildFloorLayout({ floor: myFloor }) };
+      }
+      const layout = floorLayoutCacheRef.current.layout;
+
+      ctx.fillStyle = '#0d0f10';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      for (let y = 0; y < MAP_ROWS; y += 1) {
+        for (let x = 0; x < MAP_COLS; x += 1) {
+          const cell = layout.grid[y][x];
+          if (!cell || cell.type === 'wall' || cell.type === 'glass') continue;
+          ctx.fillStyle = cell.type === 'stair' || cell.type === 'landing' ? '#5a4a34' : '#33382c';
+          ctx.fillRect(x * MAP_CELL_PX, y * MAP_CELL_PX, MAP_CELL_PX, MAP_CELL_PX);
+        }
+      }
+
+      liveState.players
+        .filter((p) => p.playerId !== myRole && p.floor === myFloor)
+        .forEach((p) => {
+          ctx.fillStyle = 'rgba(210, 210, 210, 0.55)';
+          ctx.beginPath();
+          ctx.arc((p.x / TILE) * MAP_CELL_PX, (p.y / TILE) * MAP_CELL_PX, 4, 0, Math.PI * 2);
+          ctx.fill();
+        });
+
+      const missionHere = MISSION_ZONES.find((zone) => zone.role === myRole && zone.floor === myFloor);
+
+      if (me) {
+        const px = (me.x / TILE) * MAP_CELL_PX;
+        const py = (me.y / TILE) * MAP_CELL_PX;
+
+        if (missionHere) {
+          const mx = (missionHere.x / TILE) * MAP_CELL_PX;
+          const my = (missionHere.y / TILE) * MAP_CELL_PX;
+          const t = performance.now() / 1000;
+
+          ctx.save();
+          ctx.strokeStyle = 'rgba(255, 214, 102, 0.85)';
+          ctx.lineWidth = 2;
+          ctx.setLineDash([7, 6]);
+          ctx.lineDashOffset = -((t * 30) % 13);
+          ctx.beginPath();
+          ctx.moveTo(px, py);
+          ctx.lineTo(mx, my);
+          ctx.stroke();
+          ctx.restore();
+
+          const pulse = 5 + Math.sin(t * 4) * 2;
+          ctx.fillStyle = '#ffd666';
+          ctx.beginPath();
+          ctx.arc(mx, my, pulse, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = '#8a6a1f';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+
+        ctx.fillStyle = '#4fc3f7';
+        ctx.beginPath();
+        ctx.arc(px, py, 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#12313d';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      }
+
+      rafId = requestAnimationFrame(draw);
+    };
+    rafId = requestAnimationFrame(draw);
+    return () => cancelAnimationFrame(rafId);
+  }, [mapOpen]);
 
   useEffect(() => onNearVendorChange((vendor) => {
     setNearVendorState(vendor);
@@ -79,9 +181,14 @@ export default function Hud() {
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key === 'Tab' || event.key === 'm' || event.key === 'M') {
+      if (event.key === 'Tab') {
         event.preventDefault();
         setPanelOpen((open) => !open);
+        return;
+      }
+      if (event.key === 'm' || event.key === 'M') {
+        event.preventDefault();
+        setMapOpen((open) => !open);
         return;
       }
 
@@ -106,6 +213,7 @@ export default function Hud() {
       if (event.key === 'Escape') {
         setShopOpen(false);
         setInventoryOpen(false);
+        setMapOpen(false);
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -183,6 +291,11 @@ export default function Hud() {
   const nearDoorState = state.doors?.find((d) => d.doorId === nearDoor?.doorId);
   const nearDoorOpen = nearDoorState?.open ?? true;
 
+  const myMissionOnThisFloor = MISSION_ZONES.find((zone) => zone.role === getMyRole() && zone.floor === floor);
+  const myMissionElsewhere = !myMissionOnThisFloor
+    ? MISSION_ZONES.find((zone) => zone.role === getMyRole())
+    : null;
+
   const handleBuy = (item) => {
     if (!nearVendor) return;
 
@@ -213,7 +326,7 @@ export default function Hud() {
         ))}
       </div>
 
-      <div className="hud-hint">Tab / M: equipo · E: inventario</div>
+      <div className="hud-hint">Tab: equipo · M: mapa · E: inventario</div>
 
       {!isTouchDevice() && (
       <div className="hud-abilities">
@@ -260,6 +373,34 @@ export default function Hud() {
       {toast && <div className="hud-toast">{toast}</div>}
       {roundBanner && <div className="hud-round-banner">{roundBanner}</div>}
       {waveBanner && <div className="hud-wave-banner">{waveBanner}</div>}
+
+      {mapOpen && (
+        <div className="map-modal">
+          <h3>Mapa — Piso {floor}</h3>
+          <canvas
+            ref={mapCanvasRef}
+            width={MAP_COLS * MAP_CELL_PX}
+            height={MAP_ROWS * MAP_CELL_PX}
+            className="map-canvas"
+          />
+          <div className="map-legend">
+            <span><i className="map-legend-dot map-legend-dot--me" /> Tú</span>
+            <span><i className="map-legend-dot map-legend-dot--mate" /> Compañeros</span>
+            <span><i className="map-legend-dot map-legend-dot--mission" /> {role.missionIcon} Tu misión</span>
+          </div>
+          {myMissionOnThisFloor && (
+            <p className="map-mission-note">
+              Sigue la estela punteada hasta {role.missionIcon} Misión, en este piso.
+            </p>
+          )}
+          {myMissionElsewhere && (
+            <p className="map-mission-note">
+              Tu misión no está en este piso: sube o baja al piso {myMissionElsewhere.floor}.
+            </p>
+          )}
+          <p className="shop-hint">M / Esc para cerrar</p>
+        </div>
+      )}
 
       {inventoryOpen && (
         <div className="inventory-modal">
