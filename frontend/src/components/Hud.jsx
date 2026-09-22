@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getMyRole,
   onStateChange,
@@ -63,6 +63,8 @@ export default function Hud() {
   const [shopOpen, setShopOpen] = useState(false);
   const [nearDoor, setNearDoorState] = useState(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [waveBanner, setWaveBanner] = useState(null);
+  const announcedWaveRef = useRef(0);
 
   useEffect(() => {
     return onStateChange(setState);
@@ -151,6 +153,20 @@ export default function Hud() {
 
   }, [state.round]);
 
+  // Aviso de oleada: se dispara una sola vez apenas la oleada N empieza a spawnear
+  // (restingSeconds llega a 0 y ya hay zombis por aparecer), sin importar el piso o
+  // el edificio — el Edificio C tambien tiene oleadas desde el piso 2 en adelante.
+  useEffect(() => {
+    const wave = state.wave;
+    if (!wave || wave.restingSeconds > 0 || wave.remaining <= 0) return undefined;
+    if (wave.number <= announcedWaveRef.current) return undefined;
+
+    announcedWaveRef.current = wave.number;
+    setWaveBanner(`¡Oleada ${wave.number}! Se acercan ${wave.remaining} zombis`);
+    const timeout = setTimeout(() => setWaveBanner(null), 3200);
+    return () => clearTimeout(timeout);
+  }, [state.wave]);
+
   const me = state.players.find((p) => p.playerId === getMyRole());
   const others = state.players.filter((p) => p.playerId !== getMyRole());
   const health = me?.health ?? 100;
@@ -217,6 +233,14 @@ export default function Hud() {
 
       {state.round && <div className="hud-round">Ronda {state.round.number}</div>}
 
+      {state.wave && (
+        <div className={`hud-wave${state.wave.restingSeconds > 0 ? ' hud-wave--resting' : ' hud-wave--active'}`}>
+          {state.wave.restingSeconds > 0
+            ? `Prepárate — oleada ${state.wave.number + 1} en ${state.wave.restingSeconds}s`
+            : `Oleada ${state.wave.number} — quedan ${state.wave.remaining} zombis`}
+        </div>
+      )}
+
       <button type="button" className="hud-decide-btn" onClick={() => submitDecision(PLACEHOLDER_ACTION)}>
         Decidir
       </button>
@@ -235,6 +259,7 @@ export default function Hud() {
 
       {toast && <div className="hud-toast">{toast}</div>}
       {roundBanner && <div className="hud-round-banner">{roundBanner}</div>}
+      {waveBanner && <div className="hud-wave-banner">{waveBanner}</div>}
 
       {inventoryOpen && (
         <div className="inventory-modal">

@@ -50,11 +50,15 @@ public class GameSession {
     private volatile boolean started = false;
     private volatile String host;
 
+    // Al arrancar la partida los jugadores tienen que poder hacer sus misiones y comprar
+    // recursos antes de que llegue la primera oleada — 4s no alcanzaba para eso.
+    private static final long FIRST_WAVE_PREP_MS = 45_000;
+
     public GameSession(String gameId, ScheduledExecutorService scheduler, Consumer<RoundState> onRoundResolved) {
         this.gameId = gameId;
         this.roundCoordinator = new RoundCoordinator(scheduler, onRoundResolved);
 
-        this.waveDirector = new WaveDirector(System.currentTimeMillis(), 4_000);
+        this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS);
     }
 
     public boolean hasPlayers() {

@@ -322,14 +322,17 @@ export default class MainScene extends Phaser.Scene {
   createMissionZones() {
     this.missionZones = MISSION_ZONES.filter((zone) => zone.floor === this.floor).map((zone) => {
       const mine = zone.role === getMyRole();
+      // En vez del nombre del salón, se marca con el objeto característico del rol
+      // (p.ej. 🧮 para Economía) y solo dice "Misión" — así no delata cuál de las 3
+      // salas posibles de ese rol es, en cualquier piso.
       this.add
-        .text(zone.x, zone.y, `Misión (${roleInfo(zone.role).name})\n${zone.room}`, {
+        .text(zone.x, zone.y, `${roleInfo(zone.role).missionIcon}\nMisión`, {
           fontFamily: 'sans-serif',
-          fontSize: '11px',
+          fontSize: '13px',
           color: '#ffffff',
           align: 'center',
           backgroundColor: mine ? '#5b3fa0' : '#3a3a44',
-          padding: { x: 4, y: 3 },
+          padding: { x: 5, y: 3 },
         })
         .setOrigin(0.5)
         .setDepth(4)

@@ -186,6 +186,43 @@
   padding: 3px 8px;
 }
 
+.hud-wave {
+  position: absolute;
+  top: 66px;
+  right: 12px;
+  font-size: 13px;
+  font-weight: bold;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 4px;
+  padding: 3px 8px;
+}
+
+.hud-wave--resting {
+  color: #cfe8d0;
+  border-color: rgba(76, 175, 80, 0.5);
+}
+
+.hud-wave--active {
+  color: #ffd3d3;
+  border-color: rgba(192, 57, 43, 0.6);
+}
+
+.hud-wave-banner {
+  position: absolute;
+  top: 38%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(90, 20, 20, 0.92);
+  border: 1px solid rgba(255, 180, 180, 0.6);
+  border-radius: 6px;
+  padding: 12px 22px;
+  font-size: 20px;
+  font-weight: bold;
+  color: #ffe9e9;
+  text-align: center;
+}
+
 .hud-decide-btn {
   position: absolute;
   bottom: 12px;
