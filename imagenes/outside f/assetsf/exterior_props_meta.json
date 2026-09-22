@@ -1,0 +1,170 @@
+{
+ "umbrella_table": {
+  "w": 64,
+  "h": 64,
+  "collider": {
+   "x": 8,
+   "y": 44,
+   "w": 48,
+   "h": 16
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "umbrella_torn": {
+  "w": 64,
+  "h": 64,
+  "collider": {
+   "x": 8,
+   "y": 44,
+   "w": 48,
+   "h": 16
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "chair_red": {
+  "w": 32,
+  "h": 32,
+  "collider": {
+   "x": 8,
+   "y": 20,
+   "w": 16,
+   "h": 10
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "chair_fallen": {
+  "w": 32,
+  "h": 32,
+  "collider": {
+   "x": 4,
+   "y": 18,
+   "w": 24,
+   "h": 12
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "bench": {
+  "w": 64,
+  "h": 32,
+  "collider": {
+   "x": 4,
+   "y": 14,
+   "w": 56,
+   "h": 14
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "sculpture_yellow": {
+  "w": 64,
+  "h": 96,
+  "collider": {
+   "x": 14,
+   "y": 74,
+   "w": 36,
+   "h": 16
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "palm": {
+  "w": 64,
+  "h": 64,
+  "collider": {
+   "x": 26,
+   "y": 50,
+   "w": 12,
+   "h": 10
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "tree": {
+  "w": 96,
+  "h": 128,
+  "collider": {
+   "x": 40,
+   "y": 100,
+   "w": 16,
+   "h": 18
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "tree_dead": {
+  "w": 96,
+  "h": 128,
+  "collider": {
+   "x": 40,
+   "y": 100,
+   "w": 16,
+   "h": 18
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "bins": {
+  "w": 32,
+  "h": 32,
+  "collider": {
+   "x": 2,
+   "y": 14,
+   "w": 28,
+   "h": 14
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "chess_king": {
+  "w": 32,
+  "h": 32,
+  "collider": {
+   "x": 8,
+   "y": 20,
+   "w": 16,
+   "h": 10
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "chess_pawn": {
+  "w": 32,
+  "h": 32,
+  "collider": {
+   "x": 8,
+   "y": 20,
+   "w": 16,
+   "h": 10
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "barricade": {
+  "w": 64,
+  "h": 32,
+  "collider": {
+   "x": 0,
+   "y": 12,
+   "w": 64,
+   "h": 18
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ },
+ "lamp": {
+  "w": 32,
+  "h": 64,
+  "collider": {
+   "x": 11,
+   "y": 52,
+   "w": 10,
+   "h": 8
+  },
+  "origin": "top-left",
+  "ySortBy": "bottom edge (y + h)"
+ }
+}
