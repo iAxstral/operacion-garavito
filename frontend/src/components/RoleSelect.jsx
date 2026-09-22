@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ROLE_CATALOG } from '../game/roleCatalog';
-import { getLobbyCode, joinAs, onStateChange } from '../game/gameSync';
+import { getLobbyCode, joinAs, onStateChange, setMyBuilding } from '../game/gameSync';
 
 const ERROR_MESSAGES = {
   role_taken: 'Ese rol ya lo eligió otro jugador.',
@@ -19,6 +19,7 @@ export default function RoleSelect({ building, onJoined, onBack }) {
     setBusy(true);
     setError(null);
     try {
+      setMyBuilding(building);
       await joinAs(role);
       onJoined();
     } catch (err) {

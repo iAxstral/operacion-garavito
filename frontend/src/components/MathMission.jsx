@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import useMissionFlow from './useMissionFlow';
 
-const MISSION_ID = 'mission-economia';
+const MISSION_ROLE = 'ECONOMIA';
 const QUESTIONS_TARGET = 5;
 const OPTION_COUNT = 4;
 const WRONG_FLASH_MS = 450;
@@ -28,7 +28,7 @@ export default function MathMission() {
   const [solved, setSolved] = useState(0);
   const [wrong, setWrong] = useState(null);
 
-  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_ID, () => {
+  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_ROLE, () => {
     setQuestion(newQuestion());
     setSolved(0);
     setWrong(null);

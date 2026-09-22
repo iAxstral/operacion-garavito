@@ -7,6 +7,7 @@ import { MISSION_ZONES, MISSION_RANGE_PX } from './missionCatalog';
 import {
   changeFloor,
   getLatestState,
+  getMyBuilding,
   getMyRole,
   getZombies,
   isInputLocked,
@@ -81,13 +82,22 @@ const DOOR_PROXIMITY_PX = 90;
 
 const SOLID_GRID_TYPES = new Set(['wall', 'glass']);
 
-const LANDING_TINT = 0xbfe0e6;
+// El Edificio C tiene piso de baldosa cafe (no el terrazo gris ni el rellano celeste
+// del F) y escaleras de ladrillo/madera oscura, distintas de las del F.
+const LANDING_TINT = 0xc9a876;
+const CAFE_FLOOR_TINT = 0x9c6b3e;
+const CAFE_STAIR_TINT = 0x6b4326;
 
 const STAIRS_ARROW_GLYPH = { up: '▲', down: '▼' };
 
 const ITEM_TYPE_COLORS = { WEAPON: 0x8a3b3b, FOOD: 0x3b8a4e, AMMO: 0x8a7a3b };
 
-const INTERACTIVE_MISSIONS = new Set(['mission-seguridad', 'mission-salud', 'mission-economia', 'mission-infraestructura']);
+// Las 4 misiones son interactivas (abren un minijuego), sin importar en cual de las
+// 3 salas de su rol viva cada instancia — por eso se compara por rol, no por missionId.
+const INTERACTIVE_MISSION_ROLES = new Set(['SEGURIDAD', 'SALUD', 'ECONOMIA', 'INFRAESTRUCTURA']);
+
+// El Edificio C es mas chico que el F: solo tiene 2 pisos jugables.
+const BUILDING_C_MAX_FLOOR = 2;
 
 const DIRECTIONS = ['down', 'up', 'right', 'left'];
 
@@ -280,6 +290,25 @@ export default class MainScene extends Phaser.Scene {
       .setScrollFactor(0)
       .setDepth(6000);
     this.tweens.add({ targets: banner, alpha: 0, delay: 1200, duration: 700, onComplete: () => banner.destroy() });
+  }
+
+  // El Edificio C es mas chico que el F: solo tiene 2 pisos.
+  showFloorLockedBanner() {
+    const banner = this.add
+      .text(this.scale.width / 2, 70, 'El Edificio C solo tiene 2 pisos', {
+        fontFamily: 'sans-serif',
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: '#ffd9d9',
+        stroke: '#3a0b0b',
+        strokeThickness: 5,
+        backgroundColor: '#5a1f1f',
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(6000);
+    this.tweens.add({ targets: banner, alpha: 0, delay: 1400, duration: 700, onComplete: () => banner.destroy() });
   }
 
   createVendors() {
@@ -570,14 +599,14 @@ export default class MainScene extends Phaser.Scene {
       if (withinRange && !zone.inRange) {
         zone.inRange = true;
         if (!zone.mine) return;
-        if (INTERACTIVE_MISSIONS.has(zone.missionId)) {
+        if (INTERACTIVE_MISSION_ROLES.has(zone.role)) {
           setNearMission(zone);
         } else {
           requestMissionComplete(zone.missionId, px, py);
         }
       } else if (!withinRange && zone.inRange) {
         zone.inRange = false;
-        if (zone.mine && INTERACTIVE_MISSIONS.has(zone.missionId)) {
+        if (zone.mine && INTERACTIVE_MISSION_ROLES.has(zone.role)) {
           setNearMission(null);
         }
       }
@@ -630,6 +659,11 @@ export default class MainScene extends Phaser.Scene {
   travel(kind) {
     const target = kind === 'up' ? this.floor + 1 : this.floor - 1;
     if (target < 1 || target > FLOOR_COUNT) return;
+    // El Edificio C solo tiene 2 pisos (el F sigue con 3): no dejar subir al 3.
+    if (getMyBuilding() === 'C' && target > BUILDING_C_MAX_FLOOR) {
+      this.showFloorLockedBanner();
+      return;
+    }
 
     const arrival = buildFloorLayout({ floor: target });
     const spawn = (kind === 'up' ? arrival.downStairs : arrival.upStairs).arrivalSpawn;
@@ -732,6 +766,12 @@ export default class MainScene extends Phaser.Scene {
         } else if (cell.type === 'wall') {
           // Tinte calido para que los muros interiores combinen con el ladrillo del Edificio C.
           image.setTint(0xd9b79a);
+        } else if (cell.type === 'floor' && cell.sheet !== 'outside') {
+          // Baldosa cafe del Edificio C: no el terrazo gris del F.
+          image.setTint(CAFE_FLOOR_TINT);
+        } else if (cell.type === 'stair') {
+          // Escalera de ladrillo/madera oscura del Edificio C, distinta de la del F.
+          image.setTint(CAFE_STAIR_TINT);
         }
 
         if (SOLID_GRID_TYPES.has(cell.type)) {

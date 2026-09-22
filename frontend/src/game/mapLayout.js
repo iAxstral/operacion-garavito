@@ -152,10 +152,13 @@ const COL_RIGHT = 27;
 const COURTYARD_X0 = 10;
 const COURTYARD_X1 = 21;
 const COURTYARD_Y0 = 3;
-const COURTYARD_Y1 = 20;
+// El Edificio C es más grande que el F: el salon central baja hasta la fila 27 (las
+// salas de abajo solo ocupan columnas 3-9 y 23-32, asi que columnas 10-21 quedan
+// libres en toda la altura del mapa sin chocar con ninguna sala).
+const COURTYARD_Y1 = 27;
 const COURTYARD_CX = (COURTYARD_X0 + COURTYARD_X1) / 2;
 const COURTYARD_CY = (COURTYARD_Y0 + COURTYARD_Y1) / 2;
-const COURTYARD_RADIUS = 3;
+const COURTYARD_RADIUS = 4;
 
 const FURNITURE_COLORS = {
   desk: 0x8a5a34,
@@ -388,8 +391,15 @@ function buildCourtyard(grid, decorations) {
     }
   }
 
-  // Columnas del portico a lo largo del salon, como en el corredor de la foto.
-  [COURTYARD_Y0 + 1, COURTYARD_Y1 - 1].forEach((y) => {
+  // Columnas del portico a lo largo del salon: al ser mas alto que antes, van 4 hileras
+  // en vez de 2, para que el portico se sienta continuo en toda la altura del edificio.
+  const columnRows = [
+    COURTYARD_Y0 + 1,
+    COURTYARD_CY - 5,
+    COURTYARD_CY + 5,
+    COURTYARD_Y1 - 1,
+  ];
+  columnRows.forEach((y) => {
     [COURTYARD_X0 + 2, COURTYARD_CX, COURTYARD_X1 - 2].forEach((x) => {
       decorations.push({ type: 'column', x, y });
     });
@@ -404,18 +414,27 @@ function buildCourtyard(grid, decorations) {
     });
   });
 
-  // Farolas y bancas alrededor del jardin, y mesas altas cerca de las columnas del fondo.
-  decorations.push({ type: 'plaza-lamp', x: COURTYARD_CX, y: COURTYARD_Y0 + 1.4 });
-  decorations.push({ type: 'plaza-lamp', x: COURTYARD_CX - 3.5, y: COURTYARD_Y1 - 1.4 });
-  decorations.push({ type: 'plaza-lamp', x: COURTYARD_CX + 3.5, y: COURTYARD_Y1 - 1.4 });
+  // Farolas y bancas: el salon es angosto (12 tiles) pero muy alto (25 tiles), asi que
+  // el desplazamiento horizontal y vertical usan escalas distintas para no salirse de
+  // las paredes (interior util: columnas 11-20, filas 4-26).
+  const halfW = COURTYARD_CX - COURTYARD_X0 - 1.5; // margen horizontal seguro
+  [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
+    decorations.push({
+      type: 'plaza-lamp',
+      x: COURTYARD_CX + dx * halfW,
+      y: COURTYARD_CY + dy * (COURTYARD_RADIUS + 3),
+    });
+  });
   [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy]) => {
     decorations.push({
       type: 'plaza-bench',
-      x: COURTYARD_CX + dx * (COURTYARD_RADIUS + 1.6),
-      y: COURTYARD_CY + dy * (COURTYARD_RADIUS + 1.6),
+      x: COURTYARD_CX + dx * halfW,
+      y: COURTYARD_CY + dy * (COURTYARD_RADIUS + 5),
     });
   });
-  decorations.push({ type: 'plaza-table', x: COURTYARD_CX, y: COURTYARD_Y1 - 3 });
+  // Mesas altas cerca de las columnas del fondo, arriba y abajo del salon.
+  decorations.push({ type: 'plaza-table', x: COURTYARD_CX, y: COURTYARD_Y0 + 2.5 });
+  decorations.push({ type: 'plaza-table', x: COURTYARD_CX, y: COURTYARD_Y1 - 2.5 });
 }
 
 export function buildFloorLayout({ floor = 1 } = {}) {

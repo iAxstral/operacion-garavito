@@ -65,6 +65,58 @@ arriesgar romper esa misión para el equipo.
   sobra para rodearlos por cualquier lado; el salón entero es mucho más
   ancho que el mínimo de 4 tiles en toda su extensión, no solo en el borde.
 
+## Cambios posteriores (piso café, patio más grande, 2 pisos, 3 salas por rol)
+
+- **Piso café real**: antes el piso interior reusaba el mismo terrazo gris del
+  Edificio F. Ahora `MainScene.renderGridTiles` tiñe de café
+  (`CAFE_FLOOR_TINT = 0x9c6b3e`) toda celda `type: 'floor'` que no venga del
+  tileset exterior (la espina de pescado del patio ya es café por su propio
+  tile, así que esa no se retiñe). Las escaleras también cambian de color
+  (`CAFE_STAIR_TINT = 0x6b4326`) y el rellano deja el tinte celeste del F por
+  uno hueso/café (`0xc9a876`).
+- **Patio central más grande**: `COURTYARD_Y1` pasó de 20 a 27 (el salón crece
+  de 12×18 a 12×25 tiles) porque las columnas 10–21 estaban libres en toda la
+  altura del mapa — las salas de abajo solo ocupan 3–9 y 23–32. Se verificó
+  con `buildFloorLayout({floor:1})` que las filas 10–13 siguen sin ningún muro
+  de lado a lado y que las 4 esquinas del salón (columnas 10/21, filas 3/27)
+  siguen siendo pared. El portico pasó de 2 a 4 hileras de columnas, y las
+  farolas/bancas se recalculan con desplazamientos horizontal y vertical
+  distintos (el salón es angosto pero muy alto) para no salirse de las
+  paredes — confirmado con las mismas coordenadas exactas por consola.
+- **El Edificio C solo tiene 2 pisos**: el backend sigue compartiendo el mismo
+  mapa (3 archivos `floorN.grid`) para F y C, así que esto se resolvió del
+  lado del cliente: `BuildingSelect` → `RoleSelect` ahora guarda el edificio
+  elegido (`setMyBuilding` en `gameSync.js`), y `MainScene.travel()` bloquea
+  subir al piso 3 cuando `getMyBuilding() === 'C'`, mostrando un aviso en
+  pantalla en vez de dejar pasar. El Edificio F conserva sus 3 pisos sin
+  cambios.
+- **3 salones por rol (12 en total, no siempre el mismo)**: cada rol
+  (SEGURIDAD, SALUD, ECONOMIA, INFRAESTRUCTURA) tenía una sola sala fija.
+  Ahora tiene 3 — una por piso — reutilizando salas que ya existían en el
+  edificio (no se tocó la geometría de ningún piso para esto). Los 4 ids y
+  coordenadas originales no se movieron (siguen siendo la misión "principal"
+  de cada rol); se agregaron 8 instancias nuevas con ids como
+  `mission-salud-f1`, en espejo exacto entre
+  `frontend/src/game/missionCatalog.js` y
+  `backend/.../MissionCatalog.java`. Reparto final:
+  - SEGURIDAD: Armero (piso 2, original), Terraza (piso 1), Sala de
+    Servidores (piso 3).
+  - SALUD: Laboratorio (piso 3, original), Sala de Estudio (piso 1),
+    Biblioteca (piso 2).
+  - ECONOMIA: Cafetería (piso 1, original — nunca se movió), Sala de
+    Reuniones (piso 2), Auditorio (piso 3).
+  - INFRAESTRUCTURA: Sala de Máquinas (piso 3, original), Depósito de
+    Servicio (piso 1), Sala de Estudio piso 2 (comparte nombre con la de
+    SALUD del piso 1, pero es otro salón — están en pisos distintos).
+  - Como cada piso tiene las 4 misiones (una por rol), esto también resuelve
+    el límite de 2 pisos del Edificio C: ningún rol se queda sin poder
+    completar su misión ahí.
+  - El minijuego de cada rol (`useMissionFlow`, `SecurityMission.jsx`) ahora
+    se dispara por **rol**, no por un `missionId` fijo — así se abre sin
+    importar en cuál de las 3 salas esté el jugador. Se verificó con un
+    script Node que ninguna de las 12 coordenadas cae sobre un muro ni sobre
+    un mueble sólido (`layout.furniture`), en los 3 pisos.
+
 ## Verificación
 
 - `npx eslint` sobre los 3 archivos tocados: sin errores nuevos (el único

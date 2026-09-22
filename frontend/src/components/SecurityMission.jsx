@@ -93,8 +93,11 @@ export default function SecurityMission() {
   const nextSpawnAtRef = useRef(0);
   const activeMissionRef = useRef(null);
 
+  // 'SEGURIDAD' es el rol dueno de este minijuego: ahora hay 3 salas/instancias posibles
+  // (mission-seguridad, mission-seguridad-f1, mission-seguridad-f3), asi que se filtra
+  // por rol en vez de por un missionId fijo.
   useEffect(
-    () => onNearMissionChange((mission) => setNearMissionState(mission?.missionId === 'mission-seguridad' ? mission : null)),
+    () => onNearMissionChange((mission) => setNearMissionState(mission?.role === 'SEGURIDAD' ? mission : null)),
     [],
   );
 
@@ -102,7 +105,8 @@ export default function SecurityMission() {
 
   useEffect(() => {
     const event = lastEvent;
-    if (!event || event.playerId !== getMyRole() || event.itemId !== 'mission-seguridad') return;
+    const activeId = activeMissionRef.current?.missionId;
+    if (!event || event.playerId !== getMyRole() || !activeId || event.itemId !== activeId) return;
 
     if (event.type === 'MISSION_STARTED') {
       finishedRef.current = false;

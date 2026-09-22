@@ -8,6 +8,10 @@ const EVENT_TIMEOUT_MS = 6000;
 let gameId = null;
 let myRole = 'SEGURIDAD';
 let currentFloor = 1;
+// Edificio elegido en BuildingSelect ('F' o 'C'). Solo se usa del lado del cliente:
+// el backend comparte el mismo mapa para ambos, pero el Edificio C es mas chico
+// (2 pisos) asi que MainScene usa esto para no dejar subir al piso 3 jugando ahi.
+let myBuilding = 'F';
 
 function emptyState() {
   return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null };
@@ -48,6 +52,14 @@ export function getGameId() {
 
 export function getMyRole() {
   return myRole;
+}
+
+export function setMyBuilding(building) {
+  myBuilding = building === 'C' ? 'C' : 'F';
+}
+
+export function getMyBuilding() {
+  return myBuilding;
 }
 
 export const touchInput = { moveX: 0, moveY: 0, attack: false, dash: false, charged: false };

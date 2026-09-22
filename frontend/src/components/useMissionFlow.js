@@ -11,7 +11,10 @@ import {
 
 const SUCCESS_CLOSE_DELAY_MS = 1100;
 
-export default function useMissionFlow(missionId, onStarted) {
+// `role` es el rol dueño de este minijuego (p.ej. 'SALUD'), no un missionId fijo: cada
+// rol ahora tiene 3 salas/instancias posibles (mission-salud, mission-salud-f1,
+// mission-salud-f2), y el jugador puede acercarse a cualquiera de las 3.
+export default function useMissionFlow(role, onStarted) {
   const [nearMission, setNearMission] = useState(null);
   const [phase, setPhase] = useState('closed');
   const [lastEvent, setLastEvent] = useState(null);
@@ -24,8 +27,8 @@ export default function useMissionFlow(missionId, onStarted) {
   });
 
   useEffect(
-    () => onNearMissionChange((mission) => setNearMission(mission?.missionId === missionId ? mission : null)),
-    [missionId],
+    () => onNearMissionChange((mission) => setNearMission(mission?.role === role ? mission : null)),
+    [role],
   );
 
   useEffect(() => onStateChange((state) => setLastEvent(state.lastEvent)), []);
@@ -37,7 +40,8 @@ export default function useMissionFlow(missionId, onStarted) {
 
   useEffect(() => {
     const event = lastEvent;
-    if (!event || event.playerId !== getMyRole() || event.itemId !== missionId) return;
+    const activeId = activeMissionRef.current?.missionId;
+    if (!event || event.playerId !== getMyRole() || !activeId || event.itemId !== activeId) return;
 
     if (event.type === 'MISSION_STARTED') {
       finishedRef.current = false;
@@ -47,12 +51,12 @@ export default function useMissionFlow(missionId, onStarted) {
     } else if (event.type === 'MISSION_REJECTED') {
       close();
     }
-  }, [lastEvent, missionId, close]);
+  }, [lastEvent, close]);
 
   const cancel = useCallback(() => {
-    requestMissionCancel(missionId);
+    requestMissionCancel(activeMissionRef.current?.missionId ?? nearMission?.missionId);
     close();
-  }, [missionId, close]);
+  }, [nearMission, close]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
