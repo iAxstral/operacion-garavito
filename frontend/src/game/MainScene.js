@@ -1,20 +1,66 @@
 import Phaser from 'phaser';
-import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout } from './mapLayout';
+import { TILE, MAP_COLS, MAP_ROWS, FLOOR_COUNT, buildFloorLayout } from './mapLayout';
+import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { MISSION_ZONES, MISSION_RANGE_PX } from './missionCatalog';
-import { ensureJoined, onStateChange, requestPickup, setNearVendor, requestMissionComplete } from './gameSync';
+import {
+  changeFloor,
+  getLatestState,
+  getMyBuilding,
+  getMyRole,
+  getZombies,
+  isInputLocked,
+  onStateChange,
+  reportPosition,
+  requestAttack,
+  requestPickup,
+  setNearVendor,
+  setNearMission,
+  setNearDoor,
+  setNearStairs,
+  touchInput,
+  requestMissionComplete,
+} from './gameSync';
+import ZombieLayer from './ZombieLayer';
+import Lighting from './Lighting';
+import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
-// --- Placeholder de respaldo (capsula de color generada en codigo) ---
-// Para revertir rapido a este placeholder (sin depender de los atlas reales
-// en frontend/public/sprites/), descomentar este import y los tres bloques
-// marcados "Placeholder de respaldo" mas abajo, y comentar en su lugar el
-// bloque "Atlas real" correspondiente en preload()/create().
-// import { USE_REAL_SPRITESHEET, SEGURIDAD_SPRITE } from './spriteConfig';
+const DASH_SPEED = 420;
+const DASH_MS = 180;
+const DASH_COOLDOWN_MS = 1200;
+
+const ATTACK_REQUEST_MS = 400;
+const CHARGED_COOLDOWN_MS = 6000;
+const CHARGED_RADIUS = 150;
+const FLOOR_FADE_MS = 180;
+const ROAR_RANGE_PX = 260;
+const GROAN_RANGE_PX = 170;
+const BITE_RANGE_PX = 48;
+const FAR_COOLDOWN_MS = 6000;
+const NEAR_COOLDOWN_MS = 1800;
+const MAX_ROAR_VOLUME = 0.75;
+const MAX_GROAN_VOLUME = 0.5;
+const BITE_COOLDOWN_MS = 1500;
+const RAIN_MIN_VOLUME = 0.3;
+const RAIN_MAX_VOLUME = 0.6;
+const RAIN_SWELL_MS = 11000;
+const TOUCH_DEADZONE = 0.3;
+const REMOTE_LERP_PER_SECOND = 10;
+
+const FACING_RADIANS = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
+
+const PLAYER_BODY_WIDTH = 30;
+const PLAYER_BODY_HEIGHT = 18;
+
+const PLAYER_BODY_FOOT_INSET = 6;
 
 const MAP_PIXEL_WIDTH = MAP_COLS * TILE;
 const MAP_PIXEL_HEIGHT = MAP_ROWS * TILE;
 const PLAYER_SPEED = 160;
+
+const WALK_WOBBLE_HZ = 3;
+const WALK_WOBBLE_DEG = 2.5;
 
 const TILE_TEXTURE_FILES = {
   v2_floor_terrazo: 'v2_floor_terrazo_64.png',
@@ -32,58 +78,34 @@ const TILE_TEXTURE_FILES = {
   v2_banca: 'v2_banca_64x32.png',
 };
 
-// Distancia (px) del jugador al centro de una puerta para considerarla
-// "abierta" — un poco mas de un tile, para que el cambio de textura no se
-// sienta pegado al umbral exacto.
 const DOOR_PROXIMITY_PX = 90;
 
-// Ventana de gracia (ms) para seguir animando la caminata cuando NINGUNA
-// tecla de direccion esta activa. Un teclado real casi nunca suelta una
-// tecla y presiona la opuesta (ej. Left -> Right) en el mismo frame — hay
-// un hueco de varios frames sin ninguna tecla activa mientras la mano se
-// mueve. Sin esta ventana, ese hueco se lee como "se solto todo" y la
-// animacion salta a idle por 1-varios frames antes de retomar la caminata,
-// el "salta y despues va hacia donde quiere" reportado. 120ms alcanza para
-// cubrir un cambio de tecla humano tipico sin sentirse como input-lag en
-// una parada real.
-const DIRECTION_HOLD_MS = 120;
-
-// Tipos de celda del grid que bloquean el paso del jugador. 'floor'/'stair'/
-// 'landing' son caminables; puertas y baranda se resuelven en 'decorations'
-// porque se dibujan sobre una celda de piso, no la reemplazan.
 const SOLID_GRID_TYPES = new Set(['wall', 'glass']);
 
-// El rellano reutiliza la textura de piso pero con un tinte, para que se
-// note como una plataforma aparte sin necesitar un asset nuevo.
-const LANDING_TINT = 0xbfe0e6;
+// El Edificio C tiene piso de baldosa cafe (no el terrazo gris ni el rellano celeste
+// del F) y escaleras de ladrillo/madera oscura, distintas de las del F.
+const LANDING_TINT = 0xc9a876;
+const CAFE_FLOOR_TINT = 0x9c6b3e;
+const CAFE_STAIR_TINT = 0x6b4326;
 
 const STAIRS_ARROW_GLYPH = { up: '▲', down: '▼' };
 
-// Placeholder de color por tipo de item recolectable (mismo criterio que el
-// HUD en Hud.jsx) — se reemplaza por sprites reales mas adelante.
 const ITEM_TYPE_COLORS = { WEAPON: 0x8a3b3b, FOOD: 0x3b8a4e, AMMO: 0x8a7a3b };
 
-const SEGURIDAD_ATLAS = {
-  key: 'seguridad',
-  texture: '/sprites/seguridad.png',
-  atlas: '/sprites/seguridad.json',
-};
+// Las 4 misiones son interactivas (abren un minijuego), sin importar en cual de las
+// 3 salas de su rol viva cada instancia — por eso se compara por rol, no por missionId.
+const INTERACTIVE_MISSION_ROLES = new Set(['SEGURIDAD', 'SALUD', 'ECONOMIA', 'INFRAESTRUCTURA']);
 
-// Ninguna lamina de origen tiene poses de perfil izquierdo: 'left' no es una
-// animacion propia, reutiliza los frames de 'right' con el sprite espejado
-// (setFlipX) en vez de arte duplicado.
-const WALK_ANIM_BY_DIRECTION = {
-  down: 'down',
-  up: 'up',
-  right: 'right',
-  left: 'right',
-};
+// El Edificio C es mas chico que el F: solo tiene 2 pisos jugables.
+const BUILDING_C_MAX_FLOOR = 2;
 
-const IDLE_FRAME_BY_DIRECTION = {
-  down: 'down_idle_0',
-  up: 'up_idle_0',
-  right: 'right_0',
-  left: 'right_0',
+const DIRECTIONS = ['down', 'up', 'right', 'left'];
+
+const ROLE_ACCENT = {
+  SEGURIDAD: 0x7ec8ff,
+  SALUD: 0x9bf0b8,
+  ECONOMIA: 0xffd36b,
+  INFRAESTRUCTURA: 0xffa45c,
 };
 
 export default class MainScene extends Phaser.Scene {
@@ -93,7 +115,6 @@ export default class MainScene extends Phaser.Scene {
     this.cursors = null;
     this.wasd = null;
     this.currentDirection = 'down';
-    this.lastMoveAt = 0;
     this.solids = null;
     this.stairsZones = [];
     this.doors = [];
@@ -101,11 +122,41 @@ export default class MainScene extends Phaser.Scene {
     this.vendors = [];
     this.missionZones = [];
     this.unsubscribeGameState = null;
+    this.zombieLayer = null;
+    this.remotePlayers = new Map();
+
+    this.facingAngle = FACING_RADIANS.down;
+    this.walkWobblePhaseMs = 0;
+    this.dashUntil = 0;
+    this.dashReadyAt = 0;
+    this.dashVx = 0;
+    this.dashVy = 0;
+    this.nextAttackAt = 0;
+    this.chargedReadyAt = 0;
+    this.floor = 1;
+    this.spawnOverride = null;
+    this.changingFloor = false;
+    this.spritePrefix = 'seguridad';
+  }
+
+  init(data) {
+    this.remotePlayers = new Map();
+    this.floor = data?.floor ?? 1;
+    this.spawnOverride = data?.spawn ?? null;
+    this.changingFloor = false;
+    this.spritePrefix = roleInfo(getMyRole()).spritePrefix;
+  }
+
+  roleTexture(direction) {
+    return `${this.spritePrefix}_${direction}`;
   }
 
   preload() {
-    // --- Atlas real ---
-    this.load.atlas(SEGURIDAD_ATLAS.key, SEGURIDAD_ATLAS.texture, SEGURIDAD_ATLAS.atlas);
+    ROLE_CATALOG.forEach(({ spritePrefix }) => {
+      DIRECTIONS.forEach((direction) => {
+        this.load.image(`${spritePrefix}_${direction}`, `/sprites/${spritePrefix}_${direction}.png`);
+      });
+    });
 
     Object.entries(TILE_TEXTURE_FILES).forEach(([key, file]) => {
       this.load.image(key, `/tiles/${file}`);
@@ -115,45 +166,92 @@ export default class MainScene extends Phaser.Scene {
       this.load.image(vendor.sprite, vendor.spriteFile);
     });
 
-    // --- Placeholder de respaldo ---
-    // if (USE_REAL_SPRITESHEET) {
-    //   this.load.spritesheet(SEGURIDAD_SPRITE.key, SEGURIDAD_SPRITE.path, {
-    //     frameWidth: SEGURIDAD_SPRITE.frameWidth,
-    //     frameHeight: SEGURIDAD_SPRITE.frameHeight,
-    //   });
-    // }
+    preloadOutside(this);
+
+    this.load.audio('zombie_roar', '/sounds/zombie_roar.wav');
+    this.load.audio('zombie_groan', '/sounds/zombie_groan.wav');
+    this.load.audio('zombie_attack', '/sounds/zombie_attack.wav');
+    this.load.audio('rain', '/sounds/rain.wav');
+  }
+
+  startRain() {
+    // El sound manager es global: la lluvia sigue sonando al cambiar de piso.
+    if (this.sound.get('rain')) return;
+    this.sound.add('rain', { loop: true, volume: RAIN_MIN_VOLUME }).play();
+  }
+
+  playZombieSound(key, volume) {
+    const sound = this.sound.get(key) ?? this.sound.add(key);
+    if (sound.isPlaying) return;
+    sound.play({ volume });
+  }
+
+  // La lluvia sube y baja despacio para no ser un ruido constante.
+  updateRain(time) {
+    const rain = this.sound.get('rain');
+    if (!rain) return;
+    const swell = 0.5 + 0.5 * Math.sin((time / RAIN_SWELL_MS) * Math.PI * 2);
+    rain.setVolume(RAIN_MIN_VOLUME + (RAIN_MAX_VOLUME - RAIN_MIN_VOLUME) * swell);
+  }
+
+  // Cuanto mas cerca el zombi, mas fuerte y mas seguido suena.
+  updateZombieAudio(time) {
+    let nearest = null;
+    let bite = false;
+
+    this.zombiesOnFloor().forEach((zombie) => {
+      const distance = Math.hypot(this.player.x - zombie.x, this.player.y - zombie.y);
+      if (distance <= BITE_RANGE_PX) bite = true;
+      const range = zombie.tough ? ROAR_RANGE_PX : GROAN_RANGE_PX;
+      if (distance > range) return;
+      const closeness = 1 - distance / range;
+      if (!nearest || closeness > nearest.closeness) nearest = { closeness, tough: zombie.tough };
+    });
+
+    if (bite && time >= this.nextBiteSoundAt) {
+      this.nextBiteSoundAt = time + BITE_COOLDOWN_MS;
+      this.playZombieSound('zombie_attack', 0.5);
+    }
+    if (!nearest || time < this.nextZombieSoundAt) return;
+
+    const { closeness, tough } = nearest;
+    this.nextZombieSoundAt = time + FAR_COOLDOWN_MS - (FAR_COOLDOWN_MS - NEAR_COOLDOWN_MS) * closeness;
+    const volume = (tough ? MAX_ROAR_VOLUME : MAX_GROAN_VOLUME) * (0.15 + 0.85 * closeness * closeness);
+    this.playZombieSound(tough ? 'zombie_roar' : 'zombie_groan', volume);
   }
 
   create() {
-    // Piso 1 por ahora: solo tiene escalera de subida (sin piso -1 al que
-    // bajar). El cambio de piso real todavia no esta conectado.
-    const layout = buildFloorLayout({ hasUpStairs: true, hasDownStairs: false });
+
+    const layout = buildFloorLayout({ floor: this.floor });
     this.createMap(layout);
-    this.createAnimations();
 
-    // --- Atlas real ---
-    this.player = this.physics.add.sprite(
-      layout.spawn.x,
-      layout.spawn.y,
-      SEGURIDAD_ATLAS.key,
-      IDLE_FRAME_BY_DIRECTION.down,
-    );
-
-    // --- Placeholder de respaldo ---
-    // if (!USE_REAL_SPRITESHEET) {
-    //   this.generatePlaceholderSpritesheet();
-    // }
-    // this.player = this.physics.add.sprite(layout.spawn.x, layout.spawn.y, SEGURIDAD_SPRITE.key, 0);
+    const spawn = this.spawnOverride ?? layout.spawn;
+    this.player = this.physics.add.sprite(spawn.x, spawn.y, this.roleTexture('down'));
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
+
+    this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
+    this.player.body.setOffset(
+      (this.player.width - PLAYER_BODY_WIDTH) / 2,
+      this.player.height - PLAYER_BODY_HEIGHT - PLAYER_BODY_FOOT_INSET,
+    );
     this.physics.world.setBounds(0, 0, MAP_PIXEL_WIDTH, MAP_PIXEL_HEIGHT);
     this.physics.add.collider(this.player, this.solids);
 
-    this.cameras.main.setBounds(0, 0, MAP_PIXEL_WIDTH, MAP_PIXEL_HEIGHT);
+    const outside = OUTSIDE_MARGIN_TILES * TILE;
+    this.cameras.main.setBounds(-outside, -outside, MAP_PIXEL_WIDTH + 2 * outside, MAP_PIXEL_HEIGHT + 2 * outside);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
     this.cursors = this.input.keyboard.createCursorKeys();
+    this.dashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
+    this.attackAltKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
+    this.chargedKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
+    this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
+    this.input.keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.Q, Phaser.Input.Keyboard.KeyCodes.C]);
+    this.input.mouse?.disableContextMenu();
+    this.zombieLayer = new ZombieLayer(this);
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -161,61 +259,90 @@ export default class MainScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.KeyCodes.D,
     });
 
+    this.nextBiteSoundAt = 0;
+    this.nextZombieSoundAt = 0;
+    this.startRain();
     this.createFoodItems();
     this.createVendors();
     this.createMissionZones();
-    ensureJoined();
+    changeFloor(this.floor, Math.round(spawn.x), Math.round(spawn.y));
+    this.cameras.main.fadeIn(FLOOR_FADE_MS);
+    this.showFloorBanner(layout.name);
     this.events.once('shutdown', () => {
       this.unsubscribeGameState?.();
+      this.lighting?.destroy();
       setNearVendor(null);
+      setNearStairs(null);
     });
   }
 
-  /**
-   * NPC de la vendedora + maquina expendedora: sprites estaticos en
-   * posiciones fijas (VENDORS en shopCatalog.js). Solidos (no se puede
-   * caminar sobre ellos) — la interaccion es por proximidad, no por
-   * overlap fisico (ver updateVendorProximity).
-   */
+  showFloorBanner(name) {
+    const banner = this.add
+      .text(this.scale.width / 2, 70, name, {
+        fontFamily: 'sans-serif',
+        fontSize: '30px',
+        fontStyle: 'bold',
+        color: '#f2fbe2',
+        stroke: '#0b120b',
+        strokeThickness: 6,
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(6000);
+    this.tweens.add({ targets: banner, alpha: 0, delay: 1200, duration: 700, onComplete: () => banner.destroy() });
+  }
+
+  // El Edificio C es mas chico que el F: solo tiene 2 pisos.
+  showFloorLockedBanner() {
+    const banner = this.add
+      .text(this.scale.width / 2, 70, 'El Edificio C solo tiene 2 pisos', {
+        fontFamily: 'sans-serif',
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: '#ffd9d9',
+        stroke: '#3a0b0b',
+        strokeThickness: 5,
+        backgroundColor: '#5a1f1f',
+        padding: { x: 10, y: 6 },
+      })
+      .setOrigin(0.5)
+      .setScrollFactor(0)
+      .setDepth(6000);
+    this.tweens.add({ targets: banner, alpha: 0, delay: 1400, duration: 700, onComplete: () => banner.destroy() });
+  }
+
   createVendors() {
-    this.vendors = VENDORS.map((vendor) => {
+    this.vendors = VENDORS.filter((vendor) => vendor.floor === this.floor).map((vendor) => {
       const image = this.add.image(vendor.x, vendor.y, vendor.sprite).setDepth(6);
       this.solids.add(image);
       return { ...vendor, inRange: false };
     });
   }
 
-  /**
-   * Zonas de mision (una por rol): se completan automaticamente al
-   * pisarlas, mismo patron de "disparar en el flanco de entrada" que la
-   * comida y las escaleras — no solidas, no requieren tecla.
-   */
   createMissionZones() {
-    this.missionZones = MISSION_ZONES.map((zone) => {
+    this.missionZones = MISSION_ZONES.filter((zone) => zone.floor === this.floor).map((zone) => {
+      const mine = zone.role === getMyRole();
+      // En vez del nombre del salón, se marca con el objeto característico del rol
+      // (p.ej. 🧮 para Economía) y solo dice "Misión" — así no delata cuál de las 3
+      // salas posibles de ese rol es, en cualquier piso.
       this.add
-        .text(zone.x, zone.y, `Misión\n(${zone.role})`, {
+        .text(zone.x, zone.y, `${roleInfo(zone.role).missionIcon}\nMisión`, {
           fontFamily: 'sans-serif',
-          fontSize: '11px',
+          fontSize: '13px',
           color: '#ffffff',
           align: 'center',
-          backgroundColor: '#5b3fa0',
-          padding: { x: 4, y: 3 },
+          backgroundColor: mine ? '#5b3fa0' : '#3a3a44',
+          padding: { x: 5, y: 3 },
         })
         .setOrigin(0.5)
         .setDepth(4)
-        .setAlpha(0.85);
-      return { ...zone, inRange: false };
+        .setAlpha(mine ? 0.95 : 0.55);
+      return { ...zone, mine, inRange: false };
     });
   }
 
-  /**
-   * Items de comida de la Cafeteria: placeholder de color, no solidos.
-   * `applyClaimedItems` oculta los que el backend ya marco como reclamados
-   * (por este jugador o por otro) — la unica fuente de verdad de "que
-   * queda en el mapa" es el broadcast, no un estado local aparte.
-   */
   createFoodItems() {
-    this.foodItems = FOOD_ITEMS.map((item) => {
+    this.foodItems = FOOD_ITEMS.filter((item) => item.floor === this.floor).map((item) => {
       const rect = this.add
         .rectangle(item.x, item.y, 26, 26, ITEM_TYPE_COLORS[item.type])
         .setStrokeStyle(2, 0x1f5c2e)
@@ -226,6 +353,14 @@ export default class MainScene extends Phaser.Scene {
     this.unsubscribeGameState = onStateChange((state) => {
       const claimed = new Set(state.claimedItemIds);
       this.foodItems.forEach((food) => food.rect.setVisible(!claimed.has(food.itemId)));
+
+      (state.doors ?? []).forEach((doorState) => {
+        const door = this.doors.find((d) => d.doorId === doorState.doorId);
+        if (!door || door.open === doorState.open) return;
+        door.open = doorState.open;
+        door.image.setTexture(doorState.open ? 'v2_door_madera_open' : 'v2_door_madera');
+        door.image.body.enable = !doorState.open;
+      });
     });
   }
 
@@ -234,7 +369,7 @@ export default class MainScene extends Phaser.Scene {
     const py = this.player.y;
 
     this.foodItems.forEach((food) => {
-      if (!food.rect.visible) return; // ya reclamado, no hay nada que recoger
+      if (!food.rect.visible) return;
 
       const dx = px - food.x;
       const dy = py - food.y;
@@ -249,65 +384,193 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
-  update() {
+  zombiesOnFloor() {
+    return getZombies().filter((zombie) => zombie.floor === this.floor);
+  }
+
+  syncRemotePlayers(delta) {
+    const seen = new Set();
+
+    getLatestState().players.forEach((state) => {
+      if (state.playerId === getMyRole() || state.floor !== this.floor) return;
+      seen.add(state.playerId);
+
+      let entry = this.remotePlayers.get(state.playerId);
+      const prefix = roleInfo(state.role).spritePrefix;
+      if (!entry) {
+        const sprite = this.add.sprite(state.x, state.y, `${prefix}_down`).setDepth(9);
+        const label = this.add
+          .text(state.x, state.y, roleInfo(state.role).name, {
+            fontFamily: 'sans-serif',
+            fontSize: '11px',
+            color: '#ffffff',
+            backgroundColor: 'rgba(0,0,0,0.55)',
+            padding: { x: 4, y: 1 },
+          })
+          .setOrigin(0.5, 1)
+          .setDepth(11);
+        entry = { sprite, label, prefix };
+        this.remotePlayers.set(state.playerId, entry);
+      }
+
+      const dx = state.x - entry.sprite.x;
+      const dy = state.y - entry.sprite.y;
+      if (Math.hypot(dx, dy) > 3) {
+        const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+        entry.sprite.setTexture(`${entry.prefix}_${direction}`);
+      }
+      const blend = Math.min(1, (delta / 1000) * REMOTE_LERP_PER_SECOND);
+      entry.sprite.x += dx * blend;
+      entry.sprite.y += dy * blend;
+      entry.sprite.setAlpha(state.lifeState === 'DOWNED' ? 0.4 : 1);
+      entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
+    });
+
+    this.remotePlayers.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      entry.sprite.destroy();
+      entry.label.destroy();
+      this.remotePlayers.delete(id);
+    });
+  }
+
+  update(time, delta) {
     if (!this.player) return;
+    this.syncRemotePlayers(delta);
+    this.lighting.update(time, this.player, this.remotePlayers);
 
-    const up = this.cursors.up.isDown || this.wasd.up.isDown;
-    const down = this.cursors.down.isDown || this.wasd.down.isDown;
-    const left = this.cursors.left.isDown || this.wasd.left.isDown;
-    const right = this.cursors.right.isDown || this.wasd.right.isDown;
+    if (isInputLocked()) {
+      this.player.setVelocity(0, 0);
+      this.zombieLayer.sync(this.zombiesOnFloor());
+      this.zombieLayer.update(delta);
+      return;
+    }
 
-    let vx = 0;
-    let vy = 0;
+    const up = this.cursors.up.isDown || this.wasd.up.isDown || touchInput.moveY < -TOUCH_DEADZONE;
+    const down = this.cursors.down.isDown || this.wasd.down.isDown || touchInput.moveY > TOUCH_DEADZONE;
+    const left = this.cursors.left.isDown || this.wasd.left.isDown || touchInput.moveX < -TOUCH_DEADZONE;
+    const right = this.cursors.right.isDown || this.wasd.right.isDown || touchInput.moveX > TOUCH_DEADZONE;
+
+    let vx = (right ? 1 : 0) - (left ? 1 : 0);
+    let vy = (down ? 1 : 0) - (up ? 1 : 0);
     let direction = null;
 
-    if (left) {
-      vx = -PLAYER_SPEED;
-      direction = 'left';
-    } else if (right) {
-      vx = PLAYER_SPEED;
-      direction = 'right';
+    if (left) direction = 'left';
+    else if (right) direction = 'right';
+    if (up) direction = direction ?? 'up';
+    else if (down) direction = direction ?? 'down';
+
+    const magnitude = Math.hypot(vx, vy);
+    if (magnitude > 0) {
+      vx = (vx / magnitude) * PLAYER_SPEED;
+      vy = (vy / magnitude) * PLAYER_SPEED;
+
+      this.facingAngle = Math.atan2(vy, vx);
     }
 
-    if (up) {
-      vy = -PLAYER_SPEED;
-      direction = direction ?? 'up';
-    } else if (down) {
-      vy = PLAYER_SPEED;
-      direction = direction ?? 'down';
-    }
+    if (direction) this.currentDirection = direction;
 
-    this.player.setVelocity(vx, vy);
+    if (time < this.dashUntil) {
 
-    if (direction) {
-      this.currentDirection = direction;
-      this.lastMoveAt = this.time.now;
-      this.player.setFlipX(direction === 'left');
-      this.player.anims.play(WALK_ANIM_BY_DIRECTION[direction], true);
-    } else if (this.time.now - this.lastMoveAt < DIRECTION_HOLD_MS) {
-      // Hueco corto sin ninguna tecla activa (probable cambio de direccion
-      // en curso): seguir mostrando la caminata de la ultima direccion en
-      // vez de cortar a idle — ver DIRECTION_HOLD_MS.
-      this.player.setFlipX(this.currentDirection === 'left');
-      this.player.anims.play(WALK_ANIM_BY_DIRECTION[this.currentDirection], true);
+      this.player.setVelocity(this.dashVx, this.dashVy);
     } else {
-      this.player.anims.stop();
-      this.player.setFlipX(this.currentDirection === 'left');
-      this.player.setTexture(SEGURIDAD_ATLAS.key, IDLE_FRAME_BY_DIRECTION[this.currentDirection]);
+      this.player.setVelocity(vx, vy);
+
+      if ((this.dashKey.isDown || touchInput.dash) && time >= this.dashReadyAt) {
+
+        const dx = magnitude > 0 ? vx / PLAYER_SPEED : Math.cos(this.facingAngle);
+        const dy = magnitude > 0 ? vy / PLAYER_SPEED : Math.sin(this.facingAngle);
+        this.dashVx = dx * DASH_SPEED;
+        this.dashVy = dy * DASH_SPEED;
+        this.dashUntil = time + DASH_MS;
+        this.dashReadyAt = time + DASH_COOLDOWN_MS;
+        this.spawnDashTrail();
+      }
+    }
+
+    reportPosition(Math.round(this.player.x), Math.round(this.player.y), time);
+    this.updateAttack(time);
+    this.zombieLayer.sync(this.zombiesOnFloor());
+    this.zombieLayer.update(delta);
+
+    this.player.setTexture(this.roleTexture(this.currentDirection));
+    if (direction) {
+      this.walkWobblePhaseMs += delta;
+      const wobble = Math.sin((this.walkWobblePhaseMs / 1000) * WALK_WOBBLE_HZ * Math.PI * 2);
+      this.player.setAngle(wobble * WALK_WOBBLE_DEG);
+    } else {
+      this.walkWobblePhaseMs = 0;
+      this.player.setAngle(0);
     }
 
     this.updateStairsZones();
+    this.updateChargedAttack(time);
     this.updateDoorProximity();
     this.updateFoodProximity();
     this.updateVendorProximity();
     this.updateMissionProximity();
+    this.updateZombieAudio(time);
+    this.updateRain(time);
   }
 
-  /**
-   * A diferencia de las puertas (puramente visual), aca la proximidad
-   * decide si Hud.jsx ofrece la interaccion "Presiona E" — se notifica via
-   * gameSync.setNearVendor, que ya deduplica si no hay cambios.
-   */
+  updateAttack(time) {
+    const wants = this.attackKey.isDown
+      || this.attackAltKey.isDown
+      || touchInput.attack
+      || (!this.input.activePointer.wasTouch && this.input.activePointer.leftButtonDown());
+    if (!wants || time < this.nextAttackAt) return;
+
+    this.nextAttackAt = time + ATTACK_REQUEST_MS;
+    requestAttack('BASIC', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
+    this.drawSwing(this.facingAngle);
+  }
+
+  updateChargedAttack(time) {
+    const pressed = Phaser.Input.Keyboard.JustDown(this.chargedKey) || touchInput.charged;
+    touchInput.charged = false;
+    if (!pressed || time < this.chargedReadyAt) return;
+
+    this.chargedReadyAt = time + CHARGED_COOLDOWN_MS;
+    requestAttack('CHARGED', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
+    this.drawShockwave();
+  }
+
+  drawShockwave() {
+    const accent = ROLE_ACCENT[getMyRole()] ?? 0xffffff;
+    const ring = this.add.graphics();
+    ring.setDepth(this.player.y + 1);
+    ring.lineStyle(6, accent, 0.9);
+    ring.strokeCircle(0, 0, CHARGED_RADIUS);
+    ring.fillStyle(accent, 0.18);
+    ring.fillCircle(0, 0, CHARGED_RADIUS);
+    ring.setPosition(this.player.x, this.player.y);
+    ring.setScale(0.15);
+    this.tweens.add({
+      targets: ring,
+      scale: 1,
+      alpha: 0,
+      duration: 420,
+      ease: 'Cubic.easeOut',
+      onComplete: () => ring.destroy(),
+    });
+    this.cameras.main.shake(160, 0.004);
+  }
+
+  drawSwing(facing) {
+    const arc = this.add.graphics();
+    arc.setDepth(this.player.y + 1);
+    arc.fillStyle(0xfff2c4, 0.45);
+    arc.slice(this.player.x, this.player.y, 62, facing - Math.PI / 4, facing + Math.PI / 4);
+    arc.fillPath();
+    this.tweens.add({ targets: arc, alpha: 0, duration: 160, onComplete: () => arc.destroy() });
+  }
+
+  spawnDashTrail() {
+    const ghost = this.add.sprite(this.player.x, this.player.y, this.player.texture.key);
+    ghost.setDepth(this.player.depth - 1).setAlpha(0.45).setTint(0x7ec8ff);
+    this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
+  }
+
   updateVendorProximity() {
     const px = this.player.x;
     const py = this.player.y;
@@ -327,12 +590,6 @@ export default class MainScene extends Phaser.Scene {
     setNearVendor(closest);
   }
 
-  /**
-   * Mismo patron de flanco de entrada que la comida: se envia el pickup
-   * una vez al entrar al rango, no en cada frame. El backend valida rol y
-   * cooldown — este cliente no necesita saber de antemano si la mision es
-   * del rol propio, el rechazo "wrong_role" del backend ya lo cubre.
-   */
   updateMissionProximity() {
     const px = this.player.x;
     const py = this.player.y;
@@ -344,45 +601,43 @@ export default class MainScene extends Phaser.Scene {
 
       if (withinRange && !zone.inRange) {
         zone.inRange = true;
-        requestMissionComplete(zone.missionId, px, py);
+        if (!zone.mine) return;
+        if (INTERACTIVE_MISSION_ROLES.has(zone.role)) {
+          setNearMission(zone);
+        } else {
+          requestMissionComplete(zone.missionId, px, py);
+        }
       } else if (!withinRange && zone.inRange) {
         zone.inRange = false;
+        if (zone.mine && INTERACTIVE_MISSION_ROLES.has(zone.role)) {
+          setNearMission(null);
+        }
       }
     });
   }
 
-  /**
-   * Cambia la textura de cada puerta a abierta/cerrada segun la distancia
-   * al jugador — sin fisica ni overlap, es puramente visual (las puertas ya
-   * son caminables en ambos estados).
-   */
   updateDoorProximity() {
     const px = this.player.x;
     const py = this.player.y;
+    let closest = null;
+    let closestDistSq = Infinity;
 
     this.doors.forEach((door) => {
       const dx = px - door.x;
       const dy = py - door.y;
-      const withinRange = dx * dx + dy * dy <= DOOR_PROXIMITY_PX * DOOR_PROXIMITY_PX;
-
-      if (withinRange && !door.open) {
-        door.open = true;
-        door.image.setTexture('v2_door_madera_open');
-      } else if (!withinRange && door.open) {
-        door.open = false;
-        door.image.setTexture('v2_door_madera');
+      const distSq = dx * dx + dy * dy;
+      if (distSq <= DOOR_PROXIMITY_PX * DOOR_PROXIMITY_PX && distSq < closestDistSq) {
+        closest = door;
+        closestDistSq = distSq;
       }
     });
+
+    setNearDoor(closest);
   }
 
-  /**
-   * Zonas de escalera (subida y/o bajada, segun el piso): solo marcan el
-   * overlap por ahora (sin cambio de piso real todavia). Cada una se
-   * dispara una vez al entrar y una vez al salir, en vez de repetir el
-   * mensaje en cada frame que el jugador se queda parado ahi.
-   */
   updateStairsZones() {
     const body = this.player.body;
+    let active = null;
 
     this.stairsZones.forEach((stairs) => {
       const { rect } = stairs;
@@ -392,15 +647,35 @@ export default class MainScene extends Phaser.Scene {
         body.y < rect.y + rect.h &&
         body.y + body.height > rect.y;
 
-      if (overlapping && !stairs.active) {
-        stairs.active = true;
-        stairs.label.setVisible(true);
-        // eslint-disable-next-line no-console
-        console.log(`[MainScene] Jugador sobre la escalera de ${stairs.kind === 'up' ? 'subida' : 'bajada'} — cambio de piso pendiente de implementar`);
-      } else if (!overlapping && stairs.active) {
-        stairs.active = false;
-        stairs.label.setVisible(false);
-      }
+      stairs.label.setVisible(overlapping);
+      if (overlapping) active = stairs;
+    });
+
+    setNearStairs(active ? { kind: active.kind } : null);
+
+    const pressed = Phaser.Input.Keyboard.JustDown(this.interactKey);
+    if (pressed && active && !this.changingFloor) {
+      this.travel(active.kind);
+    }
+  }
+
+  travel(kind) {
+    const target = kind === 'up' ? this.floor + 1 : this.floor - 1;
+    if (target < 1 || target > FLOOR_COUNT) return;
+    // El Edificio C solo tiene 2 pisos (el F sigue con 3): no dejar subir al 3.
+    if (getMyBuilding() === 'C' && target > BUILDING_C_MAX_FLOOR) {
+      this.showFloorLockedBanner();
+      return;
+    }
+
+    const arrival = buildFloorLayout({ floor: target });
+    const spawn = (kind === 'up' ? arrival.downStairs : arrival.upStairs).arrivalSpawn;
+
+    this.changingFloor = true;
+    this.player.setVelocity(0, 0);
+    this.cameras.main.fadeOut(FLOOR_FADE_MS);
+    this.cameras.main.once('camerafadeoutcomplete', () => {
+      this.scene.restart({ floor: target, spawn });
     });
   }
 
@@ -409,10 +684,13 @@ export default class MainScene extends Phaser.Scene {
     this.stairsZones = [];
     this.doors = [];
 
+    this.lighting = new Lighting(this);
+    renderOutside(this, layout.grid, this.lighting);
     this.renderGridTiles(layout.grid);
     this.renderDecorations(layout.decorations);
     this.renderFurniture(layout.furniture);
     this.renderLabels(layout.labels);
+    this.addInteriorLights(layout);
 
     [
       { kind: 'up', stairs: layout.upStairs },
@@ -425,8 +703,8 @@ export default class MainScene extends Phaser.Scene {
             stairs.zone.x,
             stairs.zone.y - 22,
             kind === 'up'
-              ? '¡Escaleras arriba! (cambio de piso próximamente)'
-              : '¡Escaleras abajo! (cambio de piso próximamente)',
+              ? `Presiona E — subir al piso ${this.floor + 1}`
+              : `Presiona E — bajar al piso ${this.floor - 1}`,
             {
               fontFamily: 'sans-serif',
               fontSize: '13px',
@@ -442,6 +720,36 @@ export default class MainScene extends Phaser.Scene {
       });
   }
 
+  // Bombillos del edificio: solo algunas columnas del vestibulo, y luz suave en misiones y vendedores.
+  addInteriorLights(layout) {
+    const modes = ['flicker', 'steady', 'broken'];
+    layout.decorations
+      .filter((deco) => deco.type === 'column')
+      .filter((deco, i) => i % 2 === 0)
+      .forEach((deco, i) => {
+        this.lighting.addLight({
+          x: deco.x * TILE + TILE / 2,
+          y: (deco.y + 2.5) * TILE,
+          radius: 260,
+          mode: modes[i % modes.length],
+        });
+      });
+
+    VENDORS.filter((vendor) => vendor.floor === this.floor).forEach((vendor) => {
+      this.lighting.addLight({ x: vendor.x, y: vendor.y, radius: 150, mode: 'steady', bulb: false });
+    });
+    MISSION_ZONES.filter((zone) => zone.floor === this.floor).forEach((zone) => {
+      this.lighting.addLight({ x: zone.x, y: zone.y, radius: 130, mode: 'steady', bulb: false });
+    });
+
+    // Luces fluorescentes del techo del corredor porticado: parejas, sin foco visible.
+    layout.decorations
+      .filter((deco) => deco.type === 'plaza-lamp' || deco.type === 'plaza-tree')
+      .forEach((deco) => {
+        this.lighting.addLight({ x: deco.x * TILE + TILE / 2, y: deco.y * TILE + TILE / 2, radius: 200, mode: 'steady', bulb: false });
+      });
+  }
+
   renderGridTiles(grid) {
     for (let y = 0; y < MAP_ROWS; y += 1) {
       for (let x = 0; x < MAP_COLS; x += 1) {
@@ -450,10 +758,23 @@ export default class MainScene extends Phaser.Scene {
 
         const cx = x * TILE + TILE / 2;
         const cy = y * TILE + TILE / 2;
-        const image = this.add.image(cx, cy, cell.texture);
+        // El piso del patio (espina de pescado / baldosa de bano) viene del tileset exterior
+        // del Edificio C en vez de un archivo suelto.
+        const image = cell.sheet === 'outside'
+          ? this.add.image(cx, cy, 'outside_tiles', cell.frame).setScale(TILE / 32)
+          : this.add.image(cx, cy, cell.texture);
 
         if (cell.type === 'landing') {
           image.setTint(LANDING_TINT);
+        } else if (cell.type === 'wall') {
+          // Tinte calido para que los muros interiores combinen con el ladrillo del Edificio C.
+          image.setTint(0xd9b79a);
+        } else if (cell.type === 'floor' && cell.sheet !== 'outside') {
+          // Baldosa cafe del Edificio C: no el terrazo gris del F.
+          image.setTint(CAFE_FLOOR_TINT);
+        } else if (cell.type === 'stair') {
+          // Escalera de ladrillo/madera oscura del Edificio C, distinta de la del F.
+          image.setTint(CAFE_STAIR_TINT);
         }
 
         if (SOLID_GRID_TYPES.has(cell.type)) {
@@ -467,8 +788,9 @@ export default class MainScene extends Phaser.Scene {
     decorations.forEach((deco) => {
       if (deco.type === 'column') {
         const cx = deco.x * TILE + TILE / 2;
-        const cy = deco.y * TILE + TILE; // el sprite mide 2 tiles (128px) de alto
-        const image = this.add.image(cx, cy, 'v2_columna').setDepth(5);
+        const cy = deco.y * TILE + TILE;
+        // Tinte crema para que las columnas combinen con el patio del Edificio C.
+        const image = this.add.image(cx, cy, 'v2_columna').setDepth(5).setTint(0xd8cdb6);
         this.solids.add(image);
         return;
       }
@@ -504,19 +826,75 @@ export default class MainScene extends Phaser.Scene {
         return;
       }
 
+      if (deco.type === 'plaza-lamp') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        this.add.image(cx, cy, PROPS_KEY, 'farola').setOrigin(0.5, 0.95).setDepth(6);
+        return;
+      }
+
+      if (deco.type === 'plaza-tree') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        // Jardinera/arbol central del patio: bloquea poco, el pasillo sigue teniendo 4+ tiles libres.
+        const image = this.add.image(cx, cy, PROPS_KEY, 'arbol').setOrigin(0.5, 0.85).setScale(1.1).setDepth(6);
+        this.solids.add(image);
+        return;
+      }
+
+      if (deco.type === 'plaza-bench') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        const image = this.add.image(cx, cy, PROPS_KEY, 'banca_roja').setDepth(6);
+        this.solids.add(image);
+        return;
+      }
+
+      if (deco.type === 'plaza-table') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        const table = this.add.image(cx, cy, PROPS_KEY, 'mesa_redonda').setDepth(6);
+        this.solids.add(table);
+        [[-18, -14], [18, 14]].forEach(([dx, dy]) => {
+          this.add.image(cx + dx, cy + dy, PROPS_KEY, 'silla_negra').setDepth(6);
+        });
+        return;
+      }
+
+      if (deco.type === 'bath-door') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        // Solo decorativa: el nicho de banos no tiene mecanica de puerta interactiva.
+        this.add.image(cx, cy, SHEET_KEY, 21).setScale(TILE / 32).setDepth(7);
+        return;
+      }
+
+      if (deco.type === 'pictogram') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        this.add.text(cx, cy, deco.glyph, { fontSize: '20px' }).setOrigin(0.5).setDepth(7);
+        return;
+      }
+
+      if (deco.type === 'camera') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        this.add.text(cx, cy, '📷', { fontSize: '16px' }).setOrigin(0.5).setAlpha(0.85).setDepth(7);
+        return;
+      }
+
       if (deco.type === 'door') {
         const cx = deco.x * TILE + TILE / 2;
-        // La puerta mide 1.5 tiles (96px): sobresale medio tile hacia el
-        // lado del vestibulo/conector, igual que en la referencia visual.
+
         const cy =
           deco.orientation === 'down'
-            ? deco.y * TILE + 48 // top alineado con el techo de la fila de pared
-            : (deco.y + 1) * TILE - 48; // bottom alineado con el piso de la fila de pared
-        const image = this.add.image(cx, cy, 'v2_door_madera').setDepth(8);
-        // Las puertas son caminables: no se agregan a `solids`. Se guarda la
-        // referencia para actualizar textura abierta/cerrada por proximidad
-        // (ver updateDoorProximity).
-        this.doors.push({ image, x: cx, y: cy, open: false });
+            ? deco.y * TILE + 48
+            : (deco.y + 1) * TILE - 48;
+        const image = this.add.image(cx, cy, 'v2_door_madera_open').setDepth(8);
+
+        this.solids.add(image);
+        image.body.enable = false;
+        this.doors.push({ image, x: cx, y: cy, open: true, doorId: deco.doorId });
       }
     });
   }
@@ -543,118 +921,4 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
-  createAnimations() {
-    const key = SEGURIDAD_ATLAS.key;
-
-    this.anims.create({
-      key: 'down_idle',
-      frames: this.anims.generateFrameNames(key, { prefix: 'down_idle_', start: 0, end: 3 }),
-      frameRate: 4,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'up_idle',
-      frames: this.anims.generateFrameNames(key, { prefix: 'up_idle_', start: 0, end: 3 }),
-      frameRate: 4,
-      repeat: -1,
-    });
-    // Ciclos reducidos a 6 frames: la lamina fuente es una hoja de
-    // referencia de personaje (multiples angulos), no un ciclo de caminata
-    // diseñado — algunos indices de cada bloque de 8 muestran un angulo
-    // distinto (de frente/de espaldas colado en el ciclo) y rompian la
-    // fluidez. Diagnostico completo y frames descartados documentados en
-    // ARCHITECTURE.md.
-    this.anims.create({
-      key: 'right',
-      frames: this.anims.generateFrameNames(key, { prefix: 'right_', start: 2, end: 7 }),
-      frameRate: 10,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'down',
-      frames: this.anims.generateFrameNames(key, { prefix: 'down_', frames: [0, 1, 2, 3, 5, 6] }),
-      frameRate: 10,
-      repeat: -1,
-    });
-    this.anims.create({
-      key: 'up',
-      frames: this.anims.generateFrameNames(key, { prefix: 'up_', start: 2, end: 7 }),
-      frameRate: 10,
-      repeat: -1,
-    });
-    // 'left' reutiliza los frames de 'right' con flipX en vez de una
-    // animacion propia (ver WALK_ANIM_BY_DIRECTION / update()).
-  }
-
-  // --- Placeholder de respaldo (comentado) ------------------------------
-  // Genera una capsula de color con un indicador de direccion, numerada
-  // exactamente igual a como Phaser numera un spritesheet cargado desde
-  // archivo. Util para aislar bugs de input/fisica del problema de arte,
-  // sin depender de los atlas reales. Para reactivar: descomentar esto,
-  // el import de spriteConfig arriba, y los bloques "Placeholder de
-  // respaldo" en preload()/create().
-  //
-  // generatePlaceholderSpritesheet() {
-  //   const { key, frameWidth, frameHeight, framesPerDirection, rowOrder, color } = SEGURIDAD_SPRITE;
-  //   const cols = framesPerDirection;
-  //   const rows = rowOrder.length;
-  //   const sheetWidth = frameWidth * cols;
-  //   const sheetHeight = frameHeight * rows;
-  //
-  //   const gfx = this.make.graphics({ x: 0, y: 0, add: false });
-  //
-  //   rowOrder.forEach((direction, row) => {
-  //     for (let col = 0; col < cols; col += 1) {
-  //       const cx = col * frameWidth + frameWidth / 2;
-  //       const cy = row * frameHeight + frameHeight / 2;
-  //       const bob = Math.sin((col / cols) * Math.PI * 2) * 3;
-  //
-  //       gfx.fillStyle(color, 1);
-  //       gfx.fillRoundedRect(
-  //         cx - frameWidth * 0.28,
-  //         cy - frameHeight * 0.36 + bob,
-  //         frameWidth * 0.56,
-  //         frameHeight * 0.62,
-  //         6,
-  //       );
-  //
-  //       gfx.fillStyle(0xe8c39e, 1);
-  //       gfx.fillCircle(cx, cy - frameHeight * 0.28 + bob, frameWidth * 0.22);
-  //
-  //       gfx.fillStyle(0xffffff, 1);
-  //       const indicator = MainScene.directionIndicatorOffset(direction, frameWidth, frameHeight);
-  //       gfx.fillTriangle(
-  //         cx + indicator.x, cy + indicator.y - 4,
-  //         cx + indicator.x - 4, cy + indicator.y + 4,
-  //         cx + indicator.x + 4, cy + indicator.y + 4,
-  //       );
-  //     }
-  //   });
-  //
-  //   gfx.generateTexture(key, sheetWidth, sheetHeight);
-  //   gfx.destroy();
-  //
-  //   const texture = this.textures.get(key);
-  //   let frameIndex = 0;
-  //   rowOrder.forEach((_, row) => {
-  //     for (let col = 0; col < cols; col += 1) {
-  //       texture.add(frameIndex, 0, col * frameWidth, row * frameHeight, frameWidth, frameHeight);
-  //       frameIndex += 1;
-  //     }
-  //   });
-  // }
-  //
-  // static directionIndicatorOffset(direction, frameWidth, frameHeight) {
-  //   switch (direction) {
-  //     case 'up':
-  //       return { x: 0, y: -frameHeight * 0.32 };
-  //     case 'left':
-  //       return { x: -frameWidth * 0.3, y: 0 };
-  //     case 'right':
-  //       return { x: frameWidth * 0.3, y: 0 };
-  //     case 'down':
-  //     default:
-  //       return { x: 0, y: frameHeight * 0.18 };
-  //   }
-  // }
 }

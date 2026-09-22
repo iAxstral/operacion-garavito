@@ -1,0 +1,328 @@
+{
+ "image": "exterior_tiles.png",
+ "tileWidth": 32,
+ "tileHeight": 32,
+ "columns": 8,
+ "tileCount": 45,
+ "margin": 0,
+ "spacing": 0,
+ "firstgid": 1,
+ "note": "gid = id + 1 (0 = vacio). Rejilla uniforme 32x32 sin margen ni spacing.",
+ "tiles": [
+  {
+   "id": 0,
+   "gid": 1,
+   "name": "paver",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 1,
+   "gid": 2,
+   "name": "paver_b",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 2,
+   "gid": 3,
+   "name": "paver_dirty",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 3,
+   "gid": 4,
+   "name": "paver_cracked",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 4,
+   "gid": 5,
+   "name": "plaza",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 5,
+   "gid": 6,
+   "name": "plaza_cracked",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 6,
+   "gid": 7,
+   "name": "grass_a",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 7,
+   "gid": 8,
+   "name": "grass_b",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 8,
+   "gid": 9,
+   "name": "grass_dead",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 9,
+   "gid": 10,
+   "name": "dirt",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 10,
+   "gid": 11,
+   "name": "edge_grass_n",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 11,
+   "gid": 12,
+   "name": "edge_grass_s",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 12,
+   "gid": 13,
+   "name": "edge_grass_w",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 13,
+   "gid": 14,
+   "name": "edge_grass_e",
+   "layer": "ground",
+   "collides": false
+  },
+  {
+   "id": 14,
+   "gid": 15,
+   "name": "hedge",
+   "layer": "ground",
+   "collides": true
+  },
+  {
+   "id": 15,
+   "gid": 16,
+   "name": "hedge_dead",
+   "layer": "ground",
+   "collides": true
+  },
+  {
+   "id": 16,
+   "gid": 17,
+   "name": "concrete_wall",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 17,
+   "gid": 18,
+   "name": "concrete_wall_stained",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 18,
+   "gid": 19,
+   "name": "concrete_wall_F",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 19,
+   "gid": 20,
+   "name": "concrete_slit",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 20,
+   "gid": 21,
+   "name": "concrete_base",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 21,
+   "gid": 22,
+   "name": "concrete_top",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 22,
+   "gid": 23,
+   "name": "roof_edge",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 23,
+   "gid": 24,
+   "name": "louver",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 24,
+   "gid": 25,
+   "name": "louver_col",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 25,
+   "gid": 26,
+   "name": "louver_broken",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 26,
+   "gid": 27,
+   "name": "louver_lit",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 27,
+   "gid": 28,
+   "name": "slab_rail",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 28,
+   "gid": 29,
+   "name": "glass_green",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 29,
+   "gid": 30,
+   "name": "glass_cracked",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 30,
+   "gid": 31,
+   "name": "glass_boarded",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 31,
+   "gid": 32,
+   "name": "glass_dark",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 32,
+   "gid": 33,
+   "name": "steel_column",
+   "layer": "facade",
+   "collides": true
+  },
+  {
+   "id": 33,
+   "gid": 34,
+   "name": "door_l",
+   "layer": "facade",
+   "collides": false
+  },
+  {
+   "id": 34,
+   "gid": 35,
+   "name": "door_r",
+   "layer": "facade",
+   "collides": false
+  },
+  {
+   "id": 35,
+   "gid": 36,
+   "name": "shadow_overhang",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 36,
+   "gid": 37,
+   "name": "blood_a",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 37,
+   "gid": 38,
+   "name": "blood_b",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 38,
+   "gid": 39,
+   "name": "blood_drag",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 39,
+   "gid": 40,
+   "name": "crack_decal",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 40,
+   "gid": 41,
+   "name": "weeds",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 41,
+   "gid": 42,
+   "name": "debris",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 42,
+   "gid": 43,
+   "name": "leaves",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 43,
+   "gid": 44,
+   "name": "puddle",
+   "layer": "decal",
+   "collides": false
+  },
+  {
+   "id": 44,
+   "gid": 45,
+   "name": "tape_h",
+   "layer": "decal",
+   "collides": false
+  }
+ ]
+}

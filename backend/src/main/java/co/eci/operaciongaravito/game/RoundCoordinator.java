@@ -7,29 +7,9 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
-/**
- * Barrera de sincronizacion por partida: espera las decisiones de los 4
- * roles antes de resolver la ronda actual.
- *
- * Mismo patron conceptual que un {@code CyclicBarrier} — todas las partes
- * "llegan" antes de que se dispare la accion, y solo se dispara una vez —
- * pero adaptado a mensajeria asincrona por WebSocket en vez de hilos
- * bloqueados en {@code await()}: aca "llegar a la barrera" es publicar
- * {@code /decide}, y la ronda se resuelve desde el hilo que entrega la 4a
- * decision, o desde un hilo del scheduler si se agota el timeout — nunca
- * hay un hilo esperando bloqueado.
- *
- * {@code decisions} es un {@code ConcurrentHashMap} (put por rol es
- * atomico y sin lock; una resubmision del mismo rol antes de que la ronda
- * resuelva simplemente sobreescribe su entrada en vez de duplicarla). El
- * unico {@code synchronized} esta en el punto de resolucion
- * ({@link #tryResolve}) — evita que dos disparadores (la 4a decision
- * llegando Y el timeout venciendo casi al mismo tiempo) resuelvan la misma
- * ronda dos veces.
- */
 public class RoundCoordinator {
 
-    static final int REQUIRED_DECISIONS = Role.values().length; // 4
+    static final int REQUIRED_DECISIONS = Role.values().length;
     static final String DEFAULT_ACTION = "no_action";
     private static final long TIMEOUT_SECONDS = 30;
 
@@ -51,14 +31,24 @@ public class RoundCoordinator {
         scheduleTimeout();
     }
 
-    /** Vista de la ronda actual, para broadcasts que no son "se acaba de resolver" (join/pickup). */
     public RoundState currentStateView() {
         RoundState state = currentState;
         return new RoundState(state.number(), state.schoolState(), false);
     }
 
+    public void reset() {
+        synchronized (resolveLock) {
+            decisions.clear();
+            schoolState.reset();
+            roundNumber = 1;
+            currentRoundResolved = false;
+            currentState = new RoundState(roundNumber, schoolState.toSnapshot(), false);
+            scheduleTimeout();
+        }
+    }
+
     public void submitDecision(String role, String action) {
-        Role.valueOf(role); // lanza IllegalArgumentException si el rol no es valido
+        Role.valueOf(role);
         decisions.put(role, action);
         if (decisions.size() >= REQUIRED_DECISIONS) {
             tryResolve(false);
@@ -73,19 +63,13 @@ public class RoundCoordinator {
         timeoutTask = scheduler.schedule(() -> tryResolve(true), TIMEOUT_SECONDS, TimeUnit.SECONDS);
     }
 
-    /**
-     * @param forcedByTimeout true si dispara porque se agoto el tiempo (resuelve
-     *                        igual, completando con {@link #DEFAULT_ACTION} los
-     *                        roles faltantes); false si dispara porque llego una
-     *                        decision (solo resuelve si ya estan las 4).
-     */
     private void tryResolve(boolean forcedByTimeout) {
         synchronized (resolveLock) {
             if (currentRoundResolved) {
-                return; // ya resolvio el otro disparador (decision vs timeout) para esta ronda
+                return;
             }
             if (!forcedByTimeout && decisions.size() < REQUIRED_DECISIONS) {
-                return; // todavia faltan decisiones y no vencio el timeout
+                return;
             }
             currentRoundResolved = true;
 

@@ -4,24 +4,26 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.regex.Pattern;
+import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 
-/**
- * Registro en memoria de partidas activas, por gameId. Tambien es el dueño
- * del scheduler compartido que usan los {@link RoundCoordinator} de cada
- * sesion para el timeout de ronda, y de la logica de broadcast cuando una
- * ronda se resuelve — incluido el caso de timeout, que dispara desde un
- * hilo del scheduler sin que ningun mensaje STOMP haya llegado en ese
- * instante (por eso GameController no puede ser quien lo difunda).
- */
 @Service
 public class GameSessionService {
 
+    private static final System.Logger LOGGER = System.getLogger(GameSessionService.class.getName());
+    private static final Pattern VALID_CODE = Pattern.compile("[A-Z0-9]{4,8}");
+
+    private record Seat(String gameId, String role) {
+    }
+
     private final Map<String, GameSession> sessions = new ConcurrentHashMap<>();
+    private final Map<String, Seat> seatsByConnection = new ConcurrentHashMap<>();
     private final SimpMessagingTemplate messagingTemplate;
-    private final ScheduledExecutorService roundTimeoutScheduler = Executors.newScheduledThreadPool(2, runnable -> {
-        Thread thread = new Thread(runnable, "round-timeout");
+    private final ScheduledExecutorService roundTimeoutScheduler = Executors.newScheduledThreadPool(4, runnable -> {
+        Thread thread = new Thread(runnable, "game-loop");
         thread.setDaemon(true);
         return thread;
     });
@@ -30,9 +32,112 @@ public class GameSessionService {
         this.messagingTemplate = messagingTemplate;
     }
 
-    public GameSession getOrCreate(String gameId) {
-        return sessions.computeIfAbsent(gameId,
-                id -> new GameSession(id, roundTimeoutScheduler, round -> broadcastRoundResolved(id, round)));
+    private static final long TICK_PERIOD_MS = 66;
+    private static final long BROADCAST_PERIOD_MS = 125;
+
+    public static boolean isValidCode(String gameId) {
+        return gameId != null && VALID_CODE.matcher(gameId).matches();
+    }
+
+    public GameSession find(String gameId) {
+        return sessions.get(gameId);
+    }
+
+    public GameSession create(String gameId) {
+        if (!isValidCode(gameId)) {
+            return null;
+        }
+        boolean[] created = { false };
+        GameSession session = sessions.computeIfAbsent(gameId, id -> {
+            created[0] = true;
+            GameSession fresh = new GameSession(id, roundTimeoutScheduler, round -> broadcastRoundResolved(id, round));
+            startTicking(id);
+            return fresh;
+        });
+        return created[0] ? session : null;
+    }
+
+    public void registerSeat(String connectionId, String gameId, String role) {
+        if (connectionId != null) {
+            seatsByConnection.put(connectionId, new Seat(gameId, role));
+        }
+    }
+
+    public void leave(String gameId, String role) {
+        GameSession session = sessions.get(gameId);
+        if (session == null) {
+            return;
+        }
+        session.removePlayer(role);
+        seatsByConnection.values().removeIf(seat -> seat.gameId().equals(gameId) && seat.role().equals(role));
+        if (session.hasPlayers()) {
+            broadcast(gameId, session, null);
+        } else {
+            sessions.remove(gameId);
+        }
+    }
+
+    @EventListener
+    public void onDisconnect(SessionDisconnectEvent event) {
+        Seat seat = seatsByConnection.remove(event.getSessionId());
+        if (seat != null) {
+            leave(seat.gameId(), seat.role());
+        }
+    }
+
+    public void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message(session, lastEvent, session.currentRoundView()));
+    }
+
+    public void broadcastRejected(String gameId, LastEvent event) {
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, GameStateMessage.eventOnly(event));
+    }
+
+    private GameStateMessage message(GameSession session, LastEvent lastEvent, RoundState round) {
+        return new GameStateMessage(
+                session.playerStates(),
+                session.claimedItemIdsSnapshot(),
+                lastEvent,
+                round,
+                session.zombieStates(),
+                session.waveState(),
+                session.doorStates(),
+                session.lobbyState()
+        );
+    }
+
+    private void startTicking(String gameId) {
+        long[] lastTickAt = { System.currentTimeMillis() };
+        long[] lastBroadcastAt = { 0 };
+
+        roundTimeoutScheduler.scheduleAtFixedRate(() -> {
+            GameSession session = sessions.get(gameId);
+            if (session == null) {
+                throw new IllegalStateException("partida cerrada");
+            }
+
+            if (!session.hasPlayers() || !session.isStarted()) {
+                lastTickAt[0] = System.currentTimeMillis();
+                return;
+            }
+
+            try {
+                long now = System.currentTimeMillis();
+
+                double deltaSeconds = Math.min(0.25, (now - lastTickAt[0]) / 1000.0);
+                lastTickAt[0] = now;
+
+                session.tick(now, deltaSeconds);
+
+                if (now - lastBroadcastAt[0] >= BROADCAST_PERIOD_MS) {
+                    lastBroadcastAt[0] = now;
+                    broadcast(gameId, session, session.consumeWipedRun() ? LastEvent.teamWiped() : null);
+                }
+            } catch (RuntimeException ex) {
+
+                LOGGER.log(System.Logger.Level.WARNING, "fallo el tick de la partida " + gameId, ex);
+            }
+        }, TICK_PERIOD_MS, TICK_PERIOD_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
     }
 
     private void broadcastRoundResolved(String gameId, RoundState round) {
@@ -40,12 +145,6 @@ public class GameSessionService {
         if (session == null) {
             return;
         }
-        GameStateMessage message = new GameStateMessage(
-                session.playerStates(),
-                session.claimedItemIdsSnapshot(),
-                null,
-                round
-        );
-        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message(session, null, round));
     }
 }
