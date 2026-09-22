@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 
-export const OUTSIDE_MARGIN_TILES = 18;
+export const OUTSIDE_MARGIN_TILES = 12;
 
 export const SHEET_KEY = 'outside_tiles';
 export const PROPS_KEY = 'outside_props';
@@ -10,8 +10,6 @@ const SCALE = TILE / SRC_TILE;
 
 // Indices del tileset exterior del Edificio C (gid - 1). Ver imagenes/edificioC/EXTERIOR_C_TILES.md.
 const PAVER = [0, 0, 1, 1];
-const PAVER_VAR = 1;
-const PLAZA = 2;
 const GRASS = [5, 5, 6, 6, 6, 7];
 const DIRT = 8;
 const EDGE_GRASS = { n: 9, s: 10, e: 11, w: 12 };
@@ -38,13 +36,6 @@ const DEPTH_DECAL = -19;
 const DEPTH_SKY = -17;
 const DEPTH_MOUNTAIN = -16;
 const DEPTH_PROP = -5;
-
-// Patio circular al sur del edificio, como el de las fotos del Edificio C: adoquin en
-// abanico, tres farolas en triangulo, un arbol central y bancas rojas alrededor.
-const PLAZA_CX = MAP_COLS / 2;
-const PLAZA_CY = MAP_ROWS + 9;
-const PLAZA_RADIUS = 6.5;
-const PLAZA_BORDER = 1;
 
 export function preloadOutside(scene) {
   scene.load.spritesheet(SHEET_KEY, '/outside/exterior_c_tiles.png', {
@@ -81,30 +72,10 @@ function ringOf(tx, ty) {
   return { d: Math.max(dx, dy) };
 }
 
-// Info del patio circular en esta celda, o null si esta fuera de el.
-function plazaAt(tx, ty) {
-  const dx = tx - PLAZA_CX;
-  const dy = ty - PLAZA_CY;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist > PLAZA_RADIUS) return null;
-  const angle = Math.atan2(dy, dx);
-  const sector = Math.floor(((angle + Math.PI) / (Math.PI * 2)) * 12) % 12;
-  return { border: dist > PLAZA_RADIUS - PLAZA_BORDER, sector };
-}
-
-function plazaPoint(radius, angleDeg) {
-  const a = (angleDeg * Math.PI) / 180;
-  return {
-    x: (PLAZA_CX + Math.cos(a) * radius) * TILE + TILE / 2,
-    y: (PLAZA_CY + Math.sin(a) * radius) * TILE + TILE / 2,
-  };
-}
-
-// Que hay en cada celda: patio circular al sur, adoquin junto al edificio, seto y cesped.
+// Que hay en cada celda: adoquin junto al edificio, seto y cesped. El patio real del
+// Edificio C ahora vive dentro del vestibulo (ver mapLayout.js), no aqui afuera.
 function kindAt(tx, ty, grid) {
   if (isInside(tx, ty)) return grid[ty][tx] ? 'building' : 'paver';
-  const plaza = plazaAt(tx, ty);
-  if (plaza) return plaza.border ? 'plaza-border' : 'plaza';
   const { d } = ringOf(tx, ty);
   if (d <= PAVER_RING) return 'paver';
   return d === HEDGE_RING ? 'hedge' : 'grass';
@@ -170,9 +141,7 @@ function renderGround(scene, grid, rand) {
       const { x, y } = cell(tx, ty);
       const inMountains = ty < -m + MOUNTAIN_ROWS;
       let frame;
-      if (kind === 'plaza-border') frame = PAVER[0];
-      else if (kind === 'plaza') frame = plazaAt(tx, ty).sector % 2 === 0 ? PLAZA : PAVER_VAR;
-      else if (kind === 'paver') frame = edgeFrame(tx, ty, grid) ?? pick(PAVER, rand);
+      if (kind === 'paver') frame = edgeFrame(tx, ty, grid) ?? pick(PAVER, rand);
       else if (kind === 'hedge') frame = HEDGE;
       else frame = rand() < 0.05 ? DIRT : pick(GRASS, rand);
 
@@ -186,7 +155,7 @@ function renderGround(scene, grid, rand) {
         if (rand() < 0.75) tile.setTint(tint).setTintMode(Phaser.TintModes.ADD);
       }
 
-      const decalChance = kind === 'paver' || kind === 'plaza' ? 0.04 : kind === 'grass' ? 0.1 : 0;
+      const decalChance = kind === 'paver' ? 0.04 : kind === 'grass' ? 0.1 : 0;
       if (rand() < decalChance) {
         const decal = pick(kind === 'grass' ? GRASS_DECALS : PAVER_DECALS, rand);
         scene.add.image(x, y, SHEET_KEY, decal).setScale(SCALE).setDepth(DEPTH_DECAL).setAlpha(0.8);
@@ -223,12 +192,6 @@ function addStreetLamp(scene, lighting, x, y, rand) {
   lighting?.addLight({ x, y: y - 58, radius: 230, mode: roll < 0.4 ? 'broken' : roll < 0.7 ? 'flicker' : 'steady' });
 }
 
-// Farola del patio: siempre encendida, es el unico rincon realmente seguro afuera.
-function addPlazaLamp(scene, lighting, x, y) {
-  addProp(scene, 'farola', x, y, { origin: [0.5, 0.95] });
-  lighting?.addLight({ x, y: y - 58, radius: 210, mode: 'steady' });
-}
-
 function renderFurnishings(scene, rand, lighting) {
   const at = (tx, ty) => cell(tx, ty);
   const jitter = () => (rand() - 0.5) * 16;
@@ -255,30 +218,13 @@ function renderFurnishings(scene, rand, lighting) {
   addProp(scene, 'busto', at(14, MAP_ROWS + 1).x, at(14, MAP_ROWS + 1).y, { origin: [0.5, 0.85] });
   addProp(scene, 'maquina_expendedora', at(16, MAP_ROWS + 1).x, at(16, MAP_ROWS + 1).y, { origin: [0.5, 0.9] });
 
-  // El patio circular: arbol central, tres farolas en triangulo y bancas alrededor.
-  const center = plazaPoint(0, 0);
-  addProp(scene, 'arbol', center.x, center.y, { scale: 1.6, origin: [0.5, 0.9] });
-  [90, 210, 330].forEach((deg) => {
-    const { x, y } = plazaPoint(3.4, deg);
-    addPlazaLamp(scene, lighting, x, y);
-  });
-  for (let i = 0; i < 8; i += 1) {
-    const deg = (360 / 8) * i + 15;
-    const { x, y } = plazaPoint(PLAZA_RADIUS - 0.4, deg);
-    addProp(scene, 'banca_roja', x, y);
-  }
-
-  // Punto de encuentro con sombrillas y mesas altas, al borde del patio (como el banco con
-  // mochila y sombrillas de la foto).
-  [[6.5, 200], [6.5, 250]].forEach(([radius, deg]) => {
-    const { x, y } = plazaPoint(radius, deg);
+  // Sombrillas y mesas junto a la fachada sur, como el banco con mochila de la foto.
+  [[19, MAP_ROWS + 1], [21, MAP_ROWS + 1]].forEach(([tx, ty]) => {
+    const { x, y } = at(tx, ty);
     addProp(scene, 'sombrilla_roja', x + jitter(), y + jitter());
   });
-  [[5.5, 225]].forEach(([radius, deg]) => {
-    const { x, y } = plazaPoint(radius, deg);
-    addProp(scene, 'mesa_redonda', x + jitter(), y + jitter());
-    addProp(scene, 'silla_negra', x + 20, y + 18);
-  });
+  addProp(scene, 'mesa_redonda', at(23, MAP_ROWS + 1).x + jitter(), at(23, MAP_ROWS + 1).y + jitter());
+  addProp(scene, 'silla_negra', at(23, MAP_ROWS + 1).x + 20, at(23, MAP_ROWS + 1).y + 18);
 }
 
 // Viste las paredes que dan al exterior con la fachada de ladrillo calido del Edificio C:
@@ -320,8 +266,8 @@ function renderFacade(scene, grid, rand) {
 }
 
 // Rellena todo lo que no es edificio con el entorno del Edificio C: adoquin junto a los
-// muros, seto y cesped alrededor, el patio circular con sus tres farolas al sur y las
-// montanas del fondo, mas la fachada de ladrillo, en tono post-apocaliptico.
+// muros, seto y cesped alrededor, montanas de fondo y la fachada de ladrillo. El patio con
+// las farolas vive dentro del vestibulo (ver mapLayout.js), no aqui afuera.
 export function renderOutside(scene, grid, lighting) {
   lampCount = 0;
   const rand = seeded(20240921);
