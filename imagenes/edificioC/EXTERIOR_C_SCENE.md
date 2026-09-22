@@ -21,7 +21,7 @@ fuera de este alcance (quedó como opción descartada, ver conversación).
 
 | # | Zona de la foto | Dónde vive en el juego | Qué se implementó | Qué se simplificó |
 |---|---|---|---|---|
-| 1 | Patio central con 3 farolas y bancas rojas | Vestíbulo central (`hub`, filas 10–13, piso 1 únicamente) | Piso en espina de pescado (`setHerringboneFloor`), 3 farolas en triángulo siempre encendidas (`plaza-lamp`, luz fija sin parpadeo — es el único rincón "seguro"), árbol/jardinera central con colisión pequeña (`plaza-tree`), 4 bancas rojas alrededor (`plaza-bench`) | No es un patio circular real: el vestíbulo sigue siendo un corredor recto de 40×6 tiles (limitación del sistema de salas actual). Las farolas/bancas están distribuidas dentro de ese rectángulo, no en círculo |
+| 1 | Patio central con 3 farolas y bancas rojas, centro circular con 4 árboles | Salón central del piso 1 (`buildCourtyard`, columnas 10–21, filas 3–20) | Un cuarto abierto de 12×18 tiles (mucho más ancho que el mínimo de 4 tiles) conectado a los dos brazos del vestíbulo por las filas 10–13, sin ningún muro entre medio — se puede cruzar de un lado al otro. Piso en espina de pescado, columnas de pórtico en dos hileras, **4 árboles en cruz** (norte/sur/este/oeste) exactamente en el centro, 3 farolas y 4 bancas rojas alrededor, una mesa con sillas junto al fondo | Las salas "Sala de Estudio" y "Terraza" (las dos de la izquierda) se angostaron de 8 a 7 columnas para dejar libre el espacio del salón central — sus muebles se reacomodaron dentro de esa medida menor |
 | 2 | Fachada de dos pisos, columnas cada 5–7 tiles, ventanas variadas | Muros exteriores de todas las salas y del vestíbulo (`renderFacade` en `outsideDecor.js`) | Columnas crema cada 6 tiles, ventanas sanas/rotas/tapiadas/oscuras repartidas al azar (12% de puntos de tensión), zócalo claro en la base | Es un solo nivel visual (no hay un segundo piso real con su propio corredor); la "fachada de dos pisos" se sugiere con columnas + remate, no se modela en altura |
 | 3 | Corredor porticado con piso en espina de pescado y columna de concreto | El mismo vestíbulo central | Piso en espina de pescado en las 4 filas caminables, columnas cada 6 tiles (mismas de la zona 1, tintadas crema), luces fluorescentes fijas en el techo (`Lighting.addLight` con `bulb:false`, sin bombillo visible, sin parpadeo) reutilizando el sistema de luces ya existente | Sin sprite de luminaria de techo (solo el resplandor); no hay barandal de segundo piso |
 | 4 | Vestíbulo de la torre con escalera de ladrillo y mesas altas | Los dos bloques de escalera del piso 1 (subir/bajar) | Mesa redonda + 2 sillas negras junto a cada hueco de escalera (`plaza-table`) | La escalera sigue siendo el sprite genérico `v2_escalera` (no se re-texturizó a ladrillo por falta de un tile de escalera propio en el set C) |
@@ -42,22 +42,28 @@ arriesgar romper esa misión para el equipo.
 
 ## Colisión y backend
 
-- Las salas/paredes/puertas interactivas (paredes tipo `wall`/`glass`) **no
-  cambiaron de forma**, solo se renombraron dos salas (`aula`→`estudio-c`,
-  `profesores`→`deposito`), lo que cambió sus `doorId`
-  (`f1-aula`→`f1-estudio-c`, `f1-profesores`→`f1-deposito`).
+- Esta vez sí cambió la forma real del piso 1: las salas izquierdas se
+  angostaron (de `x=6,w=8` a `x=3,w=7`, ver `ROOM_TOP_LEFT_C` /
+  `ROOM_BOTTOM_LEFT_C` en `mapLayout.js`, solo usadas en el piso 1 — los
+  pisos 2 y 3 siguen con las salas genéricas originales, sin tocar) para
+  abrir la columna 10–21 donde vive el salón central (`buildCourtyard`).
+  Antes esas dos salas terminaban en la columna 13/14; ahora terminan en
+  la 9, exactamente donde ya estaba `COL_LEFT` (la columna de la puerta),
+  así que la puerta sigue funcionando igual, solo la sala es más angosta.
 - Por eso se regeneró `backend/src/main/resources/floor1.grid` corriendo
-  `node frontend/scripts/export-floor-grid.mjs`. El diff resultante son
-  **solo esas dos líneas de puerta**; el resto del mapa (muros, piso,
-  ancho de pasillos) es idéntico al de antes.
-- Los props nuevos (farolas, árbol, bancas, mesas) son sólidos del lado del
-  cliente (`this.solids`) pero el backend no los conoce — **esto ya pasaba
-  antes** con las columnas y bancas existentes (el backend nunca tuvo esa
-  información), así que no es una inconsistencia nueva que yo haya
-  introducido.
-- El árbol central del patio es el único prop nuevo con colisión; se dejó
-  de un tile para no cerrar el paso — el vestíbulo sigue teniendo 4 filas
-  caminables de alto en todo su ancho.
+  `node frontend/scripts/export-floor-grid.mjs`. Revisé el diff a mano
+  (16 de 30 filas cambian): la doble pared sólida que antes separaba las
+  columnas 9–22 se reemplaza por el salón abierto; las filas 10–13 (el
+  corredor que cruza de lado a lado) **no cambiaron**, siguen siendo
+  caminables de punta a punta como antes.
+- Los props (farolas, columnas, bancas, mesas, los 4 árboles) son sólidos
+  del lado del cliente (`this.solids`) pero el backend no los conoce —
+  **esto ya pasaba antes** con las columnas y bancas del vestíbulo original
+  (el backend nunca tuvo esa información), así que no es una inconsistencia
+  nueva. Cada árbol bloquea un solo tile y están separados por dos tiles
+  entre sí (a 2 de distancia del centro), así que el jefe zombi tiene de
+  sobra para rodearlos por cualquier lado; el salón entero es mucho más
+  ancho que el mínimo de 4 tiles en toda su extensión, no solo en el borde.
 
 ## Verificación
 
@@ -66,6 +72,14 @@ arriesgar romper esa misión para el equipo.
   cambio y no se tocó).
 - `npm run build`: compila sin errores.
 - Diff de `floor1.grid` revisado a mano línea por línea (ver arriba).
+- Además de leer el diff, corrí `buildFloorLayout({floor:1})` directamente
+  con Node (sin navegador) y consulté el tipo de celda columna por columna
+  en las filas clave (9, 10, 13, 14, 4, 19) para confirmar que las filas
+  10–13 quedan sin ningún muro entre la columna 0 y la 34, y que las
+  paredes del salón central caen exactamente donde se calcularon
+  (`COURTYARD_X0=10`, `COURTYARD_X1=21`). Los 4 árboles salieron en
+  `(15.5, 9.5)`, `(15.5, 13.5)`, `(13.5, 11.5)`, `(17.5, 11.5)` — una cruz
+  de 2 tiles de radio alrededor del centro `(15.5, 11.5)`, como se pedía.
 - **No se pudo verificar con el navegador ni con el backend Java en esta
   sesión**: la máquina quedó con memoria crítica (~30 MB libres de 7.9 GB)
   durante la sesión de pruebas, y arrancar Chrome o Maven en ese estado

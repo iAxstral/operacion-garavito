@@ -146,6 +146,17 @@ export const FLOOR_COUNT = 3;
 const COL_LEFT = 9;
 const COL_RIGHT = 27;
 
+// Salon central del piso 1 (el "cuadrado con patio circular" del Edificio C): un cuarto
+// grande y abierto, entre las salas izquierdas angostadas y las salas derechas originales,
+// que se conecta a ambos brazos del vestibulo para poder cruzar de un lado al otro.
+const COURTYARD_X0 = 10;
+const COURTYARD_X1 = 21;
+const COURTYARD_Y0 = 3;
+const COURTYARD_Y1 = 20;
+const COURTYARD_CX = (COURTYARD_X0 + COURTYARD_X1) / 2;
+const COURTYARD_CY = (COURTYARD_Y0 + COURTYARD_Y1) / 2;
+const COURTYARD_RADIUS = 3;
+
 const FURNITURE_COLORS = {
   desk: 0x8a5a34,
   table: 0x6b4a2f,
@@ -189,19 +200,25 @@ const ROOM_TOP_RIGHT = { side: 'top', x: 22, w: 10, h: 7, doorCol: COL_RIGHT };
 const ROOM_BOTTOM_LEFT = { side: 'bottom', x: 6, w: 8, h: 7, doorCol: COL_LEFT };
 const ROOM_BOTTOM_RIGHT = { side: 'bottom', x: 23, w: 10, h: 8, doorCol: COL_RIGHT };
 
+// Salas izquierdas del piso 1, mas angostas que las genericas de arriba: dejan libre la
+// franja central (columnas 10-21) para el patio circular del Edificio C. Solo se usan en el
+// piso 1; los pisos 2 y 3 siguen con ROOM_TOP_LEFT/ROOM_BOTTOM_LEFT sin cambios.
+const ROOM_TOP_LEFT_C = { side: 'top', x: 3, w: 7, h: 7, doorCol: COL_LEFT };
+const ROOM_BOTTOM_LEFT_C = { side: 'bottom', x: 3, w: 7, h: 7, doorCol: COL_LEFT };
+
 const FLOORS = {
   1: {
     name: 'Piso 1',
     rooms: [
       {
-        ...ROOM_TOP_LEFT,
+        ...ROOM_TOP_LEFT_C,
         id: 'estudio-c',
         label: 'Sala de Estudio',
         // Filas de mesas con ventanales al parqueadero, como en las fotos del Edificio C.
         furniture: () => [
-          ...tiles([7, 9, 11], [3], 34, 22, FURNITURE_COLORS.table),
-          ...tiles([7, 9, 11], [5], 34, 22, FURNITURE_COLORS.table),
-          ...tiles([7, 8, 9, 10, 11, 12], [2, 6], 14, 14, FURNITURE_COLORS.chair),
+          ...tiles([4, 6, 8], [3], 30, 20, FURNITURE_COLORS.table),
+          ...tiles([4, 6, 8], [5], 30, 20, FURNITURE_COLORS.table),
+          ...tiles([4, 5, 6, 7, 8, 9], [2, 6], 12, 12, FURNITURE_COLORS.chair),
         ],
       },
       {
@@ -215,12 +232,12 @@ const FLOORS = {
         ],
       },
       {
-        ...ROOM_BOTTOM_LEFT,
+        ...ROOM_BOTTOM_LEFT_C,
         id: 'terraza',
         label: 'Terraza',
         furniture: () => [
-          ...tableWithChairs(8, 18, 40, FOUR_CHAIRS, FURNITURE_COLORS.table),
-          ...tableWithChairs(11, 20, 40, FOUR_CHAIRS, FURNITURE_COLORS.table),
+          ...tableWithChairs(5, 18, 36, TWO_CHAIRS, FURNITURE_COLORS.table),
+          ...tableWithChairs(7, 20, 36, TWO_CHAIRS, FURNITURE_COLORS.table),
         ],
       },
       {
@@ -348,6 +365,59 @@ function buildRoom(grid, decorations, furniture, labels, floor, room) {
   furniture.push(...room.furniture());
 }
 
+// Construye el salon central del piso 1: un cuarto grande y abierto con columnas de portico
+// y un jardin circular de 4 arboles en el medio, uno por punto cardinal — el "centro
+// circular" del Edificio C. Se conecta con los dos brazos del vestibulo (izquierdo y
+// derecho) a la altura del corredor original, para poder cruzar de un lado al otro.
+function buildCourtyard(grid, decorations) {
+  const w = COURTYARD_X1 - COURTYARD_X0 + 1;
+  const h = COURTYARD_Y1 - COURTYARD_Y0 + 1;
+  fillFloorRect(grid, COURTYARD_X0, COURTYARD_Y0, w, h);
+  outlineWallRect(grid, COURTYARD_X0, COURTYARD_Y0, w, h);
+
+  // Boca de conexion con los dos brazos del vestibulo (mismas filas que su corredor).
+  for (let y = 10; y <= 13; y += 1) {
+    setFloor(grid, COURTYARD_X0, y);
+    setFloor(grid, COURTYARD_X1, y);
+  }
+
+  // Piso en espina de pescado en todo el salon.
+  for (let y = COURTYARD_Y0 + 1; y < COURTYARD_Y1; y += 1) {
+    for (let x = COURTYARD_X0 + 1; x < COURTYARD_X1; x += 1) {
+      setHerringboneFloor(grid, x, y);
+    }
+  }
+
+  // Columnas del portico a lo largo del salon, como en el corredor de la foto.
+  [COURTYARD_Y0 + 1, COURTYARD_Y1 - 1].forEach((y) => {
+    [COURTYARD_X0 + 2, COURTYARD_CX, COURTYARD_X1 - 2].forEach((x) => {
+      decorations.push({ type: 'column', x, y });
+    });
+  });
+
+  // Jardin circular central: 4 arboles, uno por punto cardinal (norte/sur/este/oeste).
+  [[0, -1], [0, 1], [-1, 0], [1, 0]].forEach(([dx, dy]) => {
+    decorations.push({
+      type: 'plaza-tree',
+      x: COURTYARD_CX + dx * (COURTYARD_RADIUS - 1),
+      y: COURTYARD_CY + dy * (COURTYARD_RADIUS - 1),
+    });
+  });
+
+  // Farolas y bancas alrededor del jardin, y mesas altas cerca de las columnas del fondo.
+  decorations.push({ type: 'plaza-lamp', x: COURTYARD_CX, y: COURTYARD_Y0 + 1.4 });
+  decorations.push({ type: 'plaza-lamp', x: COURTYARD_CX - 3.5, y: COURTYARD_Y1 - 1.4 });
+  decorations.push({ type: 'plaza-lamp', x: COURTYARD_CX + 3.5, y: COURTYARD_Y1 - 1.4 });
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([dx, dy]) => {
+    decorations.push({
+      type: 'plaza-bench',
+      x: COURTYARD_CX + dx * (COURTYARD_RADIUS + 1.6),
+      y: COURTYARD_CY + dy * (COURTYARD_RADIUS + 1.6),
+    });
+  });
+  decorations.push({ type: 'plaza-table', x: COURTYARD_CX, y: COURTYARD_Y1 - 3 });
+}
+
 export function buildFloorLayout({ floor = 1 } = {}) {
   const config = FLOORS[floor];
   const hasUpStairs = floor < FLOOR_COUNT;
@@ -409,33 +479,13 @@ export function buildFloorLayout({ floor = 1 } = {}) {
     }
   }
 
-  [6, 13, 19, 25, 31].forEach((x) => {
-    decorations.push({ type: 'column', x, y: hub.y });
-  });
-
   if (floor === 1) {
-    // Patio central porticado del Edificio C: tres farolas en triangulo, un arbol/jardinera
-    // en el centro y bancas rojas alrededor, sobre el piso en espina de pescado del vestibulo.
-    const midX = hub.x + hub.w / 2;
-    const midY = hub.y + hub.h / 2;
-    [[midX - 3, midY - 1], [midX + 3, midY - 1], [midX, midY + 1.5]].forEach(([px, py]) => {
-      decorations.push({ type: 'plaza-lamp', x: px, y: py });
-    });
-    decorations.push({ type: 'plaza-tree', x: midX, y: midY });
-    [
-      [midX - 5, midY - 1.6], [midX + 5, midY - 1.6],
-      [midX - 5, midY + 1.6], [midX + 5, midY + 1.6],
-    ].forEach(([px, py]) => {
-      decorations.push({ type: 'plaza-bench', x: px, y: py });
-    });
-    // Mesas altas con banquitos bajo el hueco de la escalera (subida y bajada).
-    if (downStairs) {
-      decorations.push({ type: 'plaza-table', x: hub.x + 6.5, y: hub.y + 1.3 });
-    }
-    if (upStairs) {
-      decorations.push({ type: 'plaza-table', x: hub.x + hub.w - 6.5, y: hub.y + 1.3 });
-    }
+    // En el piso 1 las columnas 13/19 quedan dentro del salon central: el propio
+    // buildCourtyard pone su portico ahi, para no duplicar columnas.
+    [6, 25, 31].forEach((x) => decorations.push({ type: 'column', x, y: hub.y }));
+    buildCourtyard(grid, decorations);
   } else {
+    [6, 13, 19, 25, 31].forEach((x) => decorations.push({ type: 'column', x, y: hub.y }));
     decorations.push({ type: 'bench', x: 14, y: hub.y + hub.h - 2 });
     decorations.push({ type: 'bench', x: 21, y: hub.y + 1 });
   }
