@@ -22,6 +22,8 @@ import {
   requestMissionComplete,
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
+import Lighting from './Lighting';
+import { OUTSIDE_MARGIN_TILES, preloadOutside, renderOutside } from './outsideDecor';
 
 const DASH_SPEED = 420;
 const DASH_MS = 180;
@@ -31,6 +33,17 @@ const ATTACK_REQUEST_MS = 400;
 const CHARGED_COOLDOWN_MS = 6000;
 const CHARGED_RADIUS = 150;
 const FLOOR_FADE_MS = 180;
+const ROAR_RANGE_PX = 260;
+const GROAN_RANGE_PX = 170;
+const BITE_RANGE_PX = 48;
+const FAR_COOLDOWN_MS = 6000;
+const NEAR_COOLDOWN_MS = 1800;
+const MAX_ROAR_VOLUME = 0.75;
+const MAX_GROAN_VOLUME = 0.5;
+const BITE_COOLDOWN_MS = 1500;
+const RAIN_MIN_VOLUME = 0.3;
+const RAIN_MAX_VOLUME = 0.6;
+const RAIN_SWELL_MS = 11000;
 const TOUCH_DEADZONE = 0.3;
 const REMOTE_LERP_PER_SECOND = 10;
 
@@ -142,6 +155,59 @@ export default class MainScene extends Phaser.Scene {
     VENDORS.forEach((vendor) => {
       this.load.image(vendor.sprite, vendor.spriteFile);
     });
+
+    preloadOutside(this);
+
+    this.load.audio('zombie_roar', '/sounds/zombie_roar.wav');
+    this.load.audio('zombie_groan', '/sounds/zombie_groan.wav');
+    this.load.audio('zombie_attack', '/sounds/zombie_attack.wav');
+    this.load.audio('rain', '/sounds/rain.wav');
+  }
+
+  startRain() {
+    // El sound manager es global: la lluvia sigue sonando al cambiar de piso.
+    if (this.sound.get('rain')) return;
+    this.sound.add('rain', { loop: true, volume: RAIN_MIN_VOLUME }).play();
+  }
+
+  playZombieSound(key, volume) {
+    const sound = this.sound.get(key) ?? this.sound.add(key);
+    if (sound.isPlaying) return;
+    sound.play({ volume });
+  }
+
+  // La lluvia sube y baja despacio para no ser un ruido constante.
+  updateRain(time) {
+    const rain = this.sound.get('rain');
+    if (!rain) return;
+    const swell = 0.5 + 0.5 * Math.sin((time / RAIN_SWELL_MS) * Math.PI * 2);
+    rain.setVolume(RAIN_MIN_VOLUME + (RAIN_MAX_VOLUME - RAIN_MIN_VOLUME) * swell);
+  }
+
+  // Cuanto mas cerca el zombi, mas fuerte y mas seguido suena.
+  updateZombieAudio(time) {
+    let nearest = null;
+    let bite = false;
+
+    this.zombiesOnFloor().forEach((zombie) => {
+      const distance = Math.hypot(this.player.x - zombie.x, this.player.y - zombie.y);
+      if (distance <= BITE_RANGE_PX) bite = true;
+      const range = zombie.tough ? ROAR_RANGE_PX : GROAN_RANGE_PX;
+      if (distance > range) return;
+      const closeness = 1 - distance / range;
+      if (!nearest || closeness > nearest.closeness) nearest = { closeness, tough: zombie.tough };
+    });
+
+    if (bite && time >= this.nextBiteSoundAt) {
+      this.nextBiteSoundAt = time + BITE_COOLDOWN_MS;
+      this.playZombieSound('zombie_attack', 0.5);
+    }
+    if (!nearest || time < this.nextZombieSoundAt) return;
+
+    const { closeness, tough } = nearest;
+    this.nextZombieSoundAt = time + FAR_COOLDOWN_MS - (FAR_COOLDOWN_MS - NEAR_COOLDOWN_MS) * closeness;
+    const volume = (tough ? MAX_ROAR_VOLUME : MAX_GROAN_VOLUME) * (0.15 + 0.85 * closeness * closeness);
+    this.playZombieSound(tough ? 'zombie_roar' : 'zombie_groan', volume);
   }
 
   create() {
@@ -163,7 +229,8 @@ export default class MainScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, MAP_PIXEL_WIDTH, MAP_PIXEL_HEIGHT);
     this.physics.add.collider(this.player, this.solids);
 
-    this.cameras.main.setBounds(0, 0, MAP_PIXEL_WIDTH, MAP_PIXEL_HEIGHT);
+    const outside = OUTSIDE_MARGIN_TILES * TILE;
+    this.cameras.main.setBounds(-outside, -outside, MAP_PIXEL_WIDTH + 2 * outside, MAP_PIXEL_HEIGHT + 2 * outside);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
 
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -182,6 +249,9 @@ export default class MainScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.KeyCodes.D,
     });
 
+    this.nextBiteSoundAt = 0;
+    this.nextZombieSoundAt = 0;
+    this.startRain();
     this.createFoodItems();
     this.createVendors();
     this.createMissionZones();
@@ -190,6 +260,7 @@ export default class MainScene extends Phaser.Scene {
     this.showFloorBanner(layout.name);
     this.events.once('shutdown', () => {
       this.unsubscribeGameState?.();
+      this.lighting?.destroy();
       setNearVendor(null);
       setNearStairs(null);
     });
@@ -207,7 +278,7 @@ export default class MainScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
-      .setDepth(100);
+      .setDepth(6000);
     this.tweens.add({ targets: banner, alpha: 0, delay: 1200, duration: 700, onComplete: () => banner.destroy() });
   }
 
@@ -334,6 +405,7 @@ export default class MainScene extends Phaser.Scene {
   update(time, delta) {
     if (!this.player) return;
     this.syncRemotePlayers(delta);
+    this.lighting.update(time, this.player, this.remotePlayers);
 
     if (isInputLocked()) {
       this.player.setVelocity(0, 0);
@@ -405,6 +477,8 @@ export default class MainScene extends Phaser.Scene {
     this.updateFoodProximity();
     this.updateVendorProximity();
     this.updateMissionProximity();
+    this.updateZombieAudio(time);
+    this.updateRain(time);
   }
 
   updateAttack(time) {
@@ -573,10 +647,13 @@ export default class MainScene extends Phaser.Scene {
     this.stairsZones = [];
     this.doors = [];
 
+    this.lighting = new Lighting(this);
+    renderOutside(this, layout.grid, this.lighting);
     this.renderGridTiles(layout.grid);
     this.renderDecorations(layout.decorations);
     this.renderFurniture(layout.furniture);
     this.renderLabels(layout.labels);
+    this.addInteriorLights(layout);
 
     [
       { kind: 'up', stairs: layout.upStairs },
@@ -606,6 +683,29 @@ export default class MainScene extends Phaser.Scene {
       });
   }
 
+  // Bombillos del edificio: solo algunas columnas del vestibulo, y luz suave en misiones y vendedores.
+  addInteriorLights(layout) {
+    const modes = ['flicker', 'steady', 'broken'];
+    layout.decorations
+      .filter((deco) => deco.type === 'column')
+      .filter((deco, i) => i % 2 === 0)
+      .forEach((deco, i) => {
+        this.lighting.addLight({
+          x: deco.x * TILE + TILE / 2,
+          y: (deco.y + 2.5) * TILE,
+          radius: 260,
+          mode: modes[i % modes.length],
+        });
+      });
+
+    VENDORS.filter((vendor) => vendor.floor === this.floor).forEach((vendor) => {
+      this.lighting.addLight({ x: vendor.x, y: vendor.y, radius: 150, mode: 'steady', bulb: false });
+    });
+    MISSION_ZONES.filter((zone) => zone.floor === this.floor).forEach((zone) => {
+      this.lighting.addLight({ x: zone.x, y: zone.y, radius: 130, mode: 'steady', bulb: false });
+    });
+  }
+
   renderGridTiles(grid) {
     for (let y = 0; y < MAP_ROWS; y += 1) {
       for (let x = 0; x < MAP_COLS; x += 1) {
@@ -614,10 +714,17 @@ export default class MainScene extends Phaser.Scene {
 
         const cx = x * TILE + TILE / 2;
         const cy = y * TILE + TILE / 2;
-        const image = this.add.image(cx, cy, cell.texture);
+        // El piso del patio (espina de pescado / baldosa de bano) viene del tileset exterior
+        // del Edificio C en vez de un archivo suelto.
+        const image = cell.sheet === 'outside'
+          ? this.add.image(cx, cy, 'outside_tiles', cell.frame).setScale(TILE / 32)
+          : this.add.image(cx, cy, cell.texture);
 
         if (cell.type === 'landing') {
           image.setTint(LANDING_TINT);
+        } else if (cell.type === 'wall') {
+          // Tinte calido para que los muros interiores combinen con el ladrillo del Edificio C.
+          image.setTint(0xd9b79a);
         }
 
         if (SOLID_GRID_TYPES.has(cell.type)) {
@@ -632,7 +739,8 @@ export default class MainScene extends Phaser.Scene {
       if (deco.type === 'column') {
         const cx = deco.x * TILE + TILE / 2;
         const cy = deco.y * TILE + TILE;
-        const image = this.add.image(cx, cy, 'v2_columna').setDepth(5);
+        // Tinte crema para que las columnas combinen con el patio del Edificio C.
+        const image = this.add.image(cx, cy, 'v2_columna').setDepth(5).setTint(0xd8cdb6);
         this.solids.add(image);
         return;
       }

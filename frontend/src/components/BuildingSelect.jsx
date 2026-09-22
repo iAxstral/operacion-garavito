@@ -8,7 +8,7 @@ const BUILDINGS = [
   { id: 'G', button: [259, 105, 370, 146], marker: [700, 304, 745, 349], extra: [[634, 372, 656, 398]] },
   { id: 'A', button: [385, 105, 497, 146], marker: [485, 287, 530, 331] },
   { id: 'B', button: [511, 105, 623, 146], marker: [398, 218, 443, 262], extra: [[334, 306, 360, 334]] },
-  { id: 'C', button: [637, 105, 749, 146], marker: [197, 258, 243, 303] },
+  { id: 'C', enabled: true, button: [637, 105, 749, 146], marker: [197, 258, 243, 303] },
   { id: 'Biblioteca', button: [763, 105, 889, 146], marker: [525, 232, 648, 266] },
 ];
 
@@ -29,7 +29,7 @@ export default function BuildingSelect({ onSelect, onBack }) {
       onSelect(building.id);
       return;
     }
-    setNotice(`El edificio ${building.id} todavía no está disponible. Por ahora solo el edificio F.`);
+    setNotice(`El edificio ${building.id} todavía no está disponible. Por ahora solo los edificios F y C.`);
   };
 
   return (
@@ -63,7 +63,7 @@ export default function BuildingSelect({ onSelect, onBack }) {
           Volver
         </button>
         <span className="building-select-notice">
-          {notice ?? 'Elige el edificio F para comenzar la operación.'}
+          {notice ?? 'Elige el edificio F o el edificio C para comenzar la operación.'}
         </span>
       </div>
     </div>

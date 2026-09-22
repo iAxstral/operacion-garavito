@@ -41,6 +41,18 @@ function setLanding(grid, x, y) {
   grid[y][x] = { type: 'landing', texture: floorVariant(x, y) };
 }
 
+// Piso en espina de pescado del patio del Edificio C, para el corredor central.
+// sheet: 'outside' hace que MainScene tome el frame del tileset exterior en vez de un archivo suelto.
+function setHerringboneFloor(grid, x, y) {
+  const frame = (x + y) % 2 === 0 ? 23 : 24;
+  grid[y][x] = { type: 'floor', sheet: 'outside', frame };
+}
+
+// Baldosa hueso del acceso a banos, como en las fotos del Edificio C.
+function setBathFloor(grid, x, y) {
+  grid[y][x] = { type: 'floor', sheet: 'outside', frame: 26 };
+}
+
 function fillFloorRect(grid, x0, y0, w, h) {
   for (let y = y0; y < y0 + h; y += 1) {
     for (let x = x0; x < x0 + w; x += 1) {
@@ -348,6 +360,12 @@ export function buildFloorLayout({ floor = 1 } = {}) {
     setWall(grid, x, hub.y);
     setWall(grid, x, hub.y + hub.h - 1);
   }
+  // El vestibulo central es el patio del Edificio C: piso en espina de pescado.
+  for (let y = hub.y + 1; y < hub.y + hub.h - 1; y += 1) {
+    for (let x = hub.x; x < hub.x + hub.w; x += 1) {
+      setHerringboneFloor(grid, x, y);
+    }
+  }
   [COL_LEFT, COL_RIGHT].forEach((col) => {
     setFloor(grid, col, hub.y);
     setFloor(grid, col, hub.y + hub.h - 1);
@@ -364,6 +382,9 @@ export function buildFloorLayout({ floor = 1 } = {}) {
     }
     labels.push({ x: (hub.x + 0.3) * TILE, y: (hub.y + 2) * TILE + 6, text: 'Baños' });
     decorations.push({ type: 'bench', x: hub.x + 3, y: hub.y + 2 });
+    for (let by = hub.y + 1; by < hub.y + hub.h - 1; by += 1) {
+      for (let bx = hub.x + 1; bx <= hub.x + 2; bx += 1) setBathFloor(grid, bx, by);
+    }
   }
 
   let upStairs = null;
