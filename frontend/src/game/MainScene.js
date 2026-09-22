@@ -23,7 +23,7 @@ import {
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
 import Lighting from './Lighting';
-import { OUTSIDE_MARGIN_TILES, preloadOutside, renderOutside } from './outsideDecor';
+import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
 const DASH_SPEED = 420;
 const DASH_MS = 180;
@@ -704,6 +704,13 @@ export default class MainScene extends Phaser.Scene {
     MISSION_ZONES.filter((zone) => zone.floor === this.floor).forEach((zone) => {
       this.lighting.addLight({ x: zone.x, y: zone.y, radius: 130, mode: 'steady', bulb: false });
     });
+
+    // Luces fluorescentes del techo del corredor porticado: parejas, sin foco visible.
+    layout.decorations
+      .filter((deco) => deco.type === 'plaza-lamp' || deco.type === 'plaza-tree')
+      .forEach((deco) => {
+        this.lighting.addLight({ x: deco.x * TILE + TILE / 2, y: deco.y * TILE + TILE / 2, radius: 200, mode: 'steady', bulb: false });
+      });
   }
 
   renderGridTiles(grid) {
@@ -773,6 +780,63 @@ export default class MainScene extends Phaser.Scene {
           .setOrigin(0.5)
           .setAlpha(0.55)
           .setDepth(2);
+        return;
+      }
+
+      if (deco.type === 'plaza-lamp') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        this.add.image(cx, cy, PROPS_KEY, 'farola').setOrigin(0.5, 0.95).setDepth(6);
+        return;
+      }
+
+      if (deco.type === 'plaza-tree') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        // Jardinera/arbol central del patio: bloquea poco, el pasillo sigue teniendo 4+ tiles libres.
+        const image = this.add.image(cx, cy, PROPS_KEY, 'arbol').setOrigin(0.5, 0.85).setScale(1.1).setDepth(6);
+        this.solids.add(image);
+        return;
+      }
+
+      if (deco.type === 'plaza-bench') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        const image = this.add.image(cx, cy, PROPS_KEY, 'banca_roja').setDepth(6);
+        this.solids.add(image);
+        return;
+      }
+
+      if (deco.type === 'plaza-table') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        const table = this.add.image(cx, cy, PROPS_KEY, 'mesa_redonda').setDepth(6);
+        this.solids.add(table);
+        [[-18, -14], [18, 14]].forEach(([dx, dy]) => {
+          this.add.image(cx + dx, cy + dy, PROPS_KEY, 'silla_negra').setDepth(6);
+        });
+        return;
+      }
+
+      if (deco.type === 'bath-door') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        // Solo decorativa: el nicho de banos no tiene mecanica de puerta interactiva.
+        this.add.image(cx, cy, SHEET_KEY, 21).setScale(TILE / 32).setDepth(7);
+        return;
+      }
+
+      if (deco.type === 'pictogram') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        this.add.text(cx, cy, deco.glyph, { fontSize: '20px' }).setOrigin(0.5).setDepth(7);
+        return;
+      }
+
+      if (deco.type === 'camera') {
+        const cx = deco.x * TILE + TILE / 2;
+        const cy = deco.y * TILE + TILE / 2;
+        this.add.text(cx, cy, '📷', { fontSize: '16px' }).setOrigin(0.5).setAlpha(0.85).setDepth(7);
         return;
       }
 

@@ -195,17 +195,23 @@ const FLOORS = {
     rooms: [
       {
         ...ROOM_TOP_LEFT,
-        id: 'aula',
-        label: 'Aula F-104',
-        furniture: () => tiles([8, 10, 12], [3, 4, 5], 36, 24, FURNITURE_COLORS.desk),
+        id: 'estudio-c',
+        label: 'Sala de Estudio',
+        // Filas de mesas con ventanales al parqueadero, como en las fotos del Edificio C.
+        furniture: () => [
+          ...tiles([7, 9, 11], [3], 34, 22, FURNITURE_COLORS.table),
+          ...tiles([7, 9, 11], [5], 34, 22, FURNITURE_COLORS.table),
+          ...tiles([7, 8, 9, 10, 11, 12], [2, 6], 14, 14, FURNITURE_COLORS.chair),
+        ],
       },
       {
         ...ROOM_TOP_RIGHT,
-        id: 'profesores',
-        label: 'Sala de Profesores',
+        id: 'deposito',
+        label: 'Depósito de Servicio',
+        // Bultos y cajas apiladas: pasillo trasero de servicio abandonado.
         furniture: () => [
-          ...tiles([24, 26, 28, 30], [3], 40, 26, FURNITURE_COLORS.desk),
-          ...tiles([24, 30], [5], 40, 26, FURNITURE_COLORS.desk),
+          ...tiles([24, 25, 30, 31], [3], 42, 30, FURNITURE_COLORS.crate),
+          ...tiles([27, 28], [5], 60, 26, FURNITURE_COLORS.crate),
         ],
       },
       {
@@ -385,6 +391,12 @@ export function buildFloorLayout({ floor = 1 } = {}) {
     for (let by = hub.y + 1; by < hub.y + hub.h - 1; by += 1) {
       for (let bx = hub.x + 1; bx <= hub.x + 2; bx += 1) setBathFloor(grid, bx, by);
     }
+    // Nicho de banos como en la foto: puerta cafe, pictogramas y camara de seguridad arriba.
+    // Es decorativo (no bloquea ni abre/cierra): el nicho en si ya no tiene pared que lo selle.
+    decorations.push({ type: 'bath-door', x: hub.x + 1, y: hub.y });
+    decorations.push({ type: 'pictogram', x: hub.x + 1, y: hub.y + 1, glyph: '🚹' });
+    decorations.push({ type: 'pictogram', x: hub.x + 2, y: hub.y + 1, glyph: '🚺' });
+    decorations.push({ type: 'camera', x: hub.x + 1, y: hub.y + 3 });
   }
 
   let upStairs = null;
@@ -401,8 +413,32 @@ export function buildFloorLayout({ floor = 1 } = {}) {
     decorations.push({ type: 'column', x, y: hub.y });
   });
 
-  decorations.push({ type: 'bench', x: 14, y: hub.y + hub.h - 2 });
-  decorations.push({ type: 'bench', x: 21, y: hub.y + 1 });
+  if (floor === 1) {
+    // Patio central porticado del Edificio C: tres farolas en triangulo, un arbol/jardinera
+    // en el centro y bancas rojas alrededor, sobre el piso en espina de pescado del vestibulo.
+    const midX = hub.x + hub.w / 2;
+    const midY = hub.y + hub.h / 2;
+    [[midX - 3, midY - 1], [midX + 3, midY - 1], [midX, midY + 1.5]].forEach(([px, py]) => {
+      decorations.push({ type: 'plaza-lamp', x: px, y: py });
+    });
+    decorations.push({ type: 'plaza-tree', x: midX, y: midY });
+    [
+      [midX - 5, midY - 1.6], [midX + 5, midY - 1.6],
+      [midX - 5, midY + 1.6], [midX + 5, midY + 1.6],
+    ].forEach(([px, py]) => {
+      decorations.push({ type: 'plaza-bench', x: px, y: py });
+    });
+    // Mesas altas con banquitos bajo el hueco de la escalera (subida y bajada).
+    if (downStairs) {
+      decorations.push({ type: 'plaza-table', x: hub.x + 6.5, y: hub.y + 1.3 });
+    }
+    if (upStairs) {
+      decorations.push({ type: 'plaza-table', x: hub.x + hub.w - 6.5, y: hub.y + 1.3 });
+    }
+  } else {
+    decorations.push({ type: 'bench', x: 14, y: hub.y + hub.h - 2 });
+    decorations.push({ type: 'bench', x: 21, y: hub.y + 1 });
+  }
 
   const spawn = {
     x: COL_LEFT * TILE + TILE / 2,

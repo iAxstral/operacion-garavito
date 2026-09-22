@@ -31,7 +31,7 @@
 ########################################
 ########################################
 ########################################
-door f1-aula 9 7
-door f1-profesores 27 7
+door f1-estudio-c 9 7
+door f1-deposito 27 7
 door f1-terraza 9 16
 door f1-cafeteria 27 16
