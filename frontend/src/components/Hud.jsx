@@ -52,8 +52,12 @@ function itemIcon(itemId) {
   return CAFETERIA_MENU.find((item) => item.itemId === itemId)?.icon ?? null;
 }
 
-function kinderStatus(wave) {
+function kinderStatus(wave, boss) {
   if (wave.victory) return `¡Edificio despejado! Superaron los ${wave.total} Kinders`;
+  if (wave.bossStage) {
+    const health = boss ? ` (${boss.health}/${boss.maxHealth})` : '';
+    return `Kinder ${wave.number}/${wave.total} — ¡Derroten al Ingeniero de Sistemas!${health}`;
+  }
   if (wave.restingSeconds > 0) {
     return wave.number === 0
       ? `Prepárate — Kinder 1 en ${wave.restingSeconds}s`
@@ -277,17 +281,20 @@ export default function Hud() {
   // que cambian al cambiar de Kinder: con el objeto `state.wave` (nuevo en cada tick del
   // servidor) el cleanup cancelaba el timeout y el aviso nunca se ocultaba.
   const kinderNumber = state.wave?.number ?? 0;
-  const kinderActive = !!state.wave && state.wave.restingSeconds === 0 && state.wave.remaining > 0;
+  const kinderActive = !!state.wave && state.wave.restingSeconds === 0 && !state.wave.victory && kinderNumber > 0;
   const kinderQuota = state.wave?.quota ?? 0;
+  const bossStage = !!state.wave?.bossStage;
   useEffect(() => {
     if (kinderNumber < announcedWaveRef.current) announcedWaveRef.current = 0; // la corrida se reinicio
     if (!kinderActive || kinderNumber <= announcedWaveRef.current) return undefined;
 
     announcedWaveRef.current = kinderNumber;
-    setWaveBanner(`¡Kinder ${kinderNumber}! Maten ${kinderQuota} zombis para pasarlo`);
+    setWaveBanner(bossStage
+      ? `¡Kinder ${kinderNumber}! El Ingeniero de Sistemas viene por ustedes`
+      : `¡Kinder ${kinderNumber}! Maten ${kinderQuota} zombis para pasarlo`);
     const timeout = setTimeout(() => setWaveBanner(null), 3200);
     return () => clearTimeout(timeout);
-  }, [kinderNumber, kinderActive, kinderQuota]);
+  }, [kinderNumber, kinderActive, kinderQuota, bossStage]);
 
   const me = state.players.find((p) => p.playerId === getMyRole());
   const others = state.players.filter((p) => p.playerId !== getMyRole());
@@ -362,7 +369,7 @@ export default function Hud() {
 
       {state.wave && (
         <div className={`hud-wave${state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
-          {kinderStatus(state.wave)}
+          {kinderStatus(state.wave, state.boss)}
         </div>
       )}
 

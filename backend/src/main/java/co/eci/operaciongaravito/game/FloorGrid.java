@@ -30,7 +30,9 @@ public final class FloorGrid {
     public record SpawnPoint(double x, double y) {
     }
 
-    private record Template(char[][] cells, List<DoorSpec> doors, List<SpawnPoint> spawnPoints) {
+    /** {@code baseWalkable} se construye una sola vez al cargar el mapa (sin puertas). */
+    private record Template(char[][] cells, List<DoorSpec> doors, List<SpawnPoint> spawnPoints,
+                            boolean[][] baseWalkable) {
     }
 
     private static final Map<Building, Template[]> TEMPLATES = loadTemplates();
@@ -44,11 +46,13 @@ public final class FloorGrid {
 
     private final List<DoorSpec> doors;
     private final List<SpawnPoint> spawnPoints;
+    private final boolean[][] baseWalkable;
 
-    private FloorGrid(char[][] cells, List<DoorSpec> doors, List<SpawnPoint> spawnPoints) {
+    private FloorGrid(char[][] cells, List<DoorSpec> doors, List<SpawnPoint> spawnPoints, boolean[][] baseWalkable) {
         this.cells = cells;
         this.doors = doors;
         this.spawnPoints = spawnPoints;
+        this.baseWalkable = baseWalkable;
         this.rows = cells.length;
         this.cols = rows == 0 ? 0 : cells[0].length;
     }
@@ -62,7 +66,7 @@ public final class FloorGrid {
         for (int i = 0; i < copy.length; i++) {
             copy[i] = template.cells()[i].clone();
         }
-        FloorGrid grid = new FloorGrid(copy, template.doors(), template.spawnPoints());
+        FloorGrid grid = new FloorGrid(copy, template.doors(), template.spawnPoints(), template.baseWalkable());
         template.doors().forEach(spec -> grid.registerDoor(spec.doorId(), spec.col(), spec.row()));
         return grid;
     }
@@ -141,6 +145,74 @@ public final class FloorGrid {
         return List.copyOf(points);
     }
 
+    private static boolean[][] computeBaseWalkable(char[][] cells) {
+        boolean[][] walkable = new boolean[cells.length][];
+        for (int row = 0; row < cells.length; row++) {
+            walkable[row] = new boolean[cells[row].length];
+            for (int col = 0; col < cells[row].length; col++) {
+                walkable[row][col] = cells[row][col] != '#';
+            }
+        }
+        return walkable;
+    }
+
+    /**
+     * Grilla caminable [fila][columna] para el A*: la base construida al cargar el
+     * mapa con las puertas cerradas de este momento encima. Es una copia, asi que
+     * quien la usa no ve cambios de puertas hasta pedir otra.
+     */
+    public boolean[][] walkableSnapshot() {
+        boolean[][] snapshot = new boolean[baseWalkable.length][];
+        for (int row = 0; row < baseWalkable.length; row++) {
+            snapshot[row] = baseWalkable[row].clone();
+        }
+        for (String doorId : closedDoors) {
+            int[] pos = doorCells.get(doorId);
+            if (pos != null) {
+                snapshot[pos[1]][pos[0]] = false;
+            }
+        }
+        return snapshot;
+    }
+
+    /** {columna, fila} de la celda que contiene el punto (px). */
+    public static int[] cellOf(double x, double y) {
+        return new int[] { (int) Math.floor(x / TILE), (int) Math.floor(y / TILE) };
+    }
+
+    /**
+     * Linea de vision entre dos puntos (px): Bresenham por celdas; una pared o una
+     * puerta cerrada en el medio la corta.
+     */
+    public boolean hasLineOfSight(double x0, double y0, double x1, double y1) {
+        int[] from = cellOf(x0, y0);
+        int[] to = cellOf(x1, y1);
+        int col = from[0];
+        int row = from[1];
+        int dc = Math.abs(to[0] - col);
+        int dr = -Math.abs(to[1] - row);
+        int sc = col < to[0] ? 1 : -1;
+        int sr = row < to[1] ? 1 : -1;
+        int err = dc + dr;
+        while (true) {
+            if (!isWalkable(col * TILE + TILE / 2.0, row * TILE + TILE / 2.0)) {
+                return false;
+            }
+            if (col == to[0] && row == to[1]) {
+                return true;
+            }
+            int e2 = 2 * err;
+            if (e2 >= dr) {
+                err += dr;
+                col += sc;
+            }
+            if (e2 <= dc) {
+                err += dc;
+                row += sr;
+            }
+        }
+    }
+
     private static boolean openAround(char[][] cells, int col, int row) {
         for (int dr = -1; dr <= 1; dr++) {
             for (int dc = -1; dc <= 1; dc++) {
@@ -176,7 +248,7 @@ public final class FloorGrid {
                 rows.add(line.toCharArray());
             }
             char[][] cells = rows.toArray(char[][]::new);
-            return new Template(cells, List.copyOf(doors), computeSpawnPoints(cells));
+            return new Template(cells, List.copyOf(doors), computeSpawnPoints(cells), computeBaseWalkable(cells));
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }

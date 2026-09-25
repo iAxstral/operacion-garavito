@@ -21,9 +21,18 @@ class WaveCurveTest {
     }
 
     @Test
+    @DisplayName("solo el ultimo Kinder es el del jefe")
+    void onlyTheLastKinderHasTheBoss() {
+        for (int k = 1; k < WaveCurve.KINDER_COUNT; k++) {
+            assertTrue(!WaveCurve.blueprint(k).boss(), "Kinder " + k);
+        }
+        assertTrue(WaveCurve.blueprint(WaveCurve.KINDER_COUNT).boss());
+    }
+
+    @Test
     @DisplayName("cada Kinder pide mas kills, admite mas zombis vivos y spawnea mas seguido")
     void difficultyGrows() {
-        for (int k = 1; k < WaveCurve.KINDER_COUNT; k++) {
+        for (int k = 1; k < WaveCurve.KINDER_COUNT - 1; k++) {
             WaveBlueprint current = WaveCurve.blueprint(k);
             WaveBlueprint next = WaveCurve.blueprint(k + 1);
             assertTrue(next.killQuota() > current.killQuota(), "cuota del Kinder " + (k + 1));
@@ -39,7 +48,9 @@ class WaveCurveTest {
             WaveBlueprint blueprint = WaveCurve.blueprint(k);
             assertTrue(blueprint.spawnBurst() >= 2, "rafaga del Kinder " + k);
             assertTrue(blueprint.maxAlive() >= 8, "vivos del Kinder " + k);
-            assertTrue(blueprint.killQuota() > blueprint.maxAlive(), "cuota del Kinder " + k);
+            if (!blueprint.boss()) {
+                assertTrue(blueprint.killQuota() > blueprint.maxAlive(), "cuota del Kinder " + k);
+            }
         }
     }
 

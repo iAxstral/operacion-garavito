@@ -33,6 +33,7 @@ public class WaveDirector {
     private long nextEventAt;
     private long zombieSequence;
     private boolean justCleared;
+    private boolean bossDue;
 
     public WaveDirector(long now, long startDelayMs, List<FloorGrid> floors) {
         this.nextEventAt = now + startDelayMs;
@@ -41,9 +42,10 @@ public class WaveDirector {
 
     public synchronized WaveState state(long now) {
         int quota = blueprint == null ? 0 : blueprint.killQuota();
-        int remaining = phase == Phase.ACTIVE ? Math.max(0, quota - kills) : 0;
+        boolean bossStage = phase == Phase.ACTIVE && blueprint.boss();
+        int remaining = phase == Phase.ACTIVE && !bossStage ? Math.max(0, quota - kills) : 0;
         return new WaveState(kinder, WaveCurve.KINDER_COUNT, kills, quota, remaining,
-                restingSeconds(now), phase == Phase.VICTORY);
+                restingSeconds(now), bossStage, phase == Phase.VICTORY);
     }
 
     public synchronized int getKinder() {
@@ -73,7 +75,7 @@ public class WaveDirector {
                 }
             }
             case ACTIVE -> {
-                if (kills >= blueprint.killQuota()) {
+                if (!blueprint.boss() && kills >= blueprint.killQuota()) {
                     finishKinder(now);
                     return List.of();
                 }
@@ -96,6 +98,20 @@ public class WaveDirector {
         }
     }
 
+    /** El jefe del ultimo Kinder cayo: se gana la corrida. */
+    public synchronized void onBossDefeated(long now) {
+        if (phase == Phase.ACTIVE && blueprint.boss()) {
+            finishKinder(now);
+        }
+    }
+
+    /** True una sola vez al empezar el Kinder del jefe: es el momento de hacerlo aparecer. */
+    public synchronized boolean consumeBossDue() {
+        boolean value = bossDue;
+        bossDue = false;
+        return value;
+    }
+
     /** True una sola vez justo despues de pasar un Kinder (para retirar la horda). */
     public synchronized boolean consumeJustCleared() {
         boolean value = justCleared;
@@ -111,6 +127,7 @@ public class WaveDirector {
         kills = 0;
         blueprint = null;
         justCleared = false;
+        bossDue = false;
     }
 
     private void startKinder(long now, int number) {
@@ -119,6 +136,7 @@ public class WaveDirector {
         kills = 0;
         phase = Phase.ACTIVE;
         nextEventAt = now;
+        bossDue = blueprint.boss();
     }
 
     private void finishKinder(long now) {
@@ -162,7 +180,7 @@ public class WaveDirector {
      * Un punto al azar entre los que quedan lejos de todos los jugadores del piso
      * ("de todos lados"); si el piso esta tan lleno que ninguno califica, el mas lejano.
      */
-    private static FloorGrid.SpawnPoint pickSpawnPoint(List<FloorGrid.SpawnPoint> points, List<Player> onFloor,
+    static FloorGrid.SpawnPoint pickSpawnPoint(List<FloorGrid.SpawnPoint> points, List<Player> onFloor,
                                                        ThreadLocalRandom random) {
         List<FloorGrid.SpawnPoint> acceptable = points.stream()
                 .filter(point -> onFloor.stream().allMatch(player ->

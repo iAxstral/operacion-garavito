@@ -104,19 +104,33 @@ class WaveDirectorTest {
     }
 
     @Test
-    @DisplayName("tras los 5 Kinders se gana la corrida y no aparece nada mas")
+    @DisplayName("el Kinder 5 no se pasa por kills: hay que matar al jefe, y eso da la victoria")
     void fiveKindersWinTheRun() {
         WaveDirector director = new WaveDirector(START, 0, floorsOf(Building.C));
         List<Player> players = List.of(playerAt("SEGURIDAD", 1, 608, 800));
         long now = START;
-        for (int k = 1; k <= WaveCurve.KINDER_COUNT; k++) {
-            List<Zombie> alive = new ArrayList<>();
-            now = run(director, now, now + WaveCurve.WAVE_REST_MS + 500, players, alive);
+        for (int k = 1; k < WaveCurve.KINDER_COUNT; k++) {
+            now = run(director, now, now + WaveCurve.WAVE_REST_MS + 500, players, new ArrayList<>());
             assertEquals(k, director.getKinder());
+            assertFalse(director.consumeBossDue(), "el jefe no aparece antes del Kinder 5");
             director.onZombiesKilled(WaveCurve.blueprint(k).killQuota());
             now = run(director, now, now + 100, players, new ArrayList<>());
             assertTrue(director.consumeJustCleared());
         }
+
+        now = run(director, now, now + WaveCurve.WAVE_REST_MS + 500, players, new ArrayList<>());
+        assertEquals(WaveCurve.KINDER_COUNT, director.getKinder());
+        assertTrue(director.state(now).bossStage());
+        assertTrue(director.consumeBossDue(), "al empezar el Kinder 5 toca hacer aparecer al jefe");
+        assertFalse(director.consumeBossDue(), "una sola vez");
+
+        director.onZombiesKilled(500);
+        now = run(director, now, now + 500, players, new ArrayList<>());
+        assertFalse(director.isVictory(), "matar escoltas no alcanza");
+
+        director.onBossDefeated(now);
+        now = run(director, now, now + 100, players, new ArrayList<>());
+        assertTrue(director.consumeJustCleared());
         assertTrue(director.isVictory());
         assertTrue(director.state(now).victory());
 

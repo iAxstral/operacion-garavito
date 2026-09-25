@@ -22,11 +22,12 @@ public final class WaveCurve {
     public static final int EXTRA_ALIVE_PER_PLAYER = 3;
 
     private static final List<WaveBlueprint> KINDERS = List.of(
-            new WaveBlueprint(1, 15, 8, 2, 1200, 0.0, 55, 75),
-            new WaveBlueprint(2, 20, 10, 2, 1000, 0.0, 62, 85),
-            new WaveBlueprint(3, 25, 12, 3, 900, 0.15, 70, 95),
-            new WaveBlueprint(4, 30, 14, 3, 800, 0.3, 78, 110),
-            new WaveBlueprint(5, 35, 16, 3, 700, 0.35, 85, 120)
+            new WaveBlueprint(1, 15, 8, 2, 1200, 0.0, 55, 75, false),
+            new WaveBlueprint(2, 20, 10, 2, 1000, 0.0, 62, 85, false),
+            new WaveBlueprint(3, 25, 12, 3, 900, 0.15, 70, 95, false),
+            new WaveBlueprint(4, 30, 14, 3, 800, 0.3, 78, 110, false),
+            // Kinder 5: el Ingeniero de Sistemas con su escolta. Se pasa matando al jefe.
+            new WaveBlueprint(5, 0, 8, 2, 1500, 0.35, 85, 120, true)
     );
 
     private WaveCurve() {

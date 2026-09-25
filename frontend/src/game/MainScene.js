@@ -9,6 +9,7 @@ import {
   getLatestState,
   getMyBuilding,
   getMyRole,
+  getBoss,
   getZombies,
   isInputLocked,
   onStateChange,
@@ -23,6 +24,7 @@ import {
   requestMissionComplete,
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
+import BossLayer, { preloadBoss } from './BossLayer';
 import Lighting from './Lighting';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
@@ -164,6 +166,7 @@ export default class MainScene extends Phaser.Scene {
     });
 
     preloadOutside(this);
+    preloadBoss(this);
 
     this.load.audio('zombie_roar', '/sounds/zombie_roar.wav');
     this.load.audio('zombie_groan', '/sounds/zombie_groan.wav');
@@ -249,6 +252,7 @@ export default class MainScene extends Phaser.Scene {
     this.input.keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.Q, Phaser.Input.Keyboard.KeyCodes.C]);
     this.input.mouse?.disableContextMenu();
     this.zombieLayer = new ZombieLayer(this);
+    this.bossLayer = new BossLayer(this);
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -412,6 +416,13 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
+  // El jefe solo se dibuja si esta en el piso de este jugador.
+  syncBoss(delta) {
+    const boss = getBoss();
+    this.bossLayer.sync(boss && boss.floor === this.floor ? boss : null);
+    this.bossLayer.update(delta);
+  }
+
   update(time, delta) {
     if (!this.player) return;
     this.syncRemotePlayers(delta);
@@ -421,6 +432,7 @@ export default class MainScene extends Phaser.Scene {
       this.player.setVelocity(0, 0);
       this.zombieLayer.sync(this.zombiesOnFloor());
       this.zombieLayer.update(delta);
+      this.syncBoss(delta);
       return;
     }
 
@@ -470,6 +482,7 @@ export default class MainScene extends Phaser.Scene {
     this.updateAttack(time);
     this.zombieLayer.sync(this.zombiesOnFloor());
     this.zombieLayer.update(delta);
+    this.syncBoss(delta);
 
     this.player.setTexture(this.roleTexture(this.currentDirection));
     if (direction) {

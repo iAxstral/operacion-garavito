@@ -34,6 +34,12 @@ public class GameSession {
 
     private static final int REVIVE_HEALTH = 100;
 
+    /** El cuerpo del jefe es grande: los golpes lo alcanzan desde un poco mas lejos. */
+    private static final double BOSS_HIT_BONUS_PX = 24;
+    private static final int BOSS_REWARD_GARAVITOS = 25;
+    /** Si se queda solo en su piso este tiempo, sube o baja a buscar al equipo. */
+    private static final long BOSS_RELOCATE_MS = 5_000;
+
     private final String gameId;
     private final Map<String, Player> players = new ConcurrentHashMap<>();
     private final Map<String, WorldItem> worldItems = WorldItemCatalog.defaultCatalog();
@@ -42,6 +48,10 @@ public class GameSession {
     private final RoundCoordinator roundCoordinator;
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final WaveDirector waveDirector;
+    private final BossConfig bossConfig;
+    private volatile BossZombie boss;
+    private long bossAloneSince;
+    private long bossSequence;
     private final Building building;
     private final List<FloorGrid> floors;
 
@@ -54,10 +64,11 @@ public class GameSession {
     // recursos antes de que llegue la primera oleada — 4s no alcanzaba para eso.
     private static final long FIRST_WAVE_PREP_MS = 45_000;
 
-    public GameSession(String gameId, Building building, ScheduledExecutorService scheduler,
+    public GameSession(String gameId, Building building, BossConfig bossConfig, ScheduledExecutorService scheduler,
                        Consumer<RoundState> onRoundResolved) {
         this.gameId = gameId;
         this.building = building;
+        this.bossConfig = bossConfig;
         this.floors = java.util.stream.IntStream.rangeClosed(1, building.floorCount())
                 .mapToObj(floor -> FloorGrid.forFloor(building, floor))
                 .toList();
@@ -206,9 +217,13 @@ public class GameSession {
         }
         waveDirector.update(now, aliveZombieCount(), players.values())
                 .forEach(spawned -> zombies.put(spawned.getId(), spawned));
+        if (waveDirector.consumeBossDue()) {
+            spawnBoss(now);
+        }
         if (waveDirector.consumeJustCleared()) {
-            // Cuota cumplida: la horda que quedaba se retira y empieza el respiro.
+            // Cuota cumplida (o jefe vencido): la horda que quedaba se retira.
             zombies.clear();
+            boss = null;
             if (waveDirector.isVictory()) {
                 victoryPending = true;
             }
@@ -218,6 +233,7 @@ public class GameSession {
 
         if (targets.isEmpty() && !players.isEmpty()) {
             zombies.clear();
+            boss = null;
             waveDirector.resetRun(now, WaveCurve.WAVE_REST_MS);
             players.values().forEach(player -> player.revive(REVIVE_HEALTH));
             wipedRun = true;
@@ -246,6 +262,7 @@ public class GameSession {
         }
 
         zombies.values().removeIf(zombie -> !zombie.isAlive());
+        updateBoss(now, deltaSeconds, targets);
 
         if (waveDirector.restingSeconds(now) > 0) {
             players.values().forEach(player -> {
@@ -254,6 +271,63 @@ public class GameSession {
                 }
             });
         }
+    }
+
+    /** El jefe aparece en el piso con mas jugadores vivos, lejos de ellos. */
+    private void spawnBoss(long now) {
+        int floor = busiestFloor();
+        List<Player> onFloor = players.values().stream()
+                .filter(p -> p.isAlive() && p.getFloor() == floor).toList();
+        FloorGrid.SpawnPoint point = WaveDirector.pickSpawnPoint(floorGrid(floor).spawnPoints(), onFloor,
+                java.util.concurrent.ThreadLocalRandom.current());
+        boss = new BossZombie("boss" + (++bossSequence), floor, point.x(), point.y(), bossConfig,
+                java.util.random.RandomGenerator.getDefault());
+        bossAloneSince = 0;
+    }
+
+    private int busiestFloor() {
+        int best = building.floorCount();
+        long bestCount = -1;
+        for (int floor = building.floorCount(); floor >= 1; floor--) {
+            final int current = floor;
+            long count = players.values().stream().filter(p -> p.isAlive() && p.getFloor() == current).count();
+            if (count > bestCount) {
+                bestCount = count;
+                best = floor;
+            }
+        }
+        return best;
+    }
+
+    private void updateBoss(long now, double deltaSeconds, List<Player> targets) {
+        BossZombie current = boss;
+        if (current == null || !current.isAlive()) {
+            return;
+        }
+        List<Player> onFloor = targets.stream().filter(p -> p.getFloor() == current.getFloor()).toList();
+        if (onFloor.isEmpty() && !targets.isEmpty()) {
+            if (bossAloneSince == 0) {
+                bossAloneSince = now;
+            } else if (now - bossAloneSince >= BOSS_RELOCATE_MS) {
+                // Nadie en su piso: va a buscarlos, para que la corrida no se trabe con el
+                // equipo escondido en otro piso.
+                int floor = busiestFloor();
+                List<Player> there = targets.stream().filter(p -> p.getFloor() == floor).toList();
+                FloorGrid.SpawnPoint point = WaveDirector.pickSpawnPoint(floorGrid(floor).spawnPoints(), there,
+                        java.util.concurrent.ThreadLocalRandom.current());
+                current.relocate(floor, point.x(), point.y(), now);
+                bossAloneSince = 0;
+                return;
+            }
+        } else {
+            bossAloneSince = 0;
+        }
+        current.update(now, deltaSeconds, floorGrid(current.getFloor()), onFloor);
+    }
+
+    public BossView bossView() {
+        BossZombie current = boss;
+        return current == null || !current.isAlive() ? null : current.toView();
     }
 
     private FloorGrid floorGrid(int floor) {
@@ -348,6 +422,22 @@ public class GameSession {
         if (kills > 0) {
             player.addGaravitos(kills * GARAVITOS_PER_ZOMBIE);
             waveDirector.onZombiesKilled(kills);
+        }
+
+        BossZombie target = boss;
+        if (target != null && target.isAlive() && target.getFloor() == player.getFloor()) {
+            double dx = target.getX() - x;
+            double dy = target.getY() - y;
+            double angle = Math.atan2(dy, dx);
+            boolean inRange = Math.hypot(dx, dy) <= melee.range() + BOSS_HIT_BONUS_PX;
+            if (inRange && (charged || Math.abs(wrapAngle(angle - facing)) <= ATTACK_HALF_ARC_RAD)) {
+                hits++;
+                if (target.hit(melee.damage(), charged, now)) {
+                    kills++;
+                    player.addGaravitos(BOSS_REWARD_GARAVITOS);
+                    waveDirector.onBossDefeated(now);
+                }
+            }
         }
         return AttackResult.ok(hits, kills);
     }
@@ -515,6 +605,7 @@ public class GameSession {
 
     public void resetGame() {
         zombies.clear();
+        boss = null;
         // Antes se reusaba el respiro corto entre oleadas y la preparacion de 45 s
         // nunca llegaba a aplicarse: el HUD mostraba "oleada 1 en 1s" al empezar.
         waveDirector.resetRun(System.currentTimeMillis(), FIRST_WAVE_PREP_MS);

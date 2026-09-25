@@ -13,7 +13,7 @@ let currentFloor = 1;
 let myBuilding = 'F';
 
 function emptyState() {
-  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null };
+  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null, boss: null };
 }
 
 let latestState = emptyState();
@@ -224,6 +224,11 @@ export function getWave() {
   return latestState.wave ?? null;
 }
 
+/** El jefe del Kinder 5 ({ id, name, floor, x, y, health, maxHealth, state }) o null. */
+export function getBoss() {
+  return latestState.boss ?? null;
+}
+
 export function requestPickup(itemId, x, y) {
   socketService.publish(`/app/game/${gameId}/pickup`, { playerId: myRole, itemId, x, y });
 }
@@ -345,6 +350,7 @@ if (import.meta.env.DEV) {
     changeFloor,
     reportPosition,
     getZombies,
+    getBoss,
     getWave,
   };
 }

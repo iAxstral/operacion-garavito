@@ -1,0 +1,109 @@
+{
+  "character": {
+    "id": "16860b61-65f6-4495-8d23-d002b6103524",
+    "name": "Idle",
+    "prompt": "Massive hulking undead systems engineer, black tuxedo torn at shoulders, black tie soaked in blood, green lapel trim, ID badge that reads RODRIGO, grey-green rotting skin, moderate top-down game camera angle. ",
+    "size": {
+      "width": 256,
+      "height": 256
+    },
+    "directions": 8,
+    "view": "low top-down"
+  },
+  "spritesheet": {
+    "path": "Massive_hulking_undead_s-Idle.png",
+    "cell_size": {
+      "width": 256,
+      "height": 256
+    },
+    "sheet_size": {
+      "width": 2048,
+      "height": 2304
+    },
+    "columns": 8,
+    "pivot": "cell-center",
+    "rows": [
+      {
+        "row": 0,
+        "type": "rotations",
+        "frame_count": 8,
+        "directions": [
+          "south",
+          "south-east",
+          "east",
+          "north-east",
+          "north",
+          "north-west",
+          "west",
+          "south-west"
+        ]
+      },
+      {
+        "row": 1,
+        "type": "animation",
+        "frame_count": 6,
+        "animation": "Crouched Walking",
+        "animation_group_id": "c8f0aef1-449c-48bf-b8dd-1b7433d97b64",
+        "direction": "south"
+      },
+      {
+        "row": 2,
+        "type": "animation",
+        "frame_count": 6,
+        "animation": "Crouched Walking",
+        "animation_group_id": "c8f0aef1-449c-48bf-b8dd-1b7433d97b64",
+        "direction": "south-east"
+      },
+      {
+        "row": 3,
+        "type": "animation",
+        "frame_count": 6,
+        "animation": "Crouched Walking",
+        "animation_group_id": "c8f0aef1-449c-48bf-b8dd-1b7433d97b64",
+        "direction": "east"
+      },
+      {
+        "row": 4,
+        "type": "animation",
+        "frame_count": 6,
+        "animation": "Crouched Walking",
+        "animation_group_id": "c8f0aef1-449c-48bf-b8dd-1b7433d97b64",
+        "direction": "north-east"
+      },
+      {
+        "row": 5,
+        "type": "animation",
+        "frame_count": 6,
+        "animation": "Crouched Walking",
+        "animation_group_id": "c8f0aef1-449c-48bf-b8dd-1b7433d97b64",
+        "direction": "north"
+      },
+      {
+        "row": 6,
+        "type": "animation",
+        "frame_count": 6,
+        "animation": "Crouched Walking",
+        "animation_group_id": "c8f0aef1-449c-48bf-b8dd-1b7433d97b64",
+        "direction": "north-west"
+      },
+      {
+        "row": 7,
+        "type": "animation",
+        "frame_count": 6,
+        "animation": "Crouched Walking",
+        "animation_group_id": "c8f0aef1-449c-48bf-b8dd-1b7433d97b64",
+        "direction": "west"
+      },
+      {
+        "row": 8,
+        "type": "animation",
+        "frame_count": 6,
+        "animation": "Crouched Walking",
+        "animation_group_id": "c8f0aef1-449c-48bf-b8dd-1b7433d97b64",
+        "direction": "south-west"
+      }
+    ]
+  },
+  "export_version": "1.0",
+  "export_date": "2026-09-25T14:10:22.560141+00:00"
+}

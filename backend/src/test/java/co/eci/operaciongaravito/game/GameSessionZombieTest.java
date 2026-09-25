@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.util.Map;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import org.junit.jupiter.api.AfterEach;
@@ -21,7 +22,7 @@ class GameSessionZombieTest {
     @BeforeEach
     void setUp() {
         scheduler = Executors.newScheduledThreadPool(1);
-        session = new GameSession("test", Building.F, scheduler, round -> { });
+        session = new GameSession("test", Building.F, BossConfig.defaults(), scheduler, round -> { });
         assertNull(session.joinPlayer("SEGURIDAD"));
         assertTrue(session.start("SEGURIDAD"));
         player = session.getOrCreatePlayer("SEGURIDAD");
@@ -47,6 +48,26 @@ class GameSessionZombieTest {
         assertFalse(session.zombieStates().isEmpty(), "no llego a spawnear ningun zombi");
     }
 
+    /**
+     * Espera a que aparezca la horda y deja un solo zombi: las rafagas traen varios
+     * juntos y los tests de golpe necesitan saber exactamente a cuantos alcanza.
+     */
+    private ZombieState isolatedZombie() {
+        tickUntilZombies();
+        try {
+            java.lang.reflect.Field field = GameSession.class.getDeclaredField("zombies");
+            field.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, Zombie> zombies = (Map<String, Zombie>) field.get(session);
+            String keep = zombies.keySet().iterator().next();
+            zombies.keySet().removeIf(id -> !id.equals(keep));
+        } catch (ReflectiveOperationException ex) {
+            throw new AssertionError(ex);
+        }
+        assertEquals(1, session.zombieStates().size());
+        return session.zombieStates().get(0);
+    }
+
     @Test
     @DisplayName("sin arma igual se puede pegar: el juego nunca queda sin salida")
     void unarmedPlayersCanStillFight() {
@@ -57,8 +78,7 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("desarmado golpea pero no mata de un solo golpe")
     void unarmedTakesMoreThanOneHit() {
-        tickUntilZombies();
-        ZombieState target = session.zombieStates().get(0);
+        ZombieState target = isolatedZombie();
 
         AttackResult unarmed = session.attemptAttack("SEGURIDAD", AttackType.BASIC, target.x() - 20, target.y(), 0);
 
@@ -82,9 +102,8 @@ class GameSessionZombieTest {
     @DisplayName("matar un zombi paga exactamente un Garavito")
     void killingAZombiePaysOneGaravito() {
         armPlayer();
-        tickUntilZombies();
 
-        ZombieState target = session.zombieStates().get(0);
+        ZombieState target = isolatedZombie();
         player.reportPosition(target.x() - 20, target.y());
 
         int before = player.getGaravitos();
@@ -99,9 +118,8 @@ class GameSessionZombieTest {
     @DisplayName("un golpe al aire no paga nada")
     void missingPaysNothing() {
         armPlayer();
-        tickUntilZombies();
 
-        ZombieState target = session.zombieStates().get(0);
+        ZombieState target = isolatedZombie();
 
         player.reportPosition(target.x() - 20, target.y());
         AttackResult result = session.attemptAttack("SEGURIDAD", AttackType.BASIC, target.x() - 20, target.y(), Math.PI);
@@ -115,9 +133,8 @@ class GameSessionZombieTest {
     @DisplayName("un zombi fuera de alcance no recibe el golpe")
     void outOfRangeZombiesAreSafe() {
         armPlayer();
-        tickUntilZombies();
 
-        ZombieState target = session.zombieStates().get(0);
+        ZombieState target = isolatedZombie();
         AttackResult result = session.attemptAttack("SEGURIDAD", AttackType.BASIC, target.x() - 400, target.y(), 0);
 
         assertTrue(result.success());
@@ -207,19 +224,77 @@ class GameSessionZombieTest {
         tickUntilKinder(now, 1);
     }
 
-    @Test
-    @DisplayName("ganar el Kinder 5 avisa la victoria una sola vez")
-    void winningTheLastKinderAnnouncesVictory() {
+    private BossZombie currentBoss() {
+        try {
+            java.lang.reflect.Field field = GameSession.class.getDeclaredField("boss");
+            field.setAccessible(true);
+            return (BossZombie) field.get(session);
+        } catch (ReflectiveOperationException ex) {
+            throw new AssertionError(ex);
+        }
+    }
+
+    private long reachBossKinder() {
         long now = System.currentTimeMillis();
-        for (int k = 1; k <= WaveCurve.KINDER_COUNT; k++) {
+        for (int k = 1; k < WaveCurve.KINDER_COUNT; k++) {
             now = tickUntilKinder(now, k);
             registerKills(WaveCurve.blueprint(k).killQuota());
             now += 66;
             session.tick(now, 0.066);
         }
+        return tickUntilKinder(now, WaveCurve.KINDER_COUNT);
+    }
+
+    @Test
+    @DisplayName("en el Kinder 5 aparece el Ingeniero de Sistemas en el piso del jugador")
+    void theBossAppearsInTheLastKinder() {
+        assertNull(session.bossView(), "no hay jefe antes del Kinder 5");
+        reachBossKinder();
+
+        BossView view = session.bossView();
+        assertTrue(view != null, "deberia haber aparecido el jefe");
+        assertEquals(BossZombie.NAME, view.name());
+        assertEquals(player.getFloor(), view.floor());
+        assertTrue(session.waveState().bossStage());
+        assertTrue(Math.hypot(view.x() - player.getX(), view.y() - player.getY()) >= WaveDirector.MIN_SPAWN_DISTANCE_PX,
+                "no deberia aparecer encima del jugador");
+    }
+
+    @Test
+    @DisplayName("matar al jefe con un golpe real da la victoria una sola vez")
+    void killingTheBossWinsTheRun() {
+        long now = reachBossKinder();
+        BossZombie boss = currentBoss();
+        boss.hit(BossConfig.defaults().maxHealth() - 1, false, now);
+
+        armPlayer();
+        player.reportPosition(boss.getFloor(), boss.getX() - 30, boss.getY());
+        int before = player.getGaravitos();
+        AttackResult result = session.attemptAttack("SEGURIDAD", AttackType.BASIC, boss.getX() - 30, boss.getY(), 0);
+        assertTrue(result.success());
+        assertEquals(1, result.kills(), "el golpe deberia matar al jefe");
+        assertTrue(player.getGaravitos() > before, "matar al jefe paga Garavitos");
+
+        now += 66;
+        session.tick(now, 0.066);
+        assertNull(session.bossView());
         assertTrue(session.waveState().victory());
         assertTrue(session.consumeVictory());
         assertFalse(session.consumeVictory());
+    }
+
+    @Test
+    @DisplayName("si cae el equipo en el Kinder 5 el jefe desaparece y se vuelve al Kinder 1")
+    void wipeRemovesTheBoss() {
+        long now = reachBossKinder();
+        assertTrue(session.bossView() != null);
+        for (int i = 0; i < 10; i++) {
+            player.takeDamage(10);
+        }
+        now += 66;
+        session.tick(now, 0.066);
+        assertNull(session.bossView());
+        assertEquals(0, session.waveState().number());
     }
 
     @Test
@@ -239,10 +314,8 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("el ataque cargado pega en area y tiene enfriamiento propio")
     void chargedAttackHitsAllAroundAndCoolsDown() {
-        tickUntilZombies();
-        ZombieState target = session.zombieStates().get(0);
+        ZombieState target = isolatedZombie();
         player.reportPosition(target.x() - 20, target.y());
-
         AttackResult charged = session.attemptAttack("SEGURIDAD", AttackType.CHARGED, target.x() - 20, target.y(), Math.PI);
         assertTrue(charged.success());
         assertEquals(1, charged.hits(), "el ataque cargado no depende de hacia donde se mira");
@@ -303,7 +376,7 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("mientras la sala no inicia no hay zombis")
     void nothingSpawnsBeforeStart() {
-        GameSession waiting = new GameSession("wait", Building.F, scheduler, round -> { });
+        GameSession waiting = new GameSession("wait", Building.F, BossConfig.defaults(), scheduler, round -> { });
         waiting.joinPlayer("SEGURIDAD");
         long now = System.currentTimeMillis();
         for (int i = 0; i < 400; i++) {
@@ -326,19 +399,21 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("en el Edificio C (2 pisos) nunca aparece un zombi en un piso inexistente")
     void buildingCNeverSpawnsOnAMissingFloor() {
-        GameSession c = new GameSession("edc", Building.C, scheduler, round -> { });
+        GameSession c = new GameSession("edc", Building.C, BossConfig.defaults(), scheduler, round -> { });
         c.joinPlayer("SEGURIDAD");
         c.start("SEGURIDAD");
         // Antes el director sorteaba el piso 3 aunque el C no lo tiene: un zombi
         // inalcanzable que dejaba la oleada sin poder terminar.
         c.getOrCreatePlayer("SEGURIDAD").reportPosition(1, 608, 800);
         long now = System.currentTimeMillis();
+        java.util.Set<Integer> floorsSeen = new java.util.HashSet<>();
         for (int i = 0; i < 3000; i++) {
             now += 66;
             c.tick(now, 0.066);
+            c.zombieStates().forEach(z -> floorsSeen.add(z.floor()));
         }
-        assertFalse(c.zombieStates().isEmpty(), "no llego a spawnear ningun zombi");
-        assertTrue(c.zombieStates().stream().allMatch(z -> Building.C.hasFloor(z.floor())),
-                "aparecio un zombi en un piso que el Edificio C no tiene");
+        assertFalse(floorsSeen.isEmpty(), "no llego a spawnear ningun zombi");
+        assertTrue(floorsSeen.stream().allMatch(Building.C::hasFloor),
+                "aparecio un zombi en un piso que el Edificio C no tiene: " + floorsSeen);
     }
 }
