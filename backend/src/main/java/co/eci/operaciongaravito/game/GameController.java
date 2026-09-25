@@ -22,7 +22,7 @@ public class GameController {
             return;
         }
         if (request.create()) {
-            session = sessionService.create(gameId);
+            session = sessionService.create(gameId, Building.parseOrDefault(request.building()));
             if (session == null) {
                 sessionService.broadcastRejected(gameId, LastEvent.lobbyRejected(request.clientId(), "code_taken"));
                 return;

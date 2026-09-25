@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  getMyBuilding,
   getMyRole,
   onStateChange,
   submitDecision,
@@ -13,7 +14,7 @@ import {
   isInputLocked,
   purchaseItem,
 } from '../game/gameSync';
-import { MISSION_ZONES, REWARD_GARAVITOS } from '../game/missionCatalog';
+import { missionZonesFor, REWARD_GARAVITOS } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
 import { CAFETERIA_MENU } from '../game/shopCatalog';
 import { roleInfo } from '../game/roleCatalog';
@@ -71,7 +72,7 @@ export default function Hud() {
   const [mapOpen, setMapOpen] = useState(false);
   const mapCanvasRef = useRef(null);
   const stateRef = useRef(state);
-  const floorLayoutCacheRef = useRef({ floor: null, layout: null });
+  const floorLayoutCacheRef = useRef({ key: null, layout: null });
 
   useEffect(() => {
     return onStateChange(setState);
@@ -99,8 +100,9 @@ export default function Hud() {
       const me = liveState.players.find((p) => p.playerId === myRole);
       const myFloor = me?.floor ?? 1;
 
-      if (floorLayoutCacheRef.current.floor !== myFloor) {
-        floorLayoutCacheRef.current = { floor: myFloor, layout: buildFloorLayout({ floor: myFloor }) };
+      const layoutKey = `${getMyBuilding()}-${myFloor}`;
+      if (floorLayoutCacheRef.current.key !== layoutKey) {
+        floorLayoutCacheRef.current = { key: layoutKey, layout: buildFloorLayout({ building: getMyBuilding(), floor: myFloor }) };
       }
       const layout = floorLayoutCacheRef.current.layout;
 
@@ -125,7 +127,7 @@ export default function Hud() {
           ctx.fill();
         });
 
-      const missionHere = MISSION_ZONES.find((zone) => zone.role === myRole && zone.floor === myFloor);
+      const missionHere = missionZonesFor(getMyBuilding()).find((zone) => zone.role === myRole && zone.floor === myFloor);
 
       if (me) {
         const px = (me.x / TILE) * MAP_CELL_PX;
@@ -291,9 +293,9 @@ export default function Hud() {
   const nearDoorState = state.doors?.find((d) => d.doorId === nearDoor?.doorId);
   const nearDoorOpen = nearDoorState?.open ?? true;
 
-  const myMissionOnThisFloor = MISSION_ZONES.find((zone) => zone.role === getMyRole() && zone.floor === floor);
+  const myMissionOnThisFloor = missionZonesFor(getMyBuilding()).find((zone) => zone.role === getMyRole() && zone.floor === floor);
   const myMissionElsewhere = !myMissionOnThisFloor
-    ? MISSION_ZONES.find((zone) => zone.role === getMyRole())
+    ? missionZonesFor(getMyBuilding()).find((zone) => zone.role === getMyRole())
     : null;
 
   const handleBuy = (item) => {

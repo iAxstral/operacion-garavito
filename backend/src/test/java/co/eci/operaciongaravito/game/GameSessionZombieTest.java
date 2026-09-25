@@ -21,7 +21,7 @@ class GameSessionZombieTest {
     @BeforeEach
     void setUp() {
         scheduler = Executors.newScheduledThreadPool(1);
-        session = new GameSession("test", scheduler, round -> { });
+        session = new GameSession("test", Building.F, scheduler, round -> { });
         assertNull(session.joinPlayer("SEGURIDAD"));
         assertTrue(session.start("SEGURIDAD"));
         player = session.getOrCreatePlayer("SEGURIDAD");
@@ -259,7 +259,7 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("mientras la sala no inicia no hay zombis")
     void nothingSpawnsBeforeStart() {
-        GameSession waiting = new GameSession("wait", scheduler, round -> { });
+        GameSession waiting = new GameSession("wait", Building.F, scheduler, round -> { });
         waiting.joinPlayer("SEGURIDAD");
         long now = System.currentTimeMillis();
         for (int i = 0; i < 400; i++) {
@@ -277,5 +277,24 @@ class GameSessionZombieTest {
 
         assertTrue(session.zombieStates().stream().allMatch(z -> z.floor() >= 2),
                 "no deberia aparecer ningun zombi en el piso 1");
+    }
+
+    @Test
+    @DisplayName("en el Edificio C (2 pisos) nunca aparece un zombi en un piso inexistente")
+    void buildingCNeverSpawnsOnAMissingFloor() {
+        GameSession c = new GameSession("edc", Building.C, scheduler, round -> { });
+        c.joinPlayer("SEGURIDAD");
+        c.start("SEGURIDAD");
+        // Con el jugador en el piso 1 el director sortea entre los pisos embrujados; antes
+        // caia en el 3, un zombi inalcanzable que dejaba la oleada sin poder terminar.
+        c.getOrCreatePlayer("SEGURIDAD").reportPosition(1, 608, 800);
+        long now = System.currentTimeMillis();
+        for (int i = 0; i < 3000; i++) {
+            now += 66;
+            c.tick(now, 0.066);
+        }
+        assertFalse(c.zombieStates().isEmpty(), "no llego a spawnear ningun zombi");
+        assertTrue(c.zombieStates().stream().allMatch(z -> Building.C.hasFloor(z.floor())),
+                "aparecio un zombi en un piso que el Edificio C no tiene");
     }
 }

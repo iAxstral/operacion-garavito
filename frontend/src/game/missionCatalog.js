@@ -1,29 +1,35 @@
 
 export const REWARD_GARAVITOS = 25;
 
-// 3 salas por rol (una por piso), para que la misión de cada rol no viva siempre en
-// el mismo salón. Los 4 ids originales (uno por rol) NO cambiaron de id ni de
-// coordenadas — el resto son instancias nuevas agregadas en otras salas ya existentes.
-export const MISSION_ZONES = [
-  // ECONOMIA
-  { missionId: 'mission-economia', role: 'ECONOMIA', floor: 1, x: 1632, y: 1312, room: 'Cafetería', rewardGaravitos: REWARD_GARAVITOS },
-  { missionId: 'mission-economia-f2', role: 'ECONOMIA', floor: 2, x: 1568, y: 160, room: 'Sala de Reuniones', rewardGaravitos: REWARD_GARAVITOS },
-  { missionId: 'mission-economia-f3', role: 'ECONOMIA', floor: 3, x: 480, y: 1120, room: 'Auditorio', rewardGaravitos: REWARD_GARAVITOS },
+const zone = (missionId, role, floor, x, y, room) => ({
+  missionId, role, floor, x, y, room, rewardGaravitos: REWARD_GARAVITOS,
+});
 
-  // SEGURIDAD
-  { missionId: 'mission-seguridad', role: 'SEGURIDAD', floor: 2, x: 1632, y: 1312, room: 'Armero', rewardGaravitos: REWARD_GARAVITOS },
-  { missionId: 'mission-seguridad-f1', role: 'SEGURIDAD', floor: 1, x: 288, y: 1376, room: 'Terraza', rewardGaravitos: REWARD_GARAVITOS },
-  { missionId: 'mission-seguridad-f3', role: 'SEGURIDAD', floor: 3, x: 1760, y: 416, room: 'Sala de Servidores', rewardGaravitos: REWARD_GARAVITOS },
+// Espejo de backend/.../MissionCatalog.java, por edificio: las coordenadas de un
+// edificio caen dentro de paredes del otro, asi que no se pueden compartir.
+const ZONES_BY_BUILDING = {
+  // Edificio F: una mision por rol, como estaba antes del Edificio C.
+  F: [
+    zone('mission-economia', 'ECONOMIA', 1, 1632, 1312, 'Cafetería'),
+    zone('mission-seguridad', 'SEGURIDAD', 2, 1632, 1312, 'Armero'),
+    zone('mission-salud', 'SALUD', 3, 736, 224, 'Laboratorio'),
+    zone('mission-infraestructura', 'INFRAESTRUCTURA', 3, 1632, 1312, 'Sala de Máquinas'),
+  ],
+  // Edificio C: 2 pisos, una sala por rol en cada piso.
+  C: [
+    zone('mission-economia', 'ECONOMIA', 1, 1632, 1312, 'Cafetería'),
+    zone('mission-economia-f2', 'ECONOMIA', 2, 1568, 160, 'Sala de Reuniones'),
+    zone('mission-seguridad-f1', 'SEGURIDAD', 1, 288, 1376, 'Terraza'),
+    zone('mission-seguridad', 'SEGURIDAD', 2, 1632, 1312, 'Armero'),
+    zone('mission-salud-f1', 'SALUD', 1, 352, 288, 'Sala de Estudio'),
+    zone('mission-salud-f2', 'SALUD', 2, 608, 416, 'Biblioteca'),
+    zone('mission-infraestructura-f1', 'INFRAESTRUCTURA', 1, 1888, 160, 'Depósito de Servicio'),
+    zone('mission-infraestructura-f2', 'INFRAESTRUCTURA', 2, 800, 1376, 'Sala de Estudio'),
+  ],
+};
 
-  // SALUD
-  { missionId: 'mission-salud', role: 'SALUD', floor: 3, x: 736, y: 224, room: 'Laboratorio', rewardGaravitos: REWARD_GARAVITOS },
-  { missionId: 'mission-salud-f1', role: 'SALUD', floor: 1, x: 352, y: 288, room: 'Sala de Estudio', rewardGaravitos: REWARD_GARAVITOS },
-  { missionId: 'mission-salud-f2', role: 'SALUD', floor: 2, x: 608, y: 416, room: 'Biblioteca', rewardGaravitos: REWARD_GARAVITOS },
-
-  // INFRAESTRUCTURA
-  { missionId: 'mission-infraestructura', role: 'INFRAESTRUCTURA', floor: 3, x: 1632, y: 1312, room: 'Sala de Máquinas', rewardGaravitos: REWARD_GARAVITOS },
-  { missionId: 'mission-infraestructura-f1', role: 'INFRAESTRUCTURA', floor: 1, x: 1888, y: 160, room: 'Depósito de Servicio', rewardGaravitos: REWARD_GARAVITOS },
-  { missionId: 'mission-infraestructura-f2', role: 'INFRAESTRUCTURA', floor: 2, x: 800, y: 1376, room: 'Sala de Estudio', rewardGaravitos: REWARD_GARAVITOS },
-];
+export function missionZonesFor(building) {
+  return ZONES_BY_BUILDING[building] ?? ZONES_BY_BUILDING.F;
+}
 
 export const MISSION_RANGE_PX = 80;

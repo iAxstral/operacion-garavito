@@ -8,9 +8,8 @@ const EVENT_TIMEOUT_MS = 6000;
 let gameId = null;
 let myRole = 'SEGURIDAD';
 let currentFloor = 1;
-// Edificio elegido en BuildingSelect ('F' o 'C'). Solo se usa del lado del cliente:
-// el backend comparte el mismo mapa para ambos, pero el Edificio C es mas chico
-// (2 pisos) asi que MainScene usa esto para no dejar subir al piso 3 jugando ahi.
+// Edificio de la sala. Lo decide quien la crea; quien entra con un codigo adopta el
+// que devuelve el servidor, porque mapa, grillas y misiones dependen de el.
 let myBuilding = 'F';
 
 function emptyState() {
@@ -52,10 +51,6 @@ export function getGameId() {
 
 export function getMyRole() {
   return myRole;
-}
-
-export function setMyBuilding(building) {
-  myBuilding = building === 'C' ? 'C' : 'F';
 }
 
 export function getMyBuilding() {
@@ -116,7 +111,7 @@ export function generateLobbyCode() {
   return Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('');
 }
 
-export async function openLobby(code, create) {
+export async function openLobby(code, create, building) {
   await socketService.whenConnected();
   resetLocalState();
   gameId = code;
@@ -124,7 +119,7 @@ export async function openLobby(code, create) {
 
   const reply = awaitEvent((event) => event.playerId === CLIENT_ID
     && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED'));
-  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create });
+  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building });
 
   let event;
   try {
@@ -137,6 +132,7 @@ export async function openLobby(code, create) {
     closeTopic();
     throw new Error(event.reason);
   }
+  myBuilding = latestState.lobby?.building ?? building ?? 'F';
   return code;
 }
 

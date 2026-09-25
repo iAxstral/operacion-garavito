@@ -17,9 +17,11 @@ public class WaveDirector {
     private Phase phase = Phase.RESTING;
     private long nextEventAt;
     private long zombieSequence;
+    private final List<FloorGrid> floors;
 
-    public WaveDirector(long now, long startDelayMs) {
+    public WaveDirector(long now, long startDelayMs, List<FloorGrid> floors) {
         this.nextEventAt = now + startDelayMs;
+        this.floors = floors;
     }
 
     public int getWave() {
@@ -86,7 +88,8 @@ public class WaveDirector {
         List<Player> alive = players.stream().filter(Player::isAlive).toList();
         ThreadLocalRandom random = ThreadLocalRandom.current();
         int floor = pickZombieFloor(alive, random);
-        ZombieSpawnCatalog.SpawnPoint point = pickSpawnPoint(alive.stream().filter(p -> p.getFloor() == floor).toList());
+        FloorGrid.SpawnPoint point = pickSpawnPoint(floors.get(floor - 1).spawnPoints(),
+                alive.stream().filter(p -> p.getFloor() == floor).toList());
         return new Zombie(
                 "z" + (++zombieSequence),
                 floor,
@@ -105,18 +108,21 @@ public class WaveDirector {
         if (!hauntedWithPlayers.isEmpty()) {
             return hauntedWithPlayers.get(random.nextInt(hauntedWithPlayers.size()));
         }
-        return FIRST_HAUNTED_FLOOR + random.nextInt(FloorGrid.FLOOR_COUNT - FIRST_HAUNTED_FLOOR + 1);
+        // Solo pisos que este edificio tiene: el C tiene 2 y sortear el 3 dejaba zombis
+        // inalcanzables que trababan la oleada para siempre.
+        int top = floors.size();
+        int first = Math.min(FIRST_HAUNTED_FLOOR, top);
+        return first + random.nextInt(top - first + 1);
     }
 
-    private ZombieSpawnCatalog.SpawnPoint pickSpawnPoint(List<Player> alive) {
+    private FloorGrid.SpawnPoint pickSpawnPoint(List<FloorGrid.SpawnPoint> points, List<Player> alive) {
         if (alive.isEmpty()) {
-            return ZombieSpawnCatalog.POINTS.get(
-                    ThreadLocalRandom.current().nextInt(ZombieSpawnCatalog.POINTS.size()));
+            return points.get(ThreadLocalRandom.current().nextInt(points.size()));
         }
 
-        ZombieSpawnCatalog.SpawnPoint best = null;
+        FloorGrid.SpawnPoint best = null;
         double bestDistance = -1;
-        for (ZombieSpawnCatalog.SpawnPoint candidate : ZombieSpawnCatalog.POINTS) {
+        for (FloorGrid.SpawnPoint candidate : points) {
             double nearest = Double.MAX_VALUE;
             for (Player player : alive) {
                 nearest = Math.min(nearest, Math.hypot(candidate.x() - player.getX(), candidate.y() - player.getY()));
@@ -127,7 +133,7 @@ public class WaveDirector {
             }
         }
 
-        List<ZombieSpawnCatalog.SpawnPoint> acceptable = ZombieSpawnCatalog.POINTS.stream()
+        List<FloorGrid.SpawnPoint> acceptable = points.stream()
                 .filter(candidate -> alive.stream().allMatch(player ->
                         Math.hypot(candidate.x() - player.getX(), candidate.y() - player.getY()) >= MIN_SPAWN_DISTANCE_PX))
                 .toList();

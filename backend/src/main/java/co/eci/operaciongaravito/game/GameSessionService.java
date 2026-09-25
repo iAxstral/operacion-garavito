@@ -43,14 +43,14 @@ public class GameSessionService {
         return sessions.get(gameId);
     }
 
-    public GameSession create(String gameId) {
+    public GameSession create(String gameId, Building building) {
         if (!isValidCode(gameId)) {
             return null;
         }
         boolean[] created = { false };
         GameSession session = sessions.computeIfAbsent(gameId, id -> {
             created[0] = true;
-            GameSession fresh = new GameSession(id, roundTimeoutScheduler, round -> broadcastRoundResolved(id, round));
+            GameSession fresh = new GameSession(id, building, roundTimeoutScheduler, round -> broadcastRoundResolved(id, round));
             startTicking(id);
             return fresh;
         });

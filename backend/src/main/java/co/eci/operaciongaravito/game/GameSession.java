@@ -42,9 +42,8 @@ public class GameSession {
     private final RoundCoordinator roundCoordinator;
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final WaveDirector waveDirector;
-    private final List<FloorGrid> floors = java.util.stream.IntStream.rangeClosed(1, FloorGrid.FLOOR_COUNT)
-            .mapToObj(FloorGrid::forFloor)
-            .toList();
+    private final Building building;
+    private final List<FloorGrid> floors;
 
     private volatile boolean wipedRun = false;
     private volatile boolean started = false;
@@ -54,11 +53,20 @@ public class GameSession {
     // recursos antes de que llegue la primera oleada — 4s no alcanzaba para eso.
     private static final long FIRST_WAVE_PREP_MS = 45_000;
 
-    public GameSession(String gameId, ScheduledExecutorService scheduler, Consumer<RoundState> onRoundResolved) {
+    public GameSession(String gameId, Building building, ScheduledExecutorService scheduler,
+                       Consumer<RoundState> onRoundResolved) {
         this.gameId = gameId;
+        this.building = building;
+        this.floors = java.util.stream.IntStream.rangeClosed(1, building.floorCount())
+                .mapToObj(floor -> FloorGrid.forFloor(building, floor))
+                .toList();
         this.roundCoordinator = new RoundCoordinator(scheduler, onRoundResolved);
 
-        this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS);
+        this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, floors);
+    }
+
+    public Building getBuilding() {
+        return building;
     }
 
     public boolean hasPlayers() {
@@ -113,7 +121,7 @@ public class GameSession {
     }
 
     public LobbyState lobbyState() {
-        return new LobbyState(started, host);
+        return new LobbyState(started, host, building);
     }
 
     public PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
@@ -161,7 +169,7 @@ public class GameSession {
 
     public void reportPosition(String playerId, int floor, double x, double y) {
         Player player = players.get(playerId);
-        if (player != null && floor >= 1 && floor <= FloorGrid.FLOOR_COUNT) {
+        if (player != null && building.hasFloor(floor)) {
             player.reportPosition(floor, x, y);
         }
     }
@@ -380,7 +388,7 @@ public class GameSession {
             return MissionResult.rejected("unknown_player");
         }
 
-        MissionZone mission = MissionCatalog.byId(missionId);
+        MissionZone mission = MissionCatalog.byId(building, missionId);
         if (mission == null) {
             return MissionResult.rejected("unknown_mission");
         }
@@ -415,7 +423,7 @@ public class GameSession {
 
         player.setInvulnerable(false);
 
-        MissionZone mission = MissionCatalog.byId(missionId);
+        MissionZone mission = MissionCatalog.byId(building, missionId);
         if (mission == null) {
             return MissionResult.rejected("unknown_mission");
         }

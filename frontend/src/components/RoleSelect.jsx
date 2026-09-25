@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { ROLE_CATALOG } from '../game/roleCatalog';
-import { getLobbyCode, joinAs, onStateChange, setMyBuilding } from '../game/gameSync';
+import { ROLE_CATALOG, missionSummary } from '../game/roleCatalog';
+import { getLobbyCode, getMyBuilding, joinAs, onStateChange } from '../game/gameSync';
 
 const ERROR_MESSAGES = {
   role_taken: 'Ese rol ya lo eligió otro jugador.',
@@ -8,7 +8,7 @@ const ERROR_MESSAGES = {
   timeout: 'El servidor no respondió.',
 };
 
-export default function RoleSelect({ building, onJoined, onBack }) {
+export default function RoleSelect({ onJoined, onBack }) {
   const [takenRoles, setTakenRoles] = useState([]);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -19,7 +19,6 @@ export default function RoleSelect({ building, onJoined, onBack }) {
     setBusy(true);
     setError(null);
     try {
-      setMyBuilding(building);
       await joinAs(role);
       onJoined();
     } catch (err) {
@@ -33,7 +32,7 @@ export default function RoleSelect({ building, onJoined, onBack }) {
     <div className="role-select">
       <div className="main-menu-vignette" />
       <div className="role-select-content">
-        <p className="main-menu-kicker">Edificio {building} — Sala {getLobbyCode()}</p>
+        <p className="main-menu-kicker">Edificio {getMyBuilding()} — Sala {getLobbyCode()}</p>
         <h2 className="role-select-title">Elige tu rol</h2>
 
         <div className="role-select-grid">
@@ -51,7 +50,7 @@ export default function RoleSelect({ building, onJoined, onBack }) {
                 <span className="role-card-name">{entry.name}</span>
                 <span className="role-card-blurb">{entry.blurb}</span>
                 <span className="role-card-mission">
-                  {taken ? 'Ya elegido' : `Misión: ${entry.mission}`}
+                  {taken ? 'Ya elegido' : `Misión: ${missionSummary(entry.role, getMyBuilding())}`}
                 </span>
               </button>
             );
