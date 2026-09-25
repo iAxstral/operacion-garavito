@@ -131,7 +131,9 @@ public class GameSessionService {
 
                 if (now - lastBroadcastAt[0] >= BROADCAST_PERIOD_MS) {
                     lastBroadcastAt[0] = now;
-                    broadcast(gameId, session, session.consumeWipedRun() ? LastEvent.teamWiped() : null);
+                    LastEvent event = session.consumeWipedRun() ? LastEvent.teamWiped()
+                            : session.consumeVictory() ? LastEvent.victory() : null;
+                    broadcast(gameId, session, event);
                 }
             } catch (RuntimeException ex) {
 

@@ -52,6 +52,16 @@ function itemIcon(itemId) {
   return CAFETERIA_MENU.find((item) => item.itemId === itemId)?.icon ?? null;
 }
 
+function kinderStatus(wave) {
+  if (wave.victory) return `¡Edificio despejado! Superaron los ${wave.total} Kinders`;
+  if (wave.restingSeconds > 0) {
+    return wave.number === 0
+      ? `Prepárate — Kinder 1 en ${wave.restingSeconds}s`
+      : `Kinder ${wave.number} superado — Kinder ${wave.number + 1} en ${wave.restingSeconds}s`;
+  }
+  return `Kinder ${wave.number}/${wave.total} — ${wave.kills}/${wave.quota} zombis`;
+}
+
 function healthColor(health) {
   if (health > 60) return '#4caf50';
   if (health > 30) return '#e0a13a';
@@ -263,19 +273,21 @@ export default function Hud() {
 
   }, [state.round]);
 
-  // Aviso de oleada: se dispara una sola vez apenas la oleada N empieza a spawnear
-  // (restingSeconds llega a 0 y ya hay zombis por aparecer), sin importar el piso o
-  // el edificio — el Edificio C tambien tiene oleadas desde el piso 2 en adelante.
+  // Aviso de Kinder: una sola vez cuando el Kinder N arranca. Depende solo de numeros
+  // que cambian al cambiar de Kinder: con el objeto `state.wave` (nuevo en cada tick del
+  // servidor) el cleanup cancelaba el timeout y el aviso nunca se ocultaba.
+  const kinderNumber = state.wave?.number ?? 0;
+  const kinderActive = !!state.wave && state.wave.restingSeconds === 0 && state.wave.remaining > 0;
+  const kinderQuota = state.wave?.quota ?? 0;
   useEffect(() => {
-    const wave = state.wave;
-    if (!wave || wave.restingSeconds > 0 || wave.remaining <= 0) return undefined;
-    if (wave.number <= announcedWaveRef.current) return undefined;
+    if (kinderNumber < announcedWaveRef.current) announcedWaveRef.current = 0; // la corrida se reinicio
+    if (!kinderActive || kinderNumber <= announcedWaveRef.current) return undefined;
 
-    announcedWaveRef.current = wave.number;
-    setWaveBanner(`¡Oleada ${wave.number}! Se acercan ${wave.remaining} zombis`);
+    announcedWaveRef.current = kinderNumber;
+    setWaveBanner(`¡Kinder ${kinderNumber}! Maten ${kinderQuota} zombis para pasarlo`);
     const timeout = setTimeout(() => setWaveBanner(null), 3200);
     return () => clearTimeout(timeout);
-  }, [state.wave]);
+  }, [kinderNumber, kinderActive, kinderQuota]);
 
   const me = state.players.find((p) => p.playerId === getMyRole());
   const others = state.players.filter((p) => p.playerId !== getMyRole());
@@ -349,10 +361,8 @@ export default function Hud() {
       {state.round && <div className="hud-round">Ronda {state.round.number}</div>}
 
       {state.wave && (
-        <div className={`hud-wave${state.wave.restingSeconds > 0 ? ' hud-wave--resting' : ' hud-wave--active'}`}>
-          {state.wave.restingSeconds > 0
-            ? `Prepárate — oleada ${state.wave.number + 1} en ${state.wave.restingSeconds}s`
-            : `Oleada ${state.wave.number} — quedan ${state.wave.remaining} zombis`}
+        <div className={`hud-wave${state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
+          {kinderStatus(state.wave)}
         </div>
       )}
 

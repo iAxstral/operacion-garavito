@@ -46,6 +46,7 @@ public class GameSession {
     private final List<FloorGrid> floors;
 
     private volatile boolean wipedRun = false;
+    private volatile boolean victoryPending = false;
     private volatile boolean started = false;
     private volatile String host;
 
@@ -184,9 +185,15 @@ public class GameSession {
         return value;
     }
 
+    /** True (una sola vez) si el equipo acaba de ganar el ultimo Kinder. */
+    public boolean consumeVictory() {
+        boolean value = victoryPending;
+        victoryPending = false;
+        return value;
+    }
+
     public WaveState waveState() {
-        long now = System.currentTimeMillis();
-        return new WaveState(waveDirector.getWave(), waveDirector.remaining(aliveZombieCount()), waveDirector.restingSeconds(now));
+        return waveDirector.state(System.currentTimeMillis());
     }
 
     private int aliveZombieCount() {
@@ -197,16 +204,21 @@ public class GameSession {
         if (!started) {
             return;
         }
-        Zombie spawned = waveDirector.update(now, aliveZombieCount(), players.values());
-        if (spawned != null) {
-            zombies.put(spawned.getId(), spawned);
+        waveDirector.update(now, aliveZombieCount(), players.values())
+                .forEach(spawned -> zombies.put(spawned.getId(), spawned));
+        if (waveDirector.consumeJustCleared()) {
+            // Cuota cumplida: la horda que quedaba se retira y empieza el respiro.
+            zombies.clear();
+            if (waveDirector.isVictory()) {
+                victoryPending = true;
+            }
         }
 
         List<Player> targets = players.values().stream().filter(Player::isAlive).toList();
 
         if (targets.isEmpty() && !players.isEmpty()) {
             zombies.clear();
-            waveDirector.resetRun(now);
+            waveDirector.resetRun(now, WaveCurve.WAVE_REST_MS);
             players.values().forEach(player -> player.revive(REVIVE_HEALTH));
             wipedRun = true;
             return;
@@ -335,6 +347,7 @@ public class GameSession {
 
         if (kills > 0) {
             player.addGaravitos(kills * GARAVITOS_PER_ZOMBIE);
+            waveDirector.onZombiesKilled(kills);
         }
         return AttackResult.ok(hits, kills);
     }
@@ -502,12 +515,15 @@ public class GameSession {
 
     public void resetGame() {
         zombies.clear();
-        waveDirector.resetRun(System.currentTimeMillis());
+        // Antes se reusaba el respiro corto entre oleadas y la preparacion de 45 s
+        // nunca llegaba a aplicarse: el HUD mostraba "oleada 1 en 1s" al empezar.
+        waveDirector.resetRun(System.currentTimeMillis(), FIRST_WAVE_PREP_MS);
         claimedItems.clear();
         missionCooldowns.clear();
         floors.forEach(FloorGrid::resetDoors);
         players.values().forEach(Player::reset);
         roundCoordinator.reset();
         wipedRun = false;
+        victoryPending = false;
     }
 }

@@ -39,7 +39,8 @@ class GameSessionZombieTest {
 
     private void tickUntilZombies() {
         long now = System.currentTimeMillis();
-        for (int i = 0; i < 400 && session.zombieStates().isEmpty(); i++) {
+        // 45 s de preparacion antes del Kinder 1 = ~680 ticks de 66 ms.
+        for (int i = 0; i < 1500 && session.zombieStates().isEmpty(); i++) {
             now += 66;
             session.tick(now, 0.066);
         }
@@ -149,33 +150,76 @@ class GameSessionZombieTest {
         assertTrue(session.waveState().restingSeconds() > 0, "deberia haber entrado al respiro");
     }
 
-    @Test
-    @DisplayName("morir cuesta la corrida: se vuelve a la oleada 1")
-    void wipeResetsTheRun() {
-
-        long now = System.currentTimeMillis();
-        for (int i = 0; i < 4000 && session.waveState().number() < 3; i++) {
-            now += 200;
-            session.tick(now, 0.2);
-            session.zombieStates().forEach(z -> { });
-
-            armPlayer();
-            session.attemptAttack("SEGURIDAD", AttackType.BASIC, player.getX(), player.getY(), 0);
+    /** Registra kills en el director como si hubieran llegado por /attack. */
+    private void registerKills(int count) {
+        try {
+            java.lang.reflect.Field field = GameSession.class.getDeclaredField("waveDirector");
+            field.setAccessible(true);
+            ((WaveDirector) field.get(session)).onZombiesKilled(count);
+        } catch (ReflectiveOperationException ex) {
+            throw new AssertionError(ex);
         }
+    }
+
+    private long tickUntilKinder(long now, int kinder) {
+        for (int i = 0; i < 2000 && session.waveState().number() < kinder; i++) {
+            now += 66;
+            session.tick(now, 0.066);
+        }
+        assertEquals(kinder, session.waveState().number());
+        return now;
+    }
+
+    @Test
+    @DisplayName("cumplir la cuota pasa al siguiente Kinder y retira la horda")
+    void meetingTheQuotaClearsTheKinder() {
+        long now = tickUntilKinder(System.currentTimeMillis(), 1);
+        for (int i = 0; i < 100; i++) {
+            now += 66;
+            session.tick(now, 0.066);
+        }
+        assertFalse(session.zombieStates().isEmpty());
+
+        registerKills(WaveCurve.blueprint(1).killQuota());
+        now += 66;
+        session.tick(now, 0.066);
+
+        assertTrue(session.zombieStates().isEmpty(), "la horda deberia retirarse al pasar el Kinder");
+        assertTrue(session.waveState().restingSeconds() > 0, "deberia empezar el respiro");
+        tickUntilKinder(now, 2);
+    }
+
+    @Test
+    @DisplayName("morir cuesta la corrida: desde el Kinder 2 se vuelve al Kinder 1")
+    void wipeResetsTheRun() {
+        long now = tickUntilKinder(System.currentTimeMillis(), 1);
+        registerKills(WaveCurve.blueprint(1).killQuota());
+        now = tickUntilKinder(now, 2);
 
         for (int i = 0; i < 10; i++) {
             player.takeDamage(10);
         }
-        now += 200;
+        now += 66;
         session.tick(now, 0.066);
 
         assertTrue(session.consumeWipedRun(), "deberia avisarse el wipe");
+        assertEquals(0, session.waveState().number());
+        tickUntilKinder(now, 1);
+    }
 
-        for (int i = 0; i < 400 && session.waveState().restingSeconds() > 0; i++) {
-            now += 200;
-            session.tick(now, 0.2);
+    @Test
+    @DisplayName("ganar el Kinder 5 avisa la victoria una sola vez")
+    void winningTheLastKinderAnnouncesVictory() {
+        long now = System.currentTimeMillis();
+        for (int k = 1; k <= WaveCurve.KINDER_COUNT; k++) {
+            now = tickUntilKinder(now, k);
+            registerKills(WaveCurve.blueprint(k).killQuota());
+            now += 66;
+            session.tick(now, 0.066);
         }
-        assertEquals(1, session.waveState().number(), "el wipe debe costar el progreso");
+        assertTrue(session.waveState().victory());
+        assertTrue(session.consumeVictory());
+        assertFalse(session.consumeVictory());
     }
 
     @Test
@@ -270,13 +314,13 @@ class GameSessionZombieTest {
     }
 
     @Test
-    @DisplayName("el piso 1 es zona segura: los zombis solo aparecen en los pisos 2 y 3")
-    void groundFloorStaysSafe() {
+    @DisplayName("los zombis aparecen de todos lados, tambien en el piso 1")
+    void zombiesAlsoSpawnOnTheGroundFloor() {
         player.reportPosition(1, 800, 736);
         tickUntilZombies();
 
-        assertTrue(session.zombieStates().stream().allMatch(z -> z.floor() >= 2),
-                "no deberia aparecer ningun zombi en el piso 1");
+        assertTrue(session.zombieStates().stream().allMatch(z -> z.floor() == 1),
+                "con el jugador en el piso 1, la horda aparece en el piso 1");
     }
 
     @Test
@@ -285,8 +329,8 @@ class GameSessionZombieTest {
         GameSession c = new GameSession("edc", Building.C, scheduler, round -> { });
         c.joinPlayer("SEGURIDAD");
         c.start("SEGURIDAD");
-        // Con el jugador en el piso 1 el director sortea entre los pisos embrujados; antes
-        // caia en el 3, un zombi inalcanzable que dejaba la oleada sin poder terminar.
+        // Antes el director sorteaba el piso 3 aunque el C no lo tiene: un zombi
+        // inalcanzable que dejaba la oleada sin poder terminar.
         c.getOrCreatePlayer("SEGURIDAD").reportPosition(1, 608, 800);
         long now = System.currentTimeMillis();
         for (int i = 0; i < 3000; i++) {
