@@ -83,6 +83,8 @@ export default function Hud() {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [waveBanner, setWaveBanner] = useState(null);
   const announcedWaveRef = useRef(0);
+  const announcedRoundRef = useRef(0);
+  const roundHideTimeoutRef = useRef(null);
   const [mapOpen, setMapOpen] = useState(false);
   const mapCanvasRef = useRef(null);
   const stateRef = useRef(state);
@@ -268,14 +270,25 @@ export default function Hud() {
 
   }, [state.lastEvent]);
 
+  // RoundCoordinator.currentStateView() siempre manda resolved=false en los
+  // broadcasts normales (round.resolved solo es true por un instante, en el UNICO
+  // broadcast que dispara la resolucion). Con un efecto normal, ese instante dispara
+  // el banner pero el siguiente tick (ya con resolved=false) vuelve a correr el
+  // efecto: la funcion de limpieza cancela el setTimeout que lo iba a ocultar, y como
+  // ese segundo pase no reprograma uno nuevo (resolved ya es false), el banner queda
+  // pegado con el texto de la ultima ronda. Por eso el timeout se maneja en un ref,
+  // fuera del ciclo de limpieza del efecto: una vez agendado, nada lo cancela antes
+  // de tiempo salvo que resuelva otra ronda.
+  const roundNumber = state.round?.number ?? 0;
+  const roundResolved = !!state.round?.resolved;
   useEffect(() => {
-    if (!state.round?.resolved) return undefined;
+    if (!roundResolved || roundNumber === announcedRoundRef.current) return;
 
-    setRoundBanner(`¡Ronda ${state.round.number} resuelta!`);
-    const timeout = setTimeout(() => setRoundBanner(null), 3000);
-    return () => clearTimeout(timeout);
-
-  }, [state.round]);
+    announcedRoundRef.current = roundNumber;
+    setRoundBanner(`¡Ronda ${roundNumber} resuelta!`);
+    clearTimeout(roundHideTimeoutRef.current);
+    roundHideTimeoutRef.current = setTimeout(() => setRoundBanner(null), 3000);
+  }, [roundNumber, roundResolved]);
 
   // Aviso de Kinder: una sola vez cuando el Kinder N arranca. Depende solo de numeros
   // que cambian al cambiar de Kinder: con el objeto `state.wave` (nuevo en cada tick del
