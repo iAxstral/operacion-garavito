@@ -2,6 +2,11 @@ package co.eci.operaciongaravito.game;
 
 public record LastEvent(String type, String playerId, String itemId, String reason) {
 
+    /** El equipo gano el ultimo Kinder del edificio. */
+    public static LastEvent victory() {
+        return new LastEvent("VICTORY", null, null, null);
+    }
+
     public static LastEvent teamWiped() {
         return new LastEvent("TEAM_WIPED", null, null, null);
     }

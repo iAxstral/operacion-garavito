@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.regex.Pattern;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
@@ -28,8 +29,23 @@ public class GameSessionService {
         return thread;
     });
 
-    public GameSessionService(SimpMessagingTemplate messagingTemplate) {
+    private final BossConfig bossConfig;
+
+    public GameSessionService(
+            SimpMessagingTemplate messagingTemplate,
+            @Value("${game.boss.detection-radius-tiles:8}") double detectionRadiusTiles,
+            @Value("${game.boss.attack-radius-tiles:1}") double attackRadiusTiles,
+            @Value("${game.boss.repath-ms:500}") long repathMs,
+            @Value("${game.boss.alert-ms:600}") long alertMs,
+            @Value("${game.boss.stun-ms:1500}") long stunMs,
+            @Value("${game.boss.lose-target-ms:3000}") long loseTargetMs,
+            @Value("${game.boss.speed-px-per-second:115}") double speedPxPerSecond,
+            @Value("${game.boss.max-health:24}") int maxHealth,
+            @Value("${game.boss.bite-damage:12}") int biteDamage,
+            @Value("${game.boss.attack-cooldown-ms:900}") long attackCooldownMs) {
         this.messagingTemplate = messagingTemplate;
+        this.bossConfig = new BossConfig(detectionRadiusTiles, attackRadiusTiles, repathMs, alertMs, stunMs,
+                loseTargetMs, speedPxPerSecond, maxHealth, biteDamage, attackCooldownMs);
     }
 
     private static final long TICK_PERIOD_MS = 66;
@@ -43,14 +59,15 @@ public class GameSessionService {
         return sessions.get(gameId);
     }
 
-    public GameSession create(String gameId) {
+    public GameSession create(String gameId, Building building) {
         if (!isValidCode(gameId)) {
             return null;
         }
         boolean[] created = { false };
         GameSession session = sessions.computeIfAbsent(gameId, id -> {
             created[0] = true;
-            GameSession fresh = new GameSession(id, roundTimeoutScheduler, round -> broadcastRoundResolved(id, round));
+            GameSession fresh = new GameSession(id, building, bossConfig, roundTimeoutScheduler,
+                    round -> broadcastRoundResolved(id, round));
             startTicking(id);
             return fresh;
         });
@@ -102,7 +119,8 @@ public class GameSessionService {
                 session.zombieStates(),
                 session.waveState(),
                 session.doorStates(),
-                session.lobbyState()
+                session.lobbyState(),
+                session.bossView()
         );
     }
 
@@ -131,7 +149,9 @@ public class GameSessionService {
 
                 if (now - lastBroadcastAt[0] >= BROADCAST_PERIOD_MS) {
                     lastBroadcastAt[0] = now;
-                    broadcast(gameId, session, session.consumeWipedRun() ? LastEvent.teamWiped() : null);
+                    LastEvent event = session.consumeWipedRun() ? LastEvent.teamWiped()
+                            : session.consumeVictory() ? LastEvent.victory() : null;
+                    broadcast(gameId, session, event);
                 }
             } catch (RuntimeException ex) {
 

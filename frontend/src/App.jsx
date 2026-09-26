@@ -54,7 +54,6 @@ function App() {
   if (view === 'roles') {
     return (
       <RoleSelect
-        building={building}
         onJoined={() => setView('waiting')}
         onBack={() => {
           leaveGame();

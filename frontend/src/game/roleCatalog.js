@@ -1,3 +1,4 @@
+import { missionZonesFor } from './missionCatalog';
 
 export const ROLE_CATALOG = [
   {
@@ -7,8 +8,7 @@ export const ROLE_CATALOG = [
     portrait: '/personajes/seguridad.png',
     // Objeto que marca sus salas de misión en el mapa (en vez de escribir el nombre del salón).
     missionIcon: '🛡️',
-    mission: 'Armero, Terraza o Sala de Servidores',
-    blurb: 'Vigila las cámaras y mantiene la línea. Su misión vive en 3 salas distintas (Armero piso 2, Terraza piso 1 o Sala de Servidores piso 3) — no siempre es la misma.',
+    blurb: 'Vigila las cámaras y mantiene la línea.',
   },
   {
     role: 'SALUD',
@@ -16,8 +16,7 @@ export const ROLE_CATALOG = [
     spritePrefix: 'biomedica',
     portrait: '/personajes/biomedica.png',
     missionIcon: '💉',
-    mission: 'Laboratorio, Sala de Estudio o Biblioteca',
-    blurb: 'Repara el cableado conectando los cables por color. Su misión vive en 3 salas distintas (Laboratorio piso 3, Sala de Estudio piso 1 o Biblioteca piso 2) — no siempre es la misma.',
+    blurb: 'Repara el cableado conectando los cables por color.',
   },
   {
     role: 'ECONOMIA',
@@ -25,8 +24,7 @@ export const ROLE_CATALOG = [
     spritePrefix: 'economia',
     portrait: '/personajes/economia.png',
     missionIcon: '🧮',
-    mission: 'Cafetería, Sala de Reuniones o Auditorio',
-    blurb: 'Cuadra las cuentas resolviendo sumas. Su misión vive en 3 salas distintas (Cafetería piso 1, Sala de Reuniones piso 2 o Auditorio piso 3) — no siempre es la misma.',
+    blurb: 'Cuadra las cuentas resolviendo sumas.',
   },
   {
     role: 'INFRAESTRUCTURA',
@@ -34,10 +32,16 @@ export const ROLE_CATALOG = [
     spritePrefix: 'infraestructura',
     portrait: '/personajes/infraestructura.png',
     missionIcon: '🧱',
-    mission: 'Sala de Máquinas, Depósito o Sala de Estudio',
-    blurb: 'Levanta una estructura apilando bloques bien alineados. Su misión vive en 3 salas distintas (Sala de Máquinas piso 3, Depósito de Servicio piso 1 o Sala de Estudio piso 2) — no siempre es la misma.',
+    blurb: 'Levanta una estructura apilando bloques bien alineados.',
   },
 ];
+
+// Salas de mision del rol en ese edificio, derivadas del catalogo de misiones para que
+// el texto nunca diga salas que el edificio no tiene.
+export function missionSummary(role, building) {
+  const zones = missionZonesFor(building).filter((zone) => zone.role === role);
+  return zones.map((zone) => `${zone.room} (piso ${zone.floor})`).join(' o ');
+}
 
 export function roleInfo(role) {
   return ROLE_CATALOG.find((entry) => entry.role === role) ?? ROLE_CATALOG[0];

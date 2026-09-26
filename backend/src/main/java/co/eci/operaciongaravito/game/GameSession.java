@@ -34,6 +34,12 @@ public class GameSession {
 
     private static final int REVIVE_HEALTH = 100;
 
+    /** El cuerpo del jefe es grande: los golpes lo alcanzan desde un poco mas lejos. */
+    private static final double BOSS_HIT_BONUS_PX = 24;
+    private static final int BOSS_REWARD_GARAVITOS = 25;
+    /** Si se queda solo en su piso este tiempo, sube o baja a buscar al equipo. */
+    private static final long BOSS_RELOCATE_MS = 5_000;
+
     private final String gameId;
     private final Map<String, Player> players = new ConcurrentHashMap<>();
     private final Map<String, WorldItem> worldItems = WorldItemCatalog.defaultCatalog();
@@ -42,11 +48,15 @@ public class GameSession {
     private final RoundCoordinator roundCoordinator;
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final WaveDirector waveDirector;
-    private final List<FloorGrid> floors = java.util.stream.IntStream.rangeClosed(1, FloorGrid.FLOOR_COUNT)
-            .mapToObj(FloorGrid::forFloor)
-            .toList();
+    private final BossConfig bossConfig;
+    private volatile BossZombie boss;
+    private long bossAloneSince;
+    private long bossSequence;
+    private final Building building;
+    private final List<FloorGrid> floors;
 
     private volatile boolean wipedRun = false;
+    private volatile boolean victoryPending = false;
     private volatile boolean started = false;
     private volatile String host;
 
@@ -54,11 +64,21 @@ public class GameSession {
     // recursos antes de que llegue la primera oleada — 4s no alcanzaba para eso.
     private static final long FIRST_WAVE_PREP_MS = 45_000;
 
-    public GameSession(String gameId, ScheduledExecutorService scheduler, Consumer<RoundState> onRoundResolved) {
+    public GameSession(String gameId, Building building, BossConfig bossConfig, ScheduledExecutorService scheduler,
+                       Consumer<RoundState> onRoundResolved) {
         this.gameId = gameId;
+        this.building = building;
+        this.bossConfig = bossConfig;
+        this.floors = java.util.stream.IntStream.rangeClosed(1, building.floorCount())
+                .mapToObj(floor -> FloorGrid.forFloor(building, floor))
+                .toList();
         this.roundCoordinator = new RoundCoordinator(scheduler, onRoundResolved);
 
-        this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS);
+        this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, floors);
+    }
+
+    public Building getBuilding() {
+        return building;
     }
 
     public boolean hasPlayers() {
@@ -113,7 +133,7 @@ public class GameSession {
     }
 
     public LobbyState lobbyState() {
-        return new LobbyState(started, host);
+        return new LobbyState(started, host, building);
     }
 
     public PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
@@ -161,7 +181,7 @@ public class GameSession {
 
     public void reportPosition(String playerId, int floor, double x, double y) {
         Player player = players.get(playerId);
-        if (player != null && floor >= 1 && floor <= FloorGrid.FLOOR_COUNT) {
+        if (player != null && building.hasFloor(floor)) {
             player.reportPosition(floor, x, y);
         }
     }
@@ -176,9 +196,15 @@ public class GameSession {
         return value;
     }
 
+    /** True (una sola vez) si el equipo acaba de ganar el ultimo Kinder. */
+    public boolean consumeVictory() {
+        boolean value = victoryPending;
+        victoryPending = false;
+        return value;
+    }
+
     public WaveState waveState() {
-        long now = System.currentTimeMillis();
-        return new WaveState(waveDirector.getWave(), waveDirector.remaining(aliveZombieCount()), waveDirector.restingSeconds(now));
+        return waveDirector.state(System.currentTimeMillis());
     }
 
     private int aliveZombieCount() {
@@ -189,16 +215,26 @@ public class GameSession {
         if (!started) {
             return;
         }
-        Zombie spawned = waveDirector.update(now, aliveZombieCount(), players.values());
-        if (spawned != null) {
-            zombies.put(spawned.getId(), spawned);
+        waveDirector.update(now, aliveZombieCount(), players.values())
+                .forEach(spawned -> zombies.put(spawned.getId(), spawned));
+        if (waveDirector.consumeBossDue()) {
+            spawnBoss(now);
+        }
+        if (waveDirector.consumeJustCleared()) {
+            // Cuota cumplida (o jefe vencido): la horda que quedaba se retira.
+            zombies.clear();
+            boss = null;
+            if (waveDirector.isVictory()) {
+                victoryPending = true;
+            }
         }
 
         List<Player> targets = players.values().stream().filter(Player::isAlive).toList();
 
         if (targets.isEmpty() && !players.isEmpty()) {
             zombies.clear();
-            waveDirector.resetRun(now);
+            boss = null;
+            waveDirector.resetRun(now, WaveCurve.WAVE_REST_MS);
             players.values().forEach(player -> player.revive(REVIVE_HEALTH));
             wipedRun = true;
             return;
@@ -226,6 +262,7 @@ public class GameSession {
         }
 
         zombies.values().removeIf(zombie -> !zombie.isAlive());
+        updateBoss(now, deltaSeconds, targets);
 
         if (waveDirector.restingSeconds(now) > 0) {
             players.values().forEach(player -> {
@@ -234,6 +271,63 @@ public class GameSession {
                 }
             });
         }
+    }
+
+    /** El jefe aparece en el piso con mas jugadores vivos, lejos de ellos. */
+    private void spawnBoss(long now) {
+        int floor = busiestFloor();
+        List<Player> onFloor = players.values().stream()
+                .filter(p -> p.isAlive() && p.getFloor() == floor).toList();
+        FloorGrid.SpawnPoint point = WaveDirector.pickSpawnPoint(floorGrid(floor).spawnPoints(), onFloor,
+                java.util.concurrent.ThreadLocalRandom.current());
+        boss = new BossZombie("boss" + (++bossSequence), floor, point.x(), point.y(), bossConfig,
+                java.util.random.RandomGenerator.getDefault());
+        bossAloneSince = 0;
+    }
+
+    private int busiestFloor() {
+        int best = building.floorCount();
+        long bestCount = -1;
+        for (int floor = building.floorCount(); floor >= 1; floor--) {
+            final int current = floor;
+            long count = players.values().stream().filter(p -> p.isAlive() && p.getFloor() == current).count();
+            if (count > bestCount) {
+                bestCount = count;
+                best = floor;
+            }
+        }
+        return best;
+    }
+
+    private void updateBoss(long now, double deltaSeconds, List<Player> targets) {
+        BossZombie current = boss;
+        if (current == null || !current.isAlive()) {
+            return;
+        }
+        List<Player> onFloor = targets.stream().filter(p -> p.getFloor() == current.getFloor()).toList();
+        if (onFloor.isEmpty() && !targets.isEmpty()) {
+            if (bossAloneSince == 0) {
+                bossAloneSince = now;
+            } else if (now - bossAloneSince >= BOSS_RELOCATE_MS) {
+                // Nadie en su piso: va a buscarlos, para que la corrida no se trabe con el
+                // equipo escondido en otro piso.
+                int floor = busiestFloor();
+                List<Player> there = targets.stream().filter(p -> p.getFloor() == floor).toList();
+                FloorGrid.SpawnPoint point = WaveDirector.pickSpawnPoint(floorGrid(floor).spawnPoints(), there,
+                        java.util.concurrent.ThreadLocalRandom.current());
+                current.relocate(floor, point.x(), point.y(), now);
+                bossAloneSince = 0;
+                return;
+            }
+        } else {
+            bossAloneSince = 0;
+        }
+        current.update(now, deltaSeconds, floorGrid(current.getFloor()), onFloor);
+    }
+
+    public BossView bossView() {
+        BossZombie current = boss;
+        return current == null || !current.isAlive() ? null : current.toView();
     }
 
     private FloorGrid floorGrid(int floor) {
@@ -327,6 +421,23 @@ public class GameSession {
 
         if (kills > 0) {
             player.addGaravitos(kills * GARAVITOS_PER_ZOMBIE);
+            waveDirector.onZombiesKilled(kills);
+        }
+
+        BossZombie target = boss;
+        if (target != null && target.isAlive() && target.getFloor() == player.getFloor()) {
+            double dx = target.getX() - x;
+            double dy = target.getY() - y;
+            double angle = Math.atan2(dy, dx);
+            boolean inRange = Math.hypot(dx, dy) <= melee.range() + BOSS_HIT_BONUS_PX;
+            if (inRange && (charged || Math.abs(wrapAngle(angle - facing)) <= ATTACK_HALF_ARC_RAD)) {
+                hits++;
+                if (target.hit(melee.damage(), charged, now)) {
+                    kills++;
+                    player.addGaravitos(BOSS_REWARD_GARAVITOS);
+                    waveDirector.onBossDefeated(now);
+                }
+            }
         }
         return AttackResult.ok(hits, kills);
     }
@@ -380,7 +491,7 @@ public class GameSession {
             return MissionResult.rejected("unknown_player");
         }
 
-        MissionZone mission = MissionCatalog.byId(missionId);
+        MissionZone mission = MissionCatalog.byId(building, missionId);
         if (mission == null) {
             return MissionResult.rejected("unknown_mission");
         }
@@ -415,7 +526,7 @@ public class GameSession {
 
         player.setInvulnerable(false);
 
-        MissionZone mission = MissionCatalog.byId(missionId);
+        MissionZone mission = MissionCatalog.byId(building, missionId);
         if (mission == null) {
             return MissionResult.rejected("unknown_mission");
         }
@@ -494,12 +605,16 @@ public class GameSession {
 
     public void resetGame() {
         zombies.clear();
-        waveDirector.resetRun(System.currentTimeMillis());
+        boss = null;
+        // Antes se reusaba el respiro corto entre oleadas y la preparacion de 45 s
+        // nunca llegaba a aplicarse: el HUD mostraba "oleada 1 en 1s" al empezar.
+        waveDirector.resetRun(System.currentTimeMillis(), FIRST_WAVE_PREP_MS);
         claimedItems.clear();
         missionCooldowns.clear();
         floors.forEach(FloorGrid::resetDoors);
         players.values().forEach(Player::reset);
         roundCoordinator.reset();
         wipedRun = false;
+        victoryPending = false;
     }
 }

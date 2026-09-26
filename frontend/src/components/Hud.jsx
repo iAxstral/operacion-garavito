@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  getMyBuilding,
   getMyRole,
   onStateChange,
   submitDecision,
@@ -13,7 +14,7 @@ import {
   isInputLocked,
   purchaseItem,
 } from '../game/gameSync';
-import { MISSION_ZONES, REWARD_GARAVITOS } from '../game/missionCatalog';
+import { missionZonesFor, REWARD_GARAVITOS } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
 import { CAFETERIA_MENU } from '../game/shopCatalog';
 import { roleInfo } from '../game/roleCatalog';
@@ -51,6 +52,20 @@ function itemIcon(itemId) {
   return CAFETERIA_MENU.find((item) => item.itemId === itemId)?.icon ?? null;
 }
 
+function kinderStatus(wave, boss) {
+  if (wave.victory) return `¡Edificio despejado! Superaron los ${wave.total} Kinders`;
+  if (wave.bossStage) {
+    const health = boss ? ` (${boss.health}/${boss.maxHealth})` : '';
+    return `Kinder ${wave.number}/${wave.total} — ¡Derroten al Ingeniero de Sistemas!${health}`;
+  }
+  if (wave.restingSeconds > 0) {
+    return wave.number === 0
+      ? `Prepárate — Kinder 1 en ${wave.restingSeconds}s`
+      : `Kinder ${wave.number} superado — Kinder ${wave.number + 1} en ${wave.restingSeconds}s`;
+  }
+  return `Kinder ${wave.number}/${wave.total} — ${wave.kills}/${wave.quota} zombis`;
+}
+
 function healthColor(health) {
   if (health > 60) return '#4caf50';
   if (health > 30) return '#e0a13a';
@@ -68,10 +83,12 @@ export default function Hud() {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [waveBanner, setWaveBanner] = useState(null);
   const announcedWaveRef = useRef(0);
+  const announcedRoundRef = useRef(0);
+  const roundHideTimeoutRef = useRef(null);
   const [mapOpen, setMapOpen] = useState(false);
   const mapCanvasRef = useRef(null);
   const stateRef = useRef(state);
-  const floorLayoutCacheRef = useRef({ floor: null, layout: null });
+  const floorLayoutCacheRef = useRef({ key: null, layout: null });
 
   useEffect(() => {
     return onStateChange(setState);
@@ -99,8 +116,9 @@ export default function Hud() {
       const me = liveState.players.find((p) => p.playerId === myRole);
       const myFloor = me?.floor ?? 1;
 
-      if (floorLayoutCacheRef.current.floor !== myFloor) {
-        floorLayoutCacheRef.current = { floor: myFloor, layout: buildFloorLayout({ floor: myFloor }) };
+      const layoutKey = `${getMyBuilding()}-${myFloor}`;
+      if (floorLayoutCacheRef.current.key !== layoutKey) {
+        floorLayoutCacheRef.current = { key: layoutKey, layout: buildFloorLayout({ building: getMyBuilding(), floor: myFloor }) };
       }
       const layout = floorLayoutCacheRef.current.layout;
 
@@ -125,7 +143,7 @@ export default function Hud() {
           ctx.fill();
         });
 
-      const missionHere = MISSION_ZONES.find((zone) => zone.role === myRole && zone.floor === myFloor);
+      const missionHere = missionZonesFor(getMyBuilding()).find((zone) => zone.role === myRole && zone.floor === myFloor);
 
       if (me) {
         const px = (me.x / TILE) * MAP_CELL_PX;
@@ -252,28 +270,44 @@ export default function Hud() {
 
   }, [state.lastEvent]);
 
+  // RoundCoordinator.currentStateView() siempre manda resolved=false en los
+  // broadcasts normales (round.resolved solo es true por un instante, en el UNICO
+  // broadcast que dispara la resolucion). Con un efecto normal, ese instante dispara
+  // el banner pero el siguiente tick (ya con resolved=false) vuelve a correr el
+  // efecto: la funcion de limpieza cancela el setTimeout que lo iba a ocultar, y como
+  // ese segundo pase no reprograma uno nuevo (resolved ya es false), el banner queda
+  // pegado con el texto de la ultima ronda. Por eso el timeout se maneja en un ref,
+  // fuera del ciclo de limpieza del efecto: una vez agendado, nada lo cancela antes
+  // de tiempo salvo que resuelva otra ronda.
+  const roundNumber = state.round?.number ?? 0;
+  const roundResolved = !!state.round?.resolved;
   useEffect(() => {
-    if (!state.round?.resolved) return undefined;
+    if (!roundResolved || roundNumber === announcedRoundRef.current) return;
 
-    setRoundBanner(`¡Ronda ${state.round.number} resuelta!`);
-    const timeout = setTimeout(() => setRoundBanner(null), 3000);
-    return () => clearTimeout(timeout);
+    announcedRoundRef.current = roundNumber;
+    setRoundBanner(`¡Ronda ${roundNumber} resuelta!`);
+    clearTimeout(roundHideTimeoutRef.current);
+    roundHideTimeoutRef.current = setTimeout(() => setRoundBanner(null), 3000);
+  }, [roundNumber, roundResolved]);
 
-  }, [state.round]);
-
-  // Aviso de oleada: se dispara una sola vez apenas la oleada N empieza a spawnear
-  // (restingSeconds llega a 0 y ya hay zombis por aparecer), sin importar el piso o
-  // el edificio — el Edificio C tambien tiene oleadas desde el piso 2 en adelante.
+  // Aviso de Kinder: una sola vez cuando el Kinder N arranca. Depende solo de numeros
+  // que cambian al cambiar de Kinder: con el objeto `state.wave` (nuevo en cada tick del
+  // servidor) el cleanup cancelaba el timeout y el aviso nunca se ocultaba.
+  const kinderNumber = state.wave?.number ?? 0;
+  const kinderActive = !!state.wave && state.wave.restingSeconds === 0 && !state.wave.victory && kinderNumber > 0;
+  const kinderQuota = state.wave?.quota ?? 0;
+  const bossStage = !!state.wave?.bossStage;
   useEffect(() => {
-    const wave = state.wave;
-    if (!wave || wave.restingSeconds > 0 || wave.remaining <= 0) return undefined;
-    if (wave.number <= announcedWaveRef.current) return undefined;
+    if (kinderNumber < announcedWaveRef.current) announcedWaveRef.current = 0; // la corrida se reinicio
+    if (!kinderActive || kinderNumber <= announcedWaveRef.current) return undefined;
 
-    announcedWaveRef.current = wave.number;
-    setWaveBanner(`¡Oleada ${wave.number}! Se acercan ${wave.remaining} zombis`);
+    announcedWaveRef.current = kinderNumber;
+    setWaveBanner(bossStage
+      ? `¡Kinder ${kinderNumber}! El Ingeniero de Sistemas viene por ustedes`
+      : `¡Kinder ${kinderNumber}! Maten ${kinderQuota} zombis para pasarlo`);
     const timeout = setTimeout(() => setWaveBanner(null), 3200);
     return () => clearTimeout(timeout);
-  }, [state.wave]);
+  }, [kinderNumber, kinderActive, kinderQuota, bossStage]);
 
   const me = state.players.find((p) => p.playerId === getMyRole());
   const others = state.players.filter((p) => p.playerId !== getMyRole());
@@ -291,9 +325,9 @@ export default function Hud() {
   const nearDoorState = state.doors?.find((d) => d.doorId === nearDoor?.doorId);
   const nearDoorOpen = nearDoorState?.open ?? true;
 
-  const myMissionOnThisFloor = MISSION_ZONES.find((zone) => zone.role === getMyRole() && zone.floor === floor);
+  const myMissionOnThisFloor = missionZonesFor(getMyBuilding()).find((zone) => zone.role === getMyRole() && zone.floor === floor);
   const myMissionElsewhere = !myMissionOnThisFloor
-    ? MISSION_ZONES.find((zone) => zone.role === getMyRole())
+    ? missionZonesFor(getMyBuilding()).find((zone) => zone.role === getMyRole())
     : null;
 
   const handleBuy = (item) => {
@@ -347,10 +381,8 @@ export default function Hud() {
       {state.round && <div className="hud-round">Ronda {state.round.number}</div>}
 
       {state.wave && (
-        <div className={`hud-wave${state.wave.restingSeconds > 0 ? ' hud-wave--resting' : ' hud-wave--active'}`}>
-          {state.wave.restingSeconds > 0
-            ? `Prepárate — oleada ${state.wave.number + 1} en ${state.wave.restingSeconds}s`
-            : `Oleada ${state.wave.number} — quedan ${state.wave.remaining} zombis`}
+        <div className={`hud-wave${state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
+          {kinderStatus(state.wave, state.boss)}
         </div>
       )}
 

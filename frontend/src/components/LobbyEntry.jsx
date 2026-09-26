@@ -29,7 +29,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
   const handleCreate = () => run(async () => {
     for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt += 1) {
       try {
-        const created = await openLobby(generateLobbyCode(), true);
+        const created = await openLobby(generateLobbyCode(), true, building);
         onEntered(created);
         return;
       } catch (err) {
@@ -43,7 +43,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
     event.preventDefault();
     const normalized = code.trim().toUpperCase();
     run(async () => {
-      await openLobby(normalized, false);
+      await openLobby(normalized, false, building);
       onEntered(normalized);
     });
   };
