@@ -21,9 +21,16 @@ public final class WaveCurve {
     /** Zombis vivos extra permitidos por cada jugador adicional en la sala. */
     public static final int EXTRA_ALIVE_PER_PLAYER = 3;
 
+    // Kinder 1-2: rebajados tras medir con evidencia real (log de vida cada 1s con
+    // un jugador quieto). Primer intento: bajar maxAlive de 8 a 3 no alcanzo — una
+    // vez que los 3 convergen y sincronizan la mordida (2 de dano cada 600ms POR
+    // zombi, independiente entre ellos) el techo de dano siguio siendo ~10/s, igual
+    // que con 8 (la mordida solo depende de cuantos entran en CONTACT_RANGE_PX a la
+    // vez, no del total vivo). Bajar a 2 vivos si baja el techo real a ~6.7/s. Kinder
+    // 3-5 quedan igual: la escalada de dificultad sigue ahi.
     private static final List<WaveBlueprint> KINDERS = List.of(
-            new WaveBlueprint(1, 15, 8, 2, 1200, 0.0, 55, 75, false),
-            new WaveBlueprint(2, 20, 10, 2, 1000, 0.0, 62, 85, false),
+            new WaveBlueprint(1, 8, 2, 2, 1200, 0.0, 55, 75, false),
+            new WaveBlueprint(2, 14, 4, 2, 1000, 0.0, 62, 85, false),
             new WaveBlueprint(3, 25, 12, 3, 900, 0.15, 70, 95, false),
             new WaveBlueprint(4, 30, 14, 3, 800, 0.3, 78, 110, false),
             // Kinder 5: el Ingeniero de Sistemas con su escolta. Se pasa matando al jefe.

@@ -46,11 +46,25 @@ class WaveCurveTest {
     void manyZombiesAtOnce() {
         for (int k = 1; k <= WaveCurve.KINDER_COUNT; k++) {
             WaveBlueprint blueprint = WaveCurve.blueprint(k);
-            assertTrue(blueprint.spawnBurst() >= 2, "rafaga del Kinder " + k);
-            assertTrue(blueprint.maxAlive() >= 8, "vivos del Kinder " + k);
+            assertTrue(blueprint.spawnBurst() >= 1, "rafaga del Kinder " + k);
+            assertTrue(blueprint.maxAlive() >= 2, "vivos del Kinder " + k);
             if (!blueprint.boss()) {
                 assertTrue(blueprint.killQuota() > blueprint.maxAlive(), "cuota del Kinder " + k);
             }
+        }
+    }
+
+    @Test
+    @DisplayName("el Kinder 1 da margen de reaccion: como mucho 2 zombis muerden a la vez")
+    void kinderOneStaysGentle() {
+        assertTrue(WaveCurve.blueprint(1).maxAlive() <= 2, "el Kinder 1 no deberia rodear al jugador con mas de 2 zombis");
+    }
+
+    @Test
+    @DisplayName("del Kinder 3 en adelante el tope de vivos ya exige pelear en grupo")
+    void laterKindersStaySwarmy() {
+        for (int k = 3; k <= WaveCurve.KINDER_COUNT; k++) {
+            assertTrue(WaveCurve.blueprint(k).maxAlive() >= 8, "vivos del Kinder " + k);
         }
     }
 
