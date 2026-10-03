@@ -1,9 +1,29 @@
 package co.eci.operaciongaravito.game;
 
+/**
+ * Zombi comun. Su ataque ya no es una mordida instantanea al tocar al jugador: cuando
+ * lo alcanza se prepara ({@link ZombieAttackPhase#WINDUP}) y recien al final muerde,
+ * solo si el jugador sigue a su alcance. Asi la mordida se lee en pantalla y se puede
+ * esquivar (alejarse o dash) o cortar con un golpe, que lo deja aturdido.
+ */
 public class Zombie {
 
-    private static final int CONTACT_DAMAGE = 2;
-    private static final long CONTACT_COOLDOWN_MS = 600;
+    /** A esta distancia (centro a centro) empieza a prepararse para morder. */
+    static final double ATTACK_TRIGGER_PX = 42;
+    /** Alcance real de la mordida al soltarla: un poco mas que el gatillo, pero esquivable. */
+    static final double BITE_REACH_PX = 58;
+    static final double TOUGH_BITE_REACH_PX = 64;
+
+    static final long WINDUP_MS = 420;
+    static final long TOUGH_WINDUP_MS = 520;
+    static final long STRIKE_RECOVER_MS = 650;
+    static final long STAGGER_MS = 500;
+
+    static final int BITE_DAMAGE = 4;
+    static final int TOUGH_BITE_DAMAGE = 7;
+
+    /** Mientras se recupera de una mordida o de un aturdimiento camina mas lento. */
+    private static final double RECOVER_SPEED_FACTOR = 0.45;
 
     private final String id;
     private final int floor;
@@ -13,7 +33,10 @@ public class Zombie {
     private volatile double x;
     private volatile double y;
     private volatile int health;
-    private volatile long nextContactAt;
+
+    private volatile ZombieAttackPhase phase = ZombieAttackPhase.CHASE;
+    private volatile long phaseEndsAt;
+    private Player attackTarget;
 
     private volatile long knockbackUntil;
     private volatile double knockbackVx;
@@ -53,6 +76,10 @@ public class Zombie {
         return tough;
     }
 
+    public ZombieAttackPhase getPhase() {
+        return phase;
+    }
+
     public synchronized boolean hit(int damage, double knockbackVx, double knockbackVy, long now) {
         if (health <= 0) {
             return false;
@@ -61,6 +88,10 @@ public class Zombie {
         this.knockbackVx = knockbackVx;
         this.knockbackVy = knockbackVy;
         this.knockbackUntil = now + 180;
+        if (phase == ZombieAttackPhase.WINDUP) {
+            // Pegarle mientras se prepara le corta la mordida: premia al que reacciona.
+            enterPhase(ZombieAttackPhase.STAGGER, now + STAGGER_MS);
+        }
         return health <= 0;
     }
 
@@ -76,6 +107,10 @@ public class Zombie {
         if (now < knockbackUntil) {
             moveX = knockbackVx * deltaSeconds;
             moveY = knockbackVy * deltaSeconds;
+        } else if (phase == ZombieAttackPhase.WINDUP) {
+            // Plantado mientras se prepara: solo lo mueve el empuje de los demas.
+            moveX = separationX * deltaSeconds;
+            moveY = separationY * deltaSeconds;
         } else {
             double distance = Math.hypot(targetX - x, targetY - y);
             double dirX;
@@ -93,8 +128,9 @@ public class Zombie {
                 dirY = noRoute ? (targetY - y) / distance : flow[1];
             }
 
-            moveX = dirX * speed * deltaSeconds + separationX * deltaSeconds;
-            moveY = dirY * speed * deltaSeconds + separationY * deltaSeconds;
+            double currentSpeed = phase == ZombieAttackPhase.CHASE ? speed : speed * RECOVER_SPEED_FACTOR;
+            moveX = dirX * currentSpeed * deltaSeconds + separationX * deltaSeconds;
+            moveY = dirY * currentSpeed * deltaSeconds + separationY * deltaSeconds;
         }
 
         if (floor.fits(x + moveX, y, BODY_RADIUS)) {
@@ -105,15 +141,54 @@ public class Zombie {
         }
     }
 
-    public boolean tryBite(Player player, long now) {
-        if (!isAlive() || now < nextContactAt) {
+    /**
+     * Avanza el ataque contra {@code target} (el jugador vivo mas cercano de su piso,
+     * o null si no hay). Devuelve true si en este tick la mordida le hizo dano.
+     */
+    public synchronized boolean updateAttack(Player target, long now) {
+        if (!isAlive()) {
             return false;
         }
-        nextContactAt = now + CONTACT_COOLDOWN_MS;
-        return player.takeDamage(CONTACT_DAMAGE);
+        switch (phase) {
+            case CHASE -> {
+                if (target != null && distanceTo(target) <= ATTACK_TRIGGER_PX) {
+                    attackTarget = target;
+                    enterPhase(ZombieAttackPhase.WINDUP, now + (tough ? TOUGH_WINDUP_MS : WINDUP_MS));
+                }
+            }
+            case WINDUP -> {
+                if (now >= phaseEndsAt) {
+                    Player bitten = attackTarget;
+                    enterPhase(ZombieAttackPhase.STRIKE, now + STRIKE_RECOVER_MS);
+                    return bitten != null
+                            && bitten.isAlive()
+                            && bitten.getFloor() == floor
+                            && distanceTo(bitten) <= (tough ? TOUGH_BITE_REACH_PX : BITE_REACH_PX)
+                            && bitten.takeBite(tough ? TOUGH_BITE_DAMAGE : BITE_DAMAGE, now);
+                }
+            }
+            case STRIKE, STAGGER -> {
+                if (now >= phaseEndsAt) {
+                    enterPhase(ZombieAttackPhase.CHASE, 0);
+                }
+            }
+        }
+        return false;
+    }
+
+    private void enterPhase(ZombieAttackPhase next, long endsAt) {
+        phase = next;
+        phaseEndsAt = endsAt;
+        if (next != ZombieAttackPhase.WINDUP) {
+            attackTarget = null;
+        }
+    }
+
+    private double distanceTo(Player player) {
+        return Math.hypot(player.getX() - x, player.getY() - y);
     }
 
     public ZombieState toState() {
-        return new ZombieState(id, floor, Math.round(x), Math.round(y), health, tough);
+        return new ZombieState(id, floor, Math.round(x), Math.round(y), health, tough, phase);
     }
 }

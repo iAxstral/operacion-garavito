@@ -28,7 +28,6 @@ public class GameSession {
     private static final Melee ARMED = new Melee(2, 70, 400, 280);
     private static final Melee CHARGED = new Melee(4, 150, 0, 520);
     private static final long CHARGED_COOLDOWN_MS = 6_000;
-    private static final double CONTACT_RANGE_PX = 40;
     private static final double SEPARATION_RADIUS_PX = 26;
     private static final double SEPARATION_FORCE = 90;
 
@@ -250,15 +249,14 @@ public class GameSession {
         for (Zombie zombie : living) {
             Player target = nearestPlayer(zombie, targets);
             if (target == null) {
+                // Sin nadie en su piso igual termina la mordida o el aturdimiento en curso.
+                zombie.updateAttack(null, now);
                 continue;
             }
             double[] separation = separationFor(zombie, living);
             zombie.step(floorGrid(zombie.getFloor()), fields.get(target.getPlayerId()), target.getX(), target.getY(),
                     separation[0], separation[1], deltaSeconds, now);
-
-            if (Math.hypot(target.getX() - zombie.getX(), target.getY() - zombie.getY()) <= CONTACT_RANGE_PX) {
-                zombie.tryBite(target, now);
-            }
+            zombie.updateAttack(target, now);
         }
 
         zombies.values().removeIf(zombie -> !zombie.isAlive());

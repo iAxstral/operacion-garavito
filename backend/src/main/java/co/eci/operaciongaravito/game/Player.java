@@ -22,6 +22,13 @@ public class Player {
 
     private volatile boolean invulnerable = false;
 
+    /**
+     * Tras una mordida, las de otros zombis se ignoran un instante: si no, una horda
+     * que muerde sincronizada derrite al jugador antes de que pueda reaccionar.
+     */
+    static final long BITE_GRACE_MS = 350;
+    private volatile long biteGraceUntil = 0;
+
     public Player(String role) {
         this.playerId = role;
         this.role = role;
@@ -91,6 +98,18 @@ public class Player {
             lifeState = PlayerLifeState.DOWNED;
         }
         return true;
+    }
+
+    /** Dano de una mordida de zombi: respeta la ventana de gracia entre mordidas. */
+    public synchronized boolean takeBite(int amount, long now) {
+        if (now < biteGraceUntil) {
+            return false;
+        }
+        boolean damaged = takeDamage(amount);
+        if (damaged) {
+            biteGraceUntil = now + BITE_GRACE_MS;
+        }
+        return damaged;
     }
 
     public synchronized void revive(int toHealth) {
@@ -177,5 +196,6 @@ public class Player {
         attackReadyAt = 0;
         chargedReadyAt = 0;
         invulnerable = false;
+        biteGraceUntil = 0;
     }
 }
