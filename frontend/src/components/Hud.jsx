@@ -13,7 +13,10 @@ import {
   isTouchDevice,
   isInputLocked,
   purchaseItem,
+  setInputLocked,
 } from '../game/gameSync';
+import SettingsPanel from './SettingsPanel';
+import { playSfx } from '../game/sfx';
 import { missionZonesFor, REWARD_GARAVITOS } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
 import { CAFETERIA_MENU } from '../game/shopCatalog';
@@ -86,6 +89,11 @@ export default function Hud() {
   const announcedRoundRef = useRef(0);
   const roundHideTimeoutRef = useRef(null);
   const [mapOpen, setMapOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [hurtKey, setHurtKey] = useState(0);
+  const previousHealthRef = useRef(null);
+  const lockBeforeSettingsRef = useRef(false);
+  const touch = isTouchDevice();
   const mapCanvasRef = useRef(null);
   const stateRef = useRef(state);
   const floorLayoutCacheRef = useRef({ key: null, layout: null });
@@ -212,6 +220,11 @@ export default function Hud() {
 
       if (isInputLocked()) return;
 
+      if (event.key === 'Escape' && !shopOpen && !inventoryOpen && !mapOpen) {
+        openSettings();
+        return;
+      }
+
       if ((event.key === 'e' || event.key === 'E') && nearVendor) {
         event.preventDefault();
         setShopOpen((open) => !open);
@@ -236,7 +249,7 @@ export default function Hud() {
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [nearVendor, nearDoor]);
+  }, [nearVendor, nearDoor, shopOpen, inventoryOpen, mapOpen]);
 
   useEffect(() => {
     const event = state.lastEvent;
@@ -312,6 +325,29 @@ export default function Hud() {
   const me = state.players.find((p) => p.playerId === getMyRole());
   const others = state.players.filter((p) => p.playerId !== getMyRole());
   const health = me?.health ?? 100;
+
+  // Viñeta roja en los bordes cada vez que baja la vida (la key reinicia la animacion).
+  useEffect(() => {
+    const previous = previousHealthRef.current;
+    previousHealthRef.current = health;
+    if (previous != null && health < previous) setHurtKey((key) => key + 1);
+  }, [health]);
+
+  function openSettings() {
+    // El personaje se queda quieto mientras el panel esta abierto; al cerrarlo se
+    // devuelve el bloqueo que hubiera (p. ej. un minijuego de mision abierto).
+    lockBeforeSettingsRef.current = isInputLocked();
+    setInputLocked(true);
+    setShopOpen(false);
+    setInventoryOpen(false);
+    setMapOpen(false);
+    setSettingsOpen(true);
+  }
+
+  const closeSettings = () => {
+    setSettingsOpen(false);
+    setInputLocked(lockBeforeSettingsRef.current);
+  };
   const garavitos = me?.garavitos ?? 0;
   const inventory = me?.inventory ?? [];
   const slots = [...inventory, ...Array(5 - inventory.length).fill(null)];
@@ -337,30 +373,73 @@ export default function Hud() {
   };
 
   return (
-    <div className="hud">
-      <div className="hud-health-bar">
-        <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
-        <span className="hud-health-label">{health} / 100</span>
+    <div className={`hud${touch ? ' hud--touch' : ''}`}>
+      {hurtKey > 0 && <div key={hurtKey} className={`hud-hurt-vignette${health <= 30 ? ' hud-hurt-vignette--critical' : ''}`} />}
+
+      <div className="hud-top-left">
+        <div className="hud-health-bar">
+          <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
+          <span className="hud-health-label">{health} / 100</span>
+        </div>
+
+        <div className="hud-stats-row">
+          <div className="hud-garavitos">{garavitos} Garavitos</div>
+          <div className="hud-floor">{role.name} — Piso {floor}</div>
+        </div>
+
+        <div className="hud-inventory">
+          {slots.map((slot, i) => (
+            <div
+              key={`${slot?.itemId ?? 'empty'}-${i}`}
+              className="hud-slot"
+              style={slot ? { background: TYPE_COLORS[slot.type] } : undefined}
+              title={slot?.itemName ?? 'Vacío'}
+            >
+              {slot && itemIcon(slot.itemId) && <img src={itemIcon(slot.itemId)} alt={slot.itemName} className="hud-slot-icon" />}
+            </div>
+          ))}
+        </div>
       </div>
 
-      <div className="hud-garavitos">{garavitos} Garavitos</div>
-
-      <div className="hud-floor">{role.name} — Piso {floor}</div>
-
-      <div className="hud-inventory">
-        {slots.map((slot, i) => (
-          <div
-            key={`${slot?.itemId ?? 'empty'}-${i}`}
-            className="hud-slot"
-            style={slot ? { background: TYPE_COLORS[slot.type] } : undefined}
-            title={slot?.itemName ?? 'Vacío'}
+      <div className="hud-top-right">
+        <div className="hud-menu-buttons">
+          {touch && (
+            <button
+              type="button"
+              className="hud-icon-btn"
+              aria-label="Mapa y equipo"
+              onClick={() => {
+                playSfx('click');
+                setMapOpen((open) => !open);
+              }}
+            >
+              🗺
+            </button>
+          )}
+          <button
+            type="button"
+            className="hud-icon-btn"
+            aria-label="Configuración"
+            title="Configuración (Esc)"
+            onClick={() => {
+              playSfx('click');
+              openSettings();
+            }}
           >
-            {slot && itemIcon(slot.itemId) && <img src={itemIcon(slot.itemId)} alt={slot.itemName} className="hud-slot-icon" />}
-          </div>
-        ))}
-      </div>
+            ⚙
+          </button>
+        </div>
 
-      <div className="hud-hint">Tab: equipo · M: mapa · E: inventario</div>
+        {state.wave && (
+          <div className={`hud-wave${state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
+            {kinderStatus(state.wave, state.boss)}
+          </div>
+        )}
+
+        {state.round && <div className="hud-round">Ronda {state.round.number}</div>}
+
+        <div className="hud-hint">Tab: equipo · M: mapa · E: inventario · Esc: ajustes</div>
+      </div>
 
       {!isTouchDevice() && (
       <div className="hud-abilities">
@@ -378,27 +457,19 @@ export default function Hud() {
       </div>
       )}
 
-      {state.round && <div className="hud-round">Ronda {state.round.number}</div>}
-
-      {state.wave && (
-        <div className={`hud-wave${state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
-          {kinderStatus(state.wave, state.boss)}
-        </div>
-      )}
-
       <button type="button" className="hud-decide-btn" onClick={() => submitDecision(PLACEHOLDER_ACTION)}>
         Decidir
       </button>
 
       {nearVendor && !shopOpen && (
         <div className="hud-interact-hint">
-          Presiona <strong>E</strong> — {nearVendor.label}
+          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {nearVendor.label}
         </div>
       )}
 
       {nearDoor && (
         <div className="hud-interact-hint">
-          Presiona <strong>E</strong> — {nearDoorOpen ? 'Cerrar' : 'Abrir'} puerta
+          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {nearDoorOpen ? 'Cerrar' : 'Abrir'} puerta
         </div>
       )}
 
@@ -408,6 +479,7 @@ export default function Hud() {
 
       {mapOpen && (
         <div className="map-modal map-modal--overview">
+          <button type="button" className="modal-close" aria-label="Cerrar mapa" onClick={() => setMapOpen(false)}>✕</button>
           <h3>Mapa — Piso {floor}</h3>
           <div className="map-overview-grid">
             <div className="map-overview-col map-overview-col--map">
@@ -475,12 +547,13 @@ export default function Hud() {
               </div>
             </div>
           </div>
-          <p className="shop-hint">M / Esc para cerrar</p>
+          {!touch && <p className="shop-hint">M / Esc para cerrar</p>}
         </div>
       )}
 
       {inventoryOpen && (
         <div className="inventory-modal">
+          <button type="button" className="modal-close" aria-label="Cerrar inventario" onClick={() => setInventoryOpen(false)}>✕</button>
           <h3>Inventario</h3>
           {inventory.length === 0 && <p className="inventory-empty">Vacío. Recoge comida o compra objetos.</p>}
           <div className="inventory-list">
@@ -500,12 +573,13 @@ export default function Hud() {
               </div>
             ))}
           </div>
-          <p className="shop-hint">E / I / Esc para cerrar</p>
+          {!touch && <p className="shop-hint">E / I / Esc para cerrar</p>}
         </div>
       )}
 
       {shopOpen && nearVendor && (
         <div className="shop-modal">
+          <button type="button" className="modal-close" aria-label="Cerrar tienda" onClick={() => setShopOpen(false)}>✕</button>
           <h3>{nearVendor.label}</h3>
           <div className="shop-items">
             {nearVendor.menu.map((item) => {
@@ -528,7 +602,7 @@ export default function Hud() {
               );
             })}
           </div>
-          <p className="shop-hint">E / Esc para cerrar</p>
+          {!touch && <p className="shop-hint">E / Esc para cerrar</p>}
         </div>
       )}
 
@@ -552,6 +626,8 @@ export default function Hud() {
           ))}
         </div>
       )}
+
+      {settingsOpen && <SettingsPanel inGame onClose={closeSettings} />}
     </div>
   );
 }

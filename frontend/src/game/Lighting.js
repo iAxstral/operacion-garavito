@@ -16,6 +16,9 @@ const DEPTH_FOG = 4990;
 const DEPTH_DARKNESS = 5000;
 const DEPTH_GLOW = 5001;
 const FOG_SIZE = 256;
+// Margen (px de pantalla) que la capa de oscuridad cubre de mas por cada lado: se ubica
+// en el mundo con la vista del cuadro anterior y asi no se ven bordes al mover la camara.
+const OVERSCAN = 64;
 
 // Neblina leve, solo fuera del edificio: cuatro franjas alrededor del mapa, en coordenadas del mundo.
 const FOG_LAYERS = [
@@ -124,8 +127,13 @@ export default class Lighting {
     });
   }
 
+  // La capa de oscuridad es un objeto del mundo que cubre la vista de la camara (mas un
+  // margen). Antes era fija a la pantalla, lo que se descuadraba con el zoom de celular.
   build() {
-    const { width, height } = this.scene.scale;
+    const camera = this.scene.cameras.main;
+    const width = camera.width + 2 * OVERSCAN;
+    const height = camera.height + 2 * OVERSCAN;
+    this.builtFor = `${camera.width}x${camera.height}@${camera.zoom}`;
     this.image?.destroy();
     if (this.scene.textures.exists(DARK_KEY)) this.scene.textures.remove(DARK_KEY);
 
@@ -138,9 +146,8 @@ export default class Lighting {
     this.image = this.scene.add
       .image(0, 0, DARK_KEY)
       .setOrigin(0, 0)
-      .setScrollFactor(0)
       .setDepth(DEPTH_DARKNESS)
-      .setDisplaySize(width, height);
+      .setDisplaySize(width / camera.zoom, height / camera.zoom);
   }
 
   // mode: 'steady' | 'flicker' | 'broken'. Con bulb=true dibuja el foco con su resplandor.
@@ -167,9 +174,9 @@ export default class Lighting {
   }
 
   punch(ctx, view, x, y, radius, strength) {
-    const sx = (x - view.x) * RESOLUTION;
-    const sy = (y - view.y) * RESOLUTION;
-    const r = radius * RESOLUTION;
+    const sx = (x - view.x) * view.scale;
+    const sy = (y - view.y) * view.scale;
+    const r = radius * view.scale;
     if (sx < -r || sy < -r || sx > this.texture.width + r || sy > this.texture.height + r) return;
 
     const g = ctx.createRadialGradient(sx, sy, r * 0.12, sx, sy, r);
@@ -183,7 +190,15 @@ export default class Lighting {
   }
 
   update(time, player, remotePlayers) {
-    const view = this.scene.cameras.main.worldView;
+    const camera = this.scene.cameras.main;
+    if (this.builtFor !== `${camera.width}x${camera.height}@${camera.zoom}`) this.build();
+    const margin = OVERSCAN / camera.zoom;
+    const view = {
+      x: camera.worldView.x - margin,
+      y: camera.worldView.y - margin,
+      scale: camera.zoom * RESOLUTION,
+    };
+    this.image.setPosition(view.x, view.y);
     const ctx = this.texture.context;
     const { width, height } = this.texture;
 

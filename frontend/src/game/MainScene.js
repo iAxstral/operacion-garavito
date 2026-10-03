@@ -8,6 +8,7 @@ import {
   changeFloor,
   getLatestState,
   getMyBuilding,
+  getMyPlayerState,
   getMyRole,
   getBoss,
   getZombies,
@@ -24,6 +25,8 @@ import {
   requestMissionComplete,
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
+import { channelVolume, getSettings, vibrate } from './settings';
+import { playSfx } from './sfx';
 import BossLayer, { preloadBoss } from './BossLayer';
 import Lighting from './Lighting';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
@@ -38,12 +41,15 @@ const CHARGED_RADIUS = 150;
 const FLOOR_FADE_MS = 180;
 const ROAR_RANGE_PX = 260;
 const GROAN_RANGE_PX = 170;
-const BITE_RANGE_PX = 48;
 const FAR_COOLDOWN_MS = 6000;
 const NEAR_COOLDOWN_MS = 1800;
 const MAX_ROAR_VOLUME = 0.75;
 const MAX_GROAN_VOLUME = 0.5;
-const BITE_COOLDOWN_MS = 1500;
+const MAX_BITE_VOLUME = 0.6;
+// Distancia hasta la que se oyen las mordidas, golpes y avisos de otros zombis.
+const COMBAT_HEARING_PX = 520;
+// Solo se avisa con sonido la preparacion de un zombi que esta encima de ti.
+const WINDUP_WARN_PX = 70;
 const RAIN_MIN_VOLUME = 0.3;
 const RAIN_MAX_VOLUME = 0.6;
 const RAIN_SWELL_MS = 11000;
@@ -60,6 +66,18 @@ const PLAYER_BODY_FOOT_INSET = 6;
 const MAP_PIXEL_WIDTH = MAP_COLS * TILE;
 const MAP_PIXEL_HEIGHT = MAP_ROWS * TILE;
 const PLAYER_SPEED = 160;
+
+// En pantallas chicas (celular) la camara se aleja para que se vea mas mapa alrededor:
+// con zoom 1 el personaje ocupaba casi la mitad del alto en horizontal.
+const ZOOM_REFERENCE_PX = 620;
+const MIN_CAMERA_ZOOM = 0.6;
+const BANNER_TOP_PX = 70;
+
+export function cameraZoomFor(width, height) {
+  const shortSide = Math.min(width, height);
+  if (shortSide >= ZOOM_REFERENCE_PX) return 1;
+  return Math.max(MIN_CAMERA_ZOOM, Math.round((shortSide / ZOOM_REFERENCE_PX) * 20) / 20);
+}
 
 const WALK_WOBBLE_HZ = 3;
 const WALK_WOBBLE_DEG = 2.5;
@@ -177,13 +195,89 @@ export default class MainScene extends Phaser.Scene {
   startRain() {
     // El sound manager es global: la lluvia sigue sonando al cambiar de piso.
     if (this.sound.get('rain')) return;
-    this.sound.add('rain', { loop: true, volume: RAIN_MIN_VOLUME }).play();
+    this.sound.add('rain', { loop: true, volume: RAIN_MIN_VOLUME * channelVolume('ambient') }).play();
   }
 
   playZombieSound(key, volume) {
     const sound = this.sound.get(key) ?? this.sound.add(key);
     if (sound.isPlaying) return;
-    sound.play({ volume });
+    sound.play({ volume: volume * channelVolume('zombies') });
+  }
+
+  // 1 pegado al jugador, bajando hasta 0 a COMBAT_HEARING_PX.
+  hearing(x, y) {
+    if (!this.player) return 0;
+    const distance = Math.hypot(this.player.x - x, this.player.y - y);
+    return Math.max(0, 1 - distance / COMBAT_HEARING_PX) ** 1.5;
+  }
+
+  // Jugador (local o remoto) mas cercano: hacia ahi embiste el zombi al morder.
+  nearestPlayerTo(x, y) {
+    let best = this.player ? { x: this.player.x, y: this.player.y } : null;
+    let bestDistance = best ? Math.hypot(best.x - x, best.y - y) : Infinity;
+    this.remotePlayers.forEach(({ sprite }) => {
+      const distance = Math.hypot(sprite.x - x, sprite.y - y);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = { x: sprite.x, y: sprite.y };
+      }
+    });
+    return best;
+  }
+
+  zombieHooks() {
+    return {
+      onWindup: (entry) => {
+        if (Math.hypot(this.player.x - entry.x, this.player.y - entry.y) <= WINDUP_WARN_PX) playSfx('warn');
+      },
+      onStrike: (entry) => {
+        const volume = MAX_BITE_VOLUME * this.hearing(entry.x, entry.y) * channelVolume('zombies');
+        if (volume > 0.01) this.sound.play('zombie_attack', { volume });
+      },
+      onStagger: (entry) => playSfx('stagger', this.hearing(entry.x, entry.y)),
+      onHit: (entry) => playSfx('hit', this.hearing(entry.x, entry.y)),
+    };
+  }
+
+  // Mordida (o golpe del jefe) recibida: destello, sacudida, numero flotante y vibracion.
+  checkDamageTaken() {
+    const me = getMyPlayerState();
+    if (!me) return;
+    const previous = this.lastHealth;
+    this.lastHealth = me.health;
+    if (previous == null || me.health >= previous) return;
+
+    const amount = previous - me.health;
+    this.player.setTint(0xff4040);
+    this.time.delayedCall(140, () => this.player?.clearTint());
+    if (getSettings().screenShake) this.cameras.main.shake(140, 0.006);
+    playSfx('hurt');
+    vibrate(amount >= 7 ? [70, 40, 70] : 60);
+
+    const label = this.add
+      .text(this.player.x, this.player.y - this.player.height / 2, `-${amount}`, {
+        fontFamily: 'sans-serif',
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: '#ff5a5a',
+        stroke: '#1a0000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(6000);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 34,
+      alpha: 0,
+      duration: 650,
+      ease: 'Cubic.easeOut',
+      onComplete: () => label.destroy(),
+    });
+  }
+
+  applyCameraZoom() {
+    const { width, height } = this.scale;
+    this.cameras.main.setZoom(cameraZoomFor(width, height));
   }
 
   // La lluvia sube y baja despacio para no ser un ruido constante.
@@ -191,27 +285,21 @@ export default class MainScene extends Phaser.Scene {
     const rain = this.sound.get('rain');
     if (!rain) return;
     const swell = 0.5 + 0.5 * Math.sin((time / RAIN_SWELL_MS) * Math.PI * 2);
-    rain.setVolume(RAIN_MIN_VOLUME + (RAIN_MAX_VOLUME - RAIN_MIN_VOLUME) * swell);
+    rain.setVolume((RAIN_MIN_VOLUME + (RAIN_MAX_VOLUME - RAIN_MIN_VOLUME) * swell) * channelVolume('ambient'));
   }
 
   // Cuanto mas cerca el zombi, mas fuerte y mas seguido suena.
   updateZombieAudio(time) {
     let nearest = null;
-    let bite = false;
 
     this.zombiesOnFloor().forEach((zombie) => {
       const distance = Math.hypot(this.player.x - zombie.x, this.player.y - zombie.y);
-      if (distance <= BITE_RANGE_PX) bite = true;
       const range = zombie.tough ? ROAR_RANGE_PX : GROAN_RANGE_PX;
       if (distance > range) return;
       const closeness = 1 - distance / range;
       if (!nearest || closeness > nearest.closeness) nearest = { closeness, tough: zombie.tough };
     });
 
-    if (bite && time >= this.nextBiteSoundAt) {
-      this.nextBiteSoundAt = time + BITE_COOLDOWN_MS;
-      this.playZombieSound('zombie_attack', 0.5);
-    }
     if (!nearest || time < this.nextZombieSoundAt) return;
 
     const { closeness, tough } = nearest;
@@ -242,6 +330,8 @@ export default class MainScene extends Phaser.Scene {
     const outside = OUTSIDE_MARGIN_TILES * TILE;
     this.cameras.main.setBounds(-outside, -outside, MAP_PIXEL_WIDTH + 2 * outside, MAP_PIXEL_HEIGHT + 2 * outside);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.applyCameraZoom();
+    this.scale.on('resize', this.applyCameraZoom, this);
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.dashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
@@ -251,7 +341,10 @@ export default class MainScene extends Phaser.Scene {
     this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.input.keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.Q, Phaser.Input.Keyboard.KeyCodes.C]);
     this.input.mouse?.disableContextMenu();
-    this.zombieLayer = new ZombieLayer(this);
+    this.zombieLayer = new ZombieLayer(this, {
+      hooks: this.zombieHooks(),
+      findTarget: (x, y) => this.nearestPlayerTo(x, y),
+    });
     this.bossLayer = new BossLayer(this);
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
@@ -260,8 +353,8 @@ export default class MainScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.KeyCodes.D,
     });
 
-    this.nextBiteSoundAt = 0;
     this.nextZombieSoundAt = 0;
+    this.lastHealth = null;
     this.startRain();
     this.createFoodItems();
     this.createVendors();
@@ -270,6 +363,7 @@ export default class MainScene extends Phaser.Scene {
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
     this.events.once('shutdown', () => {
+      this.scale.off('resize', this.applyCameraZoom, this);
       this.unsubscribeGameState?.();
       this.lighting?.destroy();
       setNearVendor(null);
@@ -278,8 +372,11 @@ export default class MainScene extends Phaser.Scene {
   }
 
   showFloorBanner(name) {
+    // Fijo a la pantalla: con zoom el texto se compensa para quedar arriba y del mismo tamano.
+    const zoom = this.cameras.main.zoom;
+    const { width, height } = this.scale;
     const banner = this.add
-      .text(this.scale.width / 2, 70, name, {
+      .text(width / 2, height / 2 + (BANNER_TOP_PX - height / 2) / zoom, name, {
         fontFamily: 'sans-serif',
         fontSize: '30px',
         fontStyle: 'bold',
@@ -289,6 +386,7 @@ export default class MainScene extends Phaser.Scene {
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
+      .setScale(1 / zoom)
       .setDepth(6000);
     this.tweens.add({ targets: banner, alpha: 0, delay: 1200, duration: 700, onComplete: () => banner.destroy() });
   }
@@ -427,6 +525,7 @@ export default class MainScene extends Phaser.Scene {
     if (!this.player) return;
     this.syncRemotePlayers(delta);
     this.lighting.update(time, this.player, this.remotePlayers);
+    this.checkDamageTaken();
 
     if (isInputLocked()) {
       this.player.setVelocity(0, 0);
@@ -514,6 +613,7 @@ export default class MainScene extends Phaser.Scene {
     this.nextAttackAt = time + ATTACK_REQUEST_MS;
     requestAttack('BASIC', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
     this.drawSwing(this.facingAngle);
+    playSfx('swing');
   }
 
   updateChargedAttack(time) {
@@ -524,6 +624,7 @@ export default class MainScene extends Phaser.Scene {
     this.chargedReadyAt = time + CHARGED_COOLDOWN_MS;
     requestAttack('CHARGED', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
     this.drawShockwave();
+    playSfx('charged');
   }
 
   drawShockwave() {
@@ -544,7 +645,7 @@ export default class MainScene extends Phaser.Scene {
       ease: 'Cubic.easeOut',
       onComplete: () => ring.destroy(),
     });
-    this.cameras.main.shake(160, 0.004);
+    if (getSettings().screenShake) this.cameras.main.shake(160, 0.004);
   }
 
   drawSwing(facing) {

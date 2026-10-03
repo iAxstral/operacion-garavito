@@ -1,5 +1,12 @@
+import { useState } from 'react';
+import SettingsPanel from './SettingsPanel';
+import { isTouchDevice } from '../game/gameSync';
+import { playSfx } from '../game/sfx';
 
 export default function MainMenu({ onPlay }) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const touch = isTouchDevice();
+
   return (
     <div className="main-menu">
       <div className="main-menu-vignette" />
@@ -10,18 +17,49 @@ export default function MainMenu({ onPlay }) {
         <h1 className="main-menu-title">OPERACIÓN GARAVITO</h1>
         <p className="main-menu-tagline">Sobrevive a la horda. Cumple tu misión. No caigas.</p>
 
-        <button type="button" className="main-menu-play-btn" onClick={onPlay}>
-          Jugar
-        </button>
-
-        <div className="main-menu-controls">
-          <span><strong>WASD</strong> moverse</span>
-          <span><strong>Q</strong> ataque básico</span>
-          <span><strong>C</strong> ataque cargado</span>
-          <span><strong>Shift</strong> dash</span>
-          <span><strong>E</strong> interactuar / inventario</span>
+        <div className="main-menu-actions">
+          <button
+            type="button"
+            className="main-menu-play-btn"
+            onClick={() => {
+              playSfx('click');
+              onPlay();
+            }}
+          >
+            Jugar
+          </button>
+          <button
+            type="button"
+            className="main-menu-secondary-btn"
+            onClick={() => {
+              playSfx('click');
+              setSettingsOpen(true);
+            }}
+          >
+            <span aria-hidden="true">⚙</span> Configuración
+          </button>
         </div>
+
+        {touch ? (
+          <div className="main-menu-controls">
+            <span><strong>Joystick</strong> moverse</span>
+            <span><strong>⚔</strong> atacar</span>
+            <span><strong>💥</strong> ataque cargado</span>
+            <span><strong>»</strong> dash</span>
+          </div>
+        ) : (
+          <div className="main-menu-controls">
+            <span><strong>WASD</strong> moverse</span>
+            <span><strong>Q</strong> ataque básico</span>
+            <span><strong>C</strong> ataque cargado</span>
+            <span><strong>Shift</strong> dash</span>
+            <span><strong>E</strong> interactuar / inventario</span>
+          </div>
+        )}
+        <p className="main-menu-tip">Cuando un zombi se ponga rojo va a morder: aléjate o golpéalo para cortarlo.</p>
       </div>
+
+      {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
     </div>
   );
 }
