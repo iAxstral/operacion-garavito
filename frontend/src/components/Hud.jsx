@@ -3,7 +3,6 @@ import {
   getMyBuilding,
   getMyRole,
   onStateChange,
-  submitDecision,
   onNearVendorChange,
   onNearDoorChange,
   requestDoorToggle,
@@ -24,8 +23,6 @@ import { roleInfo } from '../game/roleCatalog';
 import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
 
 const MAP_CELL_PX = 12;
-
-const PLACEHOLDER_ACTION = 'placeholder_action';
 
 const TYPE_COLORS = { WEAPON: '#8a3b3b', FOOD: '#3b8a4e', AMMO: '#8a7a3b' };
 
@@ -76,18 +73,15 @@ function healthColor(health) {
 }
 
 export default function Hud() {
-  const [state, setState] = useState({ players: [], claimedItemIds: [], lastEvent: null, round: null });
+  const [state, setState] = useState({ players: [], claimedItemIds: [], lastEvent: null });
   const [panelOpen, setPanelOpen] = useState(false);
   const [toast, setToast] = useState(null);
-  const [roundBanner, setRoundBanner] = useState(null);
   const [nearVendor, setNearVendorState] = useState(null);
   const [shopOpen, setShopOpen] = useState(false);
   const [nearDoor, setNearDoorState] = useState(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [waveBanner, setWaveBanner] = useState(null);
   const announcedWaveRef = useRef(0);
-  const announcedRoundRef = useRef(0);
-  const roundHideTimeoutRef = useRef(null);
   const [mapOpen, setMapOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hurtKey, setHurtKey] = useState(0);
@@ -283,26 +277,6 @@ export default function Hud() {
 
   }, [state.lastEvent]);
 
-  // RoundCoordinator.currentStateView() siempre manda resolved=false en los
-  // broadcasts normales (round.resolved solo es true por un instante, en el UNICO
-  // broadcast que dispara la resolucion). Con un efecto normal, ese instante dispara
-  // el banner pero el siguiente tick (ya con resolved=false) vuelve a correr el
-  // efecto: la funcion de limpieza cancela el setTimeout que lo iba a ocultar, y como
-  // ese segundo pase no reprograma uno nuevo (resolved ya es false), el banner queda
-  // pegado con el texto de la ultima ronda. Por eso el timeout se maneja en un ref,
-  // fuera del ciclo de limpieza del efecto: una vez agendado, nada lo cancela antes
-  // de tiempo salvo que resuelva otra ronda.
-  const roundNumber = state.round?.number ?? 0;
-  const roundResolved = !!state.round?.resolved;
-  useEffect(() => {
-    if (!roundResolved || roundNumber === announcedRoundRef.current) return;
-
-    announcedRoundRef.current = roundNumber;
-    setRoundBanner(`¡Ronda ${roundNumber} resuelta!`);
-    clearTimeout(roundHideTimeoutRef.current);
-    roundHideTimeoutRef.current = setTimeout(() => setRoundBanner(null), 3000);
-  }, [roundNumber, roundResolved]);
-
   // Aviso de Kinder: una sola vez cuando el Kinder N arranca. Depende solo de numeros
   // que cambian al cambiar de Kinder: con el objeto `state.wave` (nuevo en cada tick del
   // servidor) el cleanup cancelaba el timeout y el aviso nunca se ocultaba.
@@ -436,8 +410,6 @@ export default function Hud() {
           </div>
         )}
 
-        {state.round && <div className="hud-round">Ronda {state.round.number}</div>}
-
         <div className="hud-hint">Tab: equipo · M: mapa · E: inventario · Esc: ajustes</div>
       </div>
 
@@ -457,10 +429,6 @@ export default function Hud() {
       </div>
       )}
 
-      <button type="button" className="hud-decide-btn" onClick={() => submitDecision(PLACEHOLDER_ACTION)}>
-        Decidir
-      </button>
-
       {nearVendor && !shopOpen && (
         <div className="hud-interact-hint">
           {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {nearVendor.label}
@@ -474,7 +442,6 @@ export default function Hud() {
       )}
 
       {toast && <div className="hud-toast">{toast}</div>}
-      {roundBanner && <div className="hud-round-banner">{roundBanner}</div>}
       {waveBanner && <div className="hud-wave-banner">{waveBanner}</div>}
 
       {mapOpen && (

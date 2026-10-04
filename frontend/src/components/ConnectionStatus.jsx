@@ -1,45 +1,18 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { socketService } from '../services/socketService';
 
-const TEST_TOPIC = '/topic/game/test';
-const TEST_DESTINATION = '/app/game/test';
-
+// Solo aparece si se cae la conexion con el servidor: el cliente STOMP reintenta solo.
 export default function ConnectionStatus() {
-  const [status, setStatus] = useState('connecting');
-  const [lastEcho, setLastEcho] = useState(null);
-  const subscriptionRef = useRef(null);
+  const [status, setStatus] = useState(socketService.status);
 
-  useEffect(() => {
-    socketService.connect({
-      onConnect: () => {
-        setStatus('connected');
-        subscriptionRef.current = socketService.subscribe(TEST_TOPIC, (payload) => {
-          setLastEcho(payload.text);
-        });
-      },
+  useEffect(() => socketService.onStatusChange(setStatus), []);
 
-      onDisconnect: () => setStatus('disconnected'),
-      onError: () => setStatus('error'),
-    });
-
-    return () => {
-
-      subscriptionRef.current?.unsubscribe();
-    };
-  }, []);
-
-  const sendPing = () => {
-    if (!socketService.isConnected()) return;
-    socketService.publish(TEST_DESTINATION, { text: `ping @ ${new Date().toLocaleTimeString()}` });
-  };
+  if (status !== 'disconnected') return null;
 
   return (
-    <div className="connection-status">
-      <span>WebSocket: {status}</span>
-      <button type="button" onClick={sendPing} disabled={status !== 'connected'}>
-        Enviar ping de prueba
-      </button>
-      {lastEcho && <span>Último eco: {lastEcho}</span>}
+    <div className="connection-status" role="status">
+      <span className="connection-status-dot" aria-hidden="true" />
+      Se perdió la conexión con el servidor. Reconectando…
     </div>
   );
 }

@@ -233,10 +233,6 @@ export function requestPickup(itemId, x, y) {
   socketService.publish(`/app/game/${gameId}/pickup`, { playerId: myRole, itemId, x, y });
 }
 
-export function submitDecision(action) {
-  socketService.publish(`/app/game/${gameId}/decide`, { playerId: myRole, action });
-}
-
 export function purchaseItem(itemId, x, y) {
   socketService.publish(`/app/game/${gameId}/purchase`, { playerId: myRole, itemId, x, y });
 }
@@ -335,7 +331,6 @@ if (import.meta.env.DEV) {
     startGame,
     leaveGame,
     requestPickup,
-    submitDecision,
     purchaseItem,
     requestMissionComplete,
     requestMissionStart,

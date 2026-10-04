@@ -192,20 +192,6 @@ public class GameController {
         broadcast(gameId, session, event);
     }
 
-    @MessageMapping("/game/{gameId}/decide")
-    public void decide(@DestinationVariable String gameId, DecideRequest request) {
-        GameSession session = sessionService.find(gameId);
-        if (session == null) {
-            return;
-        }
-        try {
-            session.submitDecision(request.playerId(), request.action());
-        } catch (IllegalArgumentException ex) {
-
-        }
-
-    }
-
     private void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
         sessionService.broadcast(gameId, session, lastEvent);
     }

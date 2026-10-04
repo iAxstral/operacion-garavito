@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.function.Consumer;
 
 public class GameSession {
 
@@ -44,7 +42,6 @@ public class GameSession {
     private final Map<String, WorldItem> worldItems = WorldItemCatalog.defaultCatalog();
     private final Map<String, String> claimedItems = new ConcurrentHashMap<>();
     private final Map<String, Long> missionCooldowns = new ConcurrentHashMap<>();
-    private final RoundCoordinator roundCoordinator;
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final WaveDirector waveDirector;
     private final BossConfig bossConfig;
@@ -63,15 +60,13 @@ public class GameSession {
     // recursos antes de que llegue la primera oleada — 4s no alcanzaba para eso.
     private static final long FIRST_WAVE_PREP_MS = 45_000;
 
-    public GameSession(String gameId, Building building, BossConfig bossConfig, ScheduledExecutorService scheduler,
-                       Consumer<RoundState> onRoundResolved) {
+    public GameSession(String gameId, Building building, BossConfig bossConfig) {
         this.gameId = gameId;
         this.building = building;
         this.bossConfig = bossConfig;
         this.floors = java.util.stream.IntStream.rangeClosed(1, building.floorCount())
                 .mapToObj(floor -> FloorGrid.forFloor(building, floor))
                 .toList();
-        this.roundCoordinator = new RoundCoordinator(scheduler, onRoundResolved);
 
         this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, floors);
     }
@@ -593,14 +588,6 @@ public class GameSession {
                 .toList();
     }
 
-    public void submitDecision(String role, String action) {
-        roundCoordinator.submitDecision(role, action);
-    }
-
-    public RoundState currentRoundView() {
-        return roundCoordinator.currentStateView();
-    }
-
     public void resetGame() {
         zombies.clear();
         boss = null;
@@ -611,7 +598,6 @@ public class GameSession {
         missionCooldowns.clear();
         floors.forEach(FloorGrid::resetDoors);
         players.values().forEach(Player::reset);
-        roundCoordinator.reset();
         wipedRun = false;
         victoryPending = false;
     }

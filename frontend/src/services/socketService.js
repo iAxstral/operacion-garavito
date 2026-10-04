@@ -8,6 +8,21 @@ class SocketService {
   constructor() {
     this.client = null;
     this.connectListeners = new Set();
+    this.statusListeners = new Set();
+    this.status = 'connecting';
+  }
+
+  setStatus(status) {
+    if (this.status === status) return;
+    this.status = status;
+    this.statusListeners.forEach((cb) => cb(status));
+  }
+
+  /** 'connecting' | 'connected' | 'disconnected'. Llama de inmediato con el estado actual. */
+  onStatusChange(callback) {
+    this.statusListeners.add(callback);
+    callback(this.status);
+    return () => this.statusListeners.delete(callback);
   }
 
   connect({ onConnect, onError } = {}) {
@@ -22,7 +37,11 @@ class SocketService {
     this.client = new Client({
       webSocketFactory: () => new SockJS(SOCKET_URL),
       reconnectDelay: 5000,
-      onConnect: (frame) => this.connectListeners.forEach((cb) => cb(frame)),
+      onConnect: (frame) => {
+        this.setStatus('connected');
+        this.connectListeners.forEach((cb) => cb(frame));
+      },
+      onWebSocketClose: () => this.setStatus('disconnected'),
       onStompError: (frame) => onError?.(frame),
     });
 
