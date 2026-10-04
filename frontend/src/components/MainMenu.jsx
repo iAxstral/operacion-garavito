@@ -43,16 +43,21 @@ export default function MainMenu({ onPlay }) {
         {touch ? (
           <div className="main-menu-controls">
             <span><strong>Joystick</strong> moverse</span>
-            <span><strong>⚔</strong> atacar</span>
+            <span><strong>⚔</strong> atacar / disparar</span>
             <span><strong>💥</strong> ataque cargado</span>
             <span><strong>»</strong> dash</span>
+            <span><strong>★</strong> habilidad del rol</span>
           </div>
         ) : (
           <div className="main-menu-controls">
             <span><strong>WASD</strong> moverse</span>
-            <span><strong>Q</strong> ataque básico</span>
+            <span><strong>Q / clic</strong> atacar / disparar</span>
+            <span><strong>Mouse</strong> apuntar</span>
+            <span><strong>1-4</strong> armas</span>
+            <span><strong>R</strong> recargar</span>
             <span><strong>C</strong> ataque cargado</span>
             <span><strong>Shift</strong> dash</span>
+            <span><strong>F</strong> habilidad del rol</span>
             <span><strong>E</strong> interactuar / inventario</span>
           </div>
         )}

@@ -119,6 +119,29 @@ const SOUNDS = {
       setTimeout(() => noise(ctx, { gain: 0.3 * v, attack: 0.005, decay: 0.06, filter: 'bandpass', freq: 1200, q: 3 }), 260);
     },
   },
+  // Infraestructura
+  build: {
+    channel: 'combat',
+    play: (ctx, v) => {
+      tone(ctx, { type: 'square', from: 140, to: 90, gain: 0.2 * v, decay: 0.08 });
+      setTimeout(() => tone(ctx, { type: 'square', from: 160, to: 100, gain: 0.2 * v, decay: 0.08 }), 120);
+    },
+  },
+  hammer: { channel: 'combat', play: (ctx, v) => noise(ctx, { gain: 0.35 * v, decay: 0.05, filter: 'bandpass', freq: 2200, q: 2 }) },
+  breakWood: {
+    channel: 'combat',
+    play: (ctx, v) => {
+      noise(ctx, { gain: 0.45 * v, decay: 0.25, filter: 'lowpass', freq: 1500, freqTo: 300 });
+      tone(ctx, { type: 'sawtooth', from: 200, to: 60, gain: 0.15 * v, decay: 0.2 });
+    },
+  },
+  coins: {
+    channel: 'ui',
+    play: (ctx, v) => {
+      tone(ctx, { type: 'triangle', from: 1320, to: 1320, gain: 0.18 * v, decay: 0.08 });
+      setTimeout(() => tone(ctx, { type: 'triangle', from: 1760, to: 1760, gain: 0.18 * v, decay: 0.12 }), 70);
+    },
+  },
   // Escupidor: gorgoteo al cargar y escupitajo al soltar.
   spitCharge: {
     channel: 'zombies',

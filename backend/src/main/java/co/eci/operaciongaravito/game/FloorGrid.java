@@ -106,9 +106,29 @@ public final class FloorGrid {
 
     public void resetDoors() {
         closedDoors.clear();
+        blockedCells.clear();
     }
 
+    /** Celdas tapadas por barricadas ({@code col * 10_000 + row}). */
+    private final Set<Integer> blockedCells = ConcurrentHashMap.newKeySet();
+
+    public void setBlocked(int col, int row, boolean blocked) {
+        if (blocked) {
+            blockedCells.add(col * 10_000 + row);
+        } else {
+            blockedCells.remove(col * 10_000 + row);
+        }
+    }
+
+    public boolean isBlocked(int col, int row) {
+        return blockedCells.contains(col * 10_000 + row);
+    }
+
+    // Puerta cerrada o barricada: para los zombis y las balas es una pared.
     private boolean isClosedDoorCell(int col, int row) {
+        if (!blockedCells.isEmpty() && blockedCells.contains(col * 10_000 + row)) {
+            return true;
+        }
         if (closedDoors.isEmpty()) {
             return false;
         }
@@ -170,6 +190,13 @@ public final class FloorGrid {
             int[] pos = doorCells.get(doorId);
             if (pos != null) {
                 snapshot[pos[1]][pos[0]] = false;
+            }
+        }
+        for (int key : blockedCells) {
+            int col = key / 10_000;
+            int row = key % 10_000;
+            if (row < snapshot.length && col < snapshot[row].length) {
+                snapshot[row][col] = false;
             }
         }
         return snapshot;
@@ -269,6 +296,30 @@ public final class FloorGrid {
             return false;
         }
         return cells[row][col] != '#' && !isClosedDoorCell(col, row);
+    }
+
+    /**
+     * Para las balas: las paredes y las puertas cerradas las detienen, las barricadas
+     * no (se dispara por encima de ellas a los zombis que las golpean).
+     */
+    public boolean isOpenForShots(double x, double y) {
+        int col = (int) Math.floor(x / TILE);
+        int row = (int) Math.floor(y / TILE);
+        if (isWalkable(x, y)) {
+            return true;
+        }
+        return row >= 0 && row < rows && col >= 0 && col < cells[row].length
+                && cells[row][col] != '#' && isBlocked(col, row) && !isDoorCellClosed(col, row);
+    }
+
+    private boolean isDoorCellClosed(int col, int row) {
+        for (String doorId : closedDoors) {
+            int[] pos = doorCells.get(doorId);
+            if (pos != null && pos[0] == col && pos[1] == row) {
+                return true;
+            }
+        }
+        return false;
     }
 
     public boolean fits(double x, double y, double radius) {

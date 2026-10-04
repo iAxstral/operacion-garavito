@@ -43,6 +43,8 @@ public class Player {
     private volatile double shotFacing = 0;
 
     private volatile long lastDamagedAt = 0;
+    /** Enfriamiento de la habilidad del rol (p. ej. la barricada de Infraestructura). */
+    private volatile long abilityReadyAt = 0;
     /** Compañero caido que este jugador (Biomedica) esta reviviendo, o null. */
     private volatile String reviveTargetId = null;
     private volatile long reviveStartedAt = 0;
@@ -117,6 +119,27 @@ public class Player {
         if (health == 0) {
             lifeState = PlayerLifeState.DOWNED;
         }
+        return true;
+    }
+
+    public synchronized boolean tryConsumeAbility(long now, long cooldownMs) {
+        if (now < abilityReadyAt) {
+            return false;
+        }
+        abilityReadyAt = now + cooldownMs;
+        return true;
+    }
+
+    public long abilityReadyInMs(long now) {
+        return Math.max(0, abilityReadyAt - now);
+    }
+
+    /** Saca {@code amount} Garavitos si los tiene (para transferirlos). */
+    public synchronized boolean tryTakeGaravitos(int amount) {
+        if (amount <= 0 || garavitos < amount) {
+            return false;
+        }
+        garavitos -= amount;
         return true;
     }
 
@@ -373,6 +396,7 @@ public class Player {
         invulnerable = false;
         biteGraceUntil = 0;
         lastDamagedAt = 0;
+        abilityReadyAt = 0;
         reviveTargetId = null;
         reviveStartedAt = 0;
         reviveUntil = 0;

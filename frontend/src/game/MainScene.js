@@ -26,6 +26,12 @@ import {
   getSpectateTarget,
   setSpectateTarget,
   spectatableTeammates,
+  getBarricades,
+  requestPlaceBarricade,
+  requestRepairBarricade,
+  setNearBarricade,
+  getAbilityPanel,
+  setAbilityPanel,
   setNearVendor,
   setNearMission,
   setNearDoor,
@@ -35,6 +41,7 @@ import {
 import ZombieLayer from './ZombieLayer';
 import WeaponLayer from './WeaponLayer';
 import { ownedWeapons, weaponById } from './weaponCatalog';
+import { BARRICADE_REPAIR_RANGE_PX } from './abilityCatalog';
 import { channelVolume, getSettings, vibrate } from './settings';
 import { playSfx } from './sfx';
 import BossLayer, { preloadBoss } from './BossLayer';
@@ -59,6 +66,9 @@ const AIM_DIRECTIONS = ['right', 'down', 'left', 'up'];
 // Debe coincidir con GameSession.REVIVE_RANGE_PX / REVIVER_ROLE.
 const REVIVE_RANGE_PX = 80;
 const REVIVER_ROLE = 'SALUD';
+// Con el telefono de camaras abierto, Seguridad camina a esta fraccion de su velocidad.
+const PHONE_SPEED_FACTOR = 0.5;
+const BARRICADE_TEXTURE = 'barricade_planks';
 const CHARGED_COOLDOWN_MS = 6000;
 const CHARGED_RADIUS = 150;
 const FLOOR_FADE_MS = 180;
@@ -185,6 +195,7 @@ export default class MainScene extends Phaser.Scene {
     this.reviving = null;
     // Los sprites del piso anterior ya se destruyeron con la escena.
     this.acidSprites = new Map();
+    this.barricadeSprites = new Map();
     this.changingFloor = false;
     this.spritePrefix = roleInfo(getMyRole()).spritePrefix;
   }
@@ -379,6 +390,8 @@ export default class MainScene extends Phaser.Scene {
     this.weaponLayer = new WeaponLayer(this, { onDraw: () => playSfx('draw') });
     this.weaponKeys = WEAPON_KEYS.map((name) => this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes[name]));
     this.reloadKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+    this.abilityKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+    this.bakeBarricadeTexture();
     this.aimAngle = this.facingAngle;
     this.mouseAimAt = -Infinity;
     this.weaponSynced = false;
@@ -416,6 +429,7 @@ export default class MainScene extends Phaser.Scene {
     this.events.once('shutdown', () => {
       this.scale.off('resize', this.applyCameraZoom, this);
       this.weaponLayer?.destroy();
+      setNearBarricade(null);
       if (this.reviving) requestReviveCancel();
       setNearDowned(null);
       this.unsubscribeGameState?.();
@@ -602,6 +616,102 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
+  bakeBarricadeTexture() {
+    if (this.textures.exists(BARRICADE_TEXTURE)) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x4a2e17, 1).fillRect(6, 10, 6, 48).fillRect(52, 10, 6, 48);
+    [[2, 14], [2, 30], [2, 46]].forEach(([x, y]) => {
+      g.fillStyle(0x8a5a2b, 1).fillRect(x, y, 60, 10);
+      g.fillStyle(0xa8743c, 1).fillRect(x, y, 60, 3);
+      g.fillStyle(0x2b2e33, 1).fillRect(x + 6, y + 4, 3, 3).fillRect(x + 51, y + 4, 3, 3);
+    });
+    g.lineStyle(5, 0x6b4322, 1).lineBetween(8, 54, 56, 16);
+    g.generateTexture(BARRICADE_TEXTURE, 64, 64);
+    g.destroy();
+  }
+
+  // Barricadas de este piso: solidas para el jugador, con barra de vida.
+  syncBarricades() {
+    const seen = new Set();
+    getBarricades().filter((b) => b.floor === this.floor).forEach((b) => {
+      seen.add(b.id);
+      let entry = this.barricadeSprites.get(b.id);
+      if (!entry) {
+        const x = b.col * TILE + TILE / 2;
+        const y = b.row * TILE + TILE / 2;
+        const image = this.physics.add.staticImage(x, y, BARRICADE_TEXTURE).setDepth(y + 20);
+        const collider = this.physics.add.collider(this.player, image);
+        const bar = this.add.graphics().setDepth(5600);
+        image.setScale(0.4);
+        this.tweens.add({ targets: image, scale: 1, duration: 220, ease: 'Back.easeOut', onUpdate: () => image.refreshBody() });
+        entry = { image, collider, bar, x, y, health: b.health };
+        this.barricadeSprites.set(b.id, entry);
+        playSfx('build', this.hearing(x, y));
+      }
+      if (b.health < entry.health) {
+        this.tweens.add({ targets: entry.image, x: { from: entry.x - 3, to: entry.x + 3 }, duration: 50, yoyo: true, onComplete: () => entry.image.setX(entry.x) });
+      }
+      entry.health = b.health;
+      const pct = b.health / b.maxHealth;
+      entry.bar.clear();
+      entry.bar.fillStyle(0x000000, 0.6).fillRect(entry.x - 26, entry.y - 42, 52, 7);
+      entry.bar.fillStyle(pct > 0.5 ? 0xe8c34a : pct > 0.25 ? 0xe07a3a : 0xc0392b, 1).fillRect(entry.x - 25, entry.y - 41, 50 * pct, 5);
+    });
+    this.barricadeSprites.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      for (let i = 0; i < 6; i += 1) {
+        const plank = this.add.rectangle(entry.x, entry.y, 18, 5, 0x8a5a2b).setDepth(entry.y + 21);
+        this.tweens.add({
+          targets: plank,
+          x: entry.x + Phaser.Math.Between(-40, 40),
+          y: entry.y + Phaser.Math.Between(-30, 30),
+          angle: Phaser.Math.Between(-180, 180),
+          alpha: 0,
+          duration: 500,
+          onComplete: () => plank.destroy(),
+        });
+      }
+      playSfx('breakWood', this.hearing(entry.x, entry.y));
+      this.physics.world.removeCollider(entry.collider);
+      entry.image.destroy();
+      entry.bar.destroy();
+      this.barricadeSprites.delete(id);
+    });
+  }
+
+  // Tecla F / boton ★: la habilidad del rol. E repara la barricada que esta al lado.
+  updateAbility() {
+    const me = getMyPlayerState();
+    if (!me) return;
+    const pressed = Phaser.Input.Keyboard.JustDown(this.abilityKey) || touchInput.ability;
+    touchInput.ability = false;
+
+    if (me.role === 'INFRAESTRUCTURA') {
+      let near = null;
+      this.barricadeSprites.forEach((entry, id) => {
+        if (Math.hypot(this.player.x - entry.x, this.player.y - entry.y) <= BARRICADE_REPAIR_RANGE_PX) near = { id, ...entry };
+      });
+      setNearBarricade(near ? { barricadeId: near.id, health: near.health } : null);
+      if (near && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+        requestRepairBarricade(near.id);
+        playSfx('hammer');
+      }
+    } else {
+      setNearBarricade(null);
+    }
+
+    if (!pressed) return;
+    if (me.role === 'SEGURIDAD') {
+      setAbilityPanel(getAbilityPanel() === 'phone' ? null : 'phone');
+      playSfx('click');
+    } else if (me.role === 'ECONOMIA') {
+      setAbilityPanel(getAbilityPanel() === 'treasury' ? null : 'treasury');
+      playSfx('click');
+    } else if (me.role === 'INFRAESTRUCTURA') {
+      requestPlaceBarricade(Math.round(this.player.x), Math.round(this.player.y), this.aimAngle);
+    }
+  }
+
   // Bolas de acido de los escupidores en este piso: bola verde con estela y salpicadura.
   syncProjectiles(delta) {
     if (!this.acidSprites) this.acidSprites = new Map();
@@ -639,6 +749,7 @@ export default class MainScene extends Phaser.Scene {
   // El jefe solo se dibuja si esta en el piso de este jugador.
   syncBoss(delta) {
     this.syncProjectiles(delta);
+    this.syncBarricades();
     const boss = getBoss();
     this.bossLayer.sync(boss && boss.floor === this.floor ? boss : null);
     this.bossLayer.update(delta);
@@ -676,9 +787,10 @@ export default class MainScene extends Phaser.Scene {
     else if (down) direction = direction ?? 'down';
 
     const magnitude = Math.hypot(vx, vy);
+    const speed = PLAYER_SPEED * (getAbilityPanel() === 'phone' ? PHONE_SPEED_FACTOR : 1);
     if (magnitude > 0) {
-      vx = (vx / magnitude) * PLAYER_SPEED;
-      vy = (vy / magnitude) * PLAYER_SPEED;
+      vx = (vx / magnitude) * speed;
+      vy = (vy / magnitude) * speed;
 
       this.facingAngle = Math.atan2(vy, vx);
     }
@@ -693,8 +805,8 @@ export default class MainScene extends Phaser.Scene {
 
       if ((this.dashKey.isDown || touchInput.dash) && time >= this.dashReadyAt) {
 
-        const dx = magnitude > 0 ? vx / PLAYER_SPEED : Math.cos(this.facingAngle);
-        const dy = magnitude > 0 ? vy / PLAYER_SPEED : Math.sin(this.facingAngle);
+        const dx = magnitude > 0 ? vx / speed : Math.cos(this.facingAngle);
+        const dy = magnitude > 0 ? vy / speed : Math.sin(this.facingAngle);
         this.dashVx = dx * DASH_SPEED;
         this.dashVy = dy * DASH_SPEED;
         this.dashUntil = time + DASH_MS;
@@ -706,6 +818,7 @@ export default class MainScene extends Phaser.Scene {
     reportPosition(Math.round(this.player.x), Math.round(this.player.y), time);
     this.updateAim(time);
     this.updateWeaponSelection();
+    this.updateAbility();
     this.updateAttack(time);
     this.zombieLayer.sync(this.zombiesOnFloor());
     this.zombieLayer.update(delta);

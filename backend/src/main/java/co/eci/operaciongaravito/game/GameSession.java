@@ -41,6 +41,19 @@ public class GameSession {
     static final long REVIVE_MS = 3_000;
     static final int FIELD_REVIVE_HEALTH = 50;
 
+    /** Economia compra con este descuento. */
+    static final String TREASURER_ROLE = "ECONOMIA";
+    static final double TREASURER_DISCOUNT = 0.2;
+
+    /** Infraestructura: barricadas. */
+    static final String BUILDER_ROLE = "INFRAESTRUCTURA";
+    static final int MAX_BARRICADES = 2;
+    static final long BARRICADE_COOLDOWN_MS = 15_000;
+    static final double BARRICADE_REPAIR_RANGE_PX = 90;
+    /** Zombis a esta distancia del centro de una barricada la estan golpeando. */
+    static final double BARRICADE_CONTACT_PX = 56;
+    static final double BOSS_BARRICADE_CONTACT_PX = 72;
+
     /** El cuerpo del jefe es grande: los golpes lo alcanzan desde un poco mas lejos. */
     private static final double BOSS_HIT_BONUS_PX = 24;
     private static final int BOSS_REWARD_GARAVITOS = 25;
@@ -53,6 +66,8 @@ public class GameSession {
     private final Map<String, String> claimedItems = new ConcurrentHashMap<>();
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final Map<String, AcidProjectile> acids = new ConcurrentHashMap<>();
+    private final Map<String, Barricade> barricades = new ConcurrentHashMap<>();
+    private long barricadeSequence;
     private final WaveDirector waveDirector;
     private final MissionBoard missionBoard;
     private final BossConfig bossConfig;
@@ -191,7 +206,7 @@ public class GameSession {
                             weapon, p.magazine(weapon), p.getReserveAmmo(), reloadingMs,
                             p.getShotSeq(), p.getShotFacing(),
                             p.getReviveTargetId(), p.reviveProgress(now),
-                            missionBoard.viewFor(p.getPlayerId()));
+                            missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now));
                 })
                 .toList();
     }
@@ -308,6 +323,7 @@ public class GameSession {
         zombies.values().removeIf(zombie -> !zombie.isAlive());
         updateBoss(now, deltaSeconds, targets);
         updateRevives(now);
+        updateBarricades(deltaSeconds);
 
         if (waveDirector.restingSeconds(now) > 0) {
             players.values().forEach(player -> {
@@ -316,6 +332,115 @@ public class GameSession {
                 }
             });
         }
+    }
+
+    /** Los zombis pegados a una barricada la van rompiendo. */
+    private void updateBarricades(double deltaSeconds) {
+        for (Barricade barricade : barricades.values()) {
+            long touching = zombies.values().stream()
+                    .filter(z -> z.isAlive() && z.getFloor() == barricade.getFloor()
+                            && Math.hypot(z.getX() - barricade.centerX(), z.getY() - barricade.centerY()) <= BARRICADE_CONTACT_PX)
+                    .count();
+            double damage = touching * Barricade.ZOMBIE_DPS * deltaSeconds;
+            BossZombie current = boss;
+            if (current != null && current.isAlive() && current.getFloor() == barricade.getFloor()
+                    && Math.hypot(current.getX() - barricade.centerX(), current.getY() - barricade.centerY()) <= BOSS_BARRICADE_CONTACT_PX) {
+                damage += Barricade.BOSS_DPS * deltaSeconds;
+            }
+            if (damage > 0 && barricade.damage(damage)) {
+                removeBarricade(barricade);
+            }
+        }
+    }
+
+    private void removeBarricade(Barricade barricade) {
+        if (barricades.remove(barricade.getId()) != null) {
+            floorGrid(barricade.getFloor()).setBlocked(barricade.getCol(), barricade.getRow(), false);
+        }
+    }
+
+    public List<BarricadeState> barricadeStates() {
+        return barricades.values().stream().map(Barricade::toState).toList();
+    }
+
+    /**
+     * Infraestructura pone una barricada en la celda que tiene enfrente. Tiene que
+     * estar libre (sin pared, puerta, otra barricada ni jugador) y respeta el
+     * enfriamiento y el maximo de barricadas activas.
+     */
+    public synchronized PlayerActionResult attemptPlaceBarricade(String playerId, double x, double y, double facing) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return PlayerActionResult.rejected("unknown_player");
+        }
+        if (!BUILDER_ROLE.equals(player.getRole())) {
+            return PlayerActionResult.rejected("wrong_role");
+        }
+        if (!player.isAlive()) {
+            return PlayerActionResult.rejected("downed");
+        }
+        long mine = barricades.values().stream().filter(b -> b.getOwnerId().equals(playerId)).count();
+        if (mine >= MAX_BARRICADES) {
+            return PlayerActionResult.rejected("too_many_barricades");
+        }
+        FloorGrid grid = floorGrid(player.getFloor());
+        int[] cell = FloorGrid.cellOf(x + Math.cos(facing) * FloorGrid.TILE, y + Math.sin(facing) * FloorGrid.TILE);
+        double cx = cell[0] * FloorGrid.TILE + FloorGrid.TILE / 2.0;
+        double cy = cell[1] * FloorGrid.TILE + FloorGrid.TILE / 2.0;
+        boolean occupied = players.values().stream().anyMatch(p -> p.getFloor() == player.getFloor()
+                && Math.hypot(p.getX() - cx, p.getY() - cy) < FloorGrid.TILE * 0.75);
+        if (!grid.isWalkable(cx, cy) || occupied) {
+            return PlayerActionResult.rejected("blocked_spot");
+        }
+        if (!player.tryConsumeAbility(System.currentTimeMillis(), BARRICADE_COOLDOWN_MS)) {
+            return PlayerActionResult.rejected("on_cooldown");
+        }
+        Barricade barricade = new Barricade("b" + (++barricadeSequence), playerId, player.getFloor(), cell[0], cell[1]);
+        barricades.put(barricade.getId(), barricade);
+        grid.setBlocked(cell[0], cell[1], true);
+        return PlayerActionResult.ok();
+    }
+
+    public PlayerActionResult attemptRepairBarricade(String playerId, String barricadeId) {
+        Player player = players.get(playerId);
+        Barricade barricade = barricadeId == null ? null : barricades.get(barricadeId);
+        if (player == null || barricade == null) {
+            return PlayerActionResult.rejected("unknown_barricade");
+        }
+        if (!BUILDER_ROLE.equals(player.getRole())) {
+            return PlayerActionResult.rejected("wrong_role");
+        }
+        if (!player.isAlive()) {
+            return PlayerActionResult.rejected("downed");
+        }
+        if (player.getFloor() != barricade.getFloor()
+                || Math.hypot(player.getX() - barricade.centerX(), player.getY() - barricade.centerY()) > BARRICADE_REPAIR_RANGE_PX) {
+            return PlayerActionResult.rejected("too_far");
+        }
+        barricade.repair(Barricade.REPAIR_AMOUNT);
+        return PlayerActionResult.ok();
+    }
+
+    /** Economia le pasa Garavitos a un compañero (desde cualquier lugar del edificio). */
+    public PlayerActionResult attemptTransfer(String playerId, String targetId, int amount) {
+        Player giver = players.get(playerId);
+        Player receiver = targetId == null ? null : players.get(targetId);
+        if (giver == null || receiver == null || giver == receiver) {
+            return PlayerActionResult.rejected("unknown_player");
+        }
+        if (!TREASURER_ROLE.equals(giver.getRole())) {
+            return PlayerActionResult.rejected("wrong_role");
+        }
+        if (!giver.tryTakeGaravitos(amount)) {
+            return PlayerActionResult.rejected("insufficient_garavitos");
+        }
+        receiver.addGaravitos(amount);
+        return PlayerActionResult.ok();
+    }
+
+    /** Precio que paga este jugador (Economia tiene descuento). */
+    static int priceFor(Player player, int price) {
+        return TREASURER_ROLE.equals(player.getRole()) ? (int) Math.ceil(price * (1 - TREASURER_DISCOUNT)) : price;
     }
 
     /** Termina (o corta) las reanimaciones en curso. */
@@ -582,7 +707,7 @@ public class GameSession {
         double dirX = Math.cos(facing);
         double dirY = Math.sin(facing);
         double reach = 0;
-        while (reach < weapon.range() && grid.isWalkable(x + dirX * (reach + BULLET_STEP_PX), y + dirY * (reach + BULLET_STEP_PX))) {
+        while (reach < weapon.range() && grid.isOpenForShots(x + dirX * (reach + BULLET_STEP_PX), y + dirY * (reach + BULLET_STEP_PX))) {
             reach += BULLET_STEP_PX;
         }
         final double maxReach = reach;
@@ -716,7 +841,7 @@ public class GameSession {
             return PurchaseResult.rejected("too_far");
         }
 
-        return player.purchase(item.price(), new InventorySlot(item.type(), item.itemId(), item.itemName()));
+        return player.purchase(priceFor(player, item.price()), new InventorySlot(item.type(), item.itemId(), item.itemName()));
     }
 
     public MissionResult attemptStartMission(String playerId, String missionId) {
@@ -820,6 +945,7 @@ public class GameSession {
         waveDirector.resetRun(System.currentTimeMillis(), FIRST_WAVE_PREP_MS);
         claimedItems.clear();
         missionBoard.reset();
+        barricades.clear();
         floors.forEach(FloorGrid::resetDoors);
         players.values().forEach(Player::reset);
         wipedRun = false;

@@ -22,5 +22,6 @@ public record PlayerState(
         double shotFacing,
         String reviving,
         double reviveProgress,
-        List<MissionView> missions) {
+        List<MissionView> missions,
+        long abilityReadyInMs) {
 }

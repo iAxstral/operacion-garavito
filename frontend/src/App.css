@@ -2475,3 +2475,169 @@ body {
     gap: 6px;
   }
 }
+
+/* ---------- Habilidades de rol ---------- */
+
+.hud-ability-chip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  padding: 3px 9px 3px 4px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(232, 195, 74, 0.6);
+  border-radius: 6px;
+}
+
+.hud-ability-chip small {
+  opacity: 0.75;
+}
+
+.hud-ability-chip--cooling {
+  border-color: rgba(255, 255, 255, 0.25);
+  opacity: 0.8;
+}
+
+.hud-ability-chip .hud-ability-key {
+  min-width: 18px;
+  padding: 1px 5px;
+}
+
+.shop-item-price s {
+  opacity: 0.55;
+}
+
+.phone-panel,
+.treasury-panel {
+  position: absolute;
+  top: calc(56px + env(safe-area-inset-top));
+  right: calc(12px + env(safe-area-inset-right));
+  z-index: 35;
+  box-sizing: border-box;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100dvh - 80px);
+  overflow: auto;
+  padding: 10px 12px 12px;
+  font-family: sans-serif;
+  color: #d8f5d8;
+  background: rgba(8, 12, 10, 0.94);
+  border: 2px solid #2f4a3a;
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.6);
+  pointer-events: auto;
+}
+
+.phone-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  padding-right: 36px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.phone-close {
+  top: 0;
+  right: 0;
+}
+
+.phone-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.phone-tab {
+  flex: 1;
+  padding: 6px 4px;
+  font-family: inherit;
+  font-size: 12px;
+  color: #d8f5d8;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.phone-tab--active {
+  color: #0b120b;
+  background: #86a86a;
+  border-color: #86a86a;
+  font-weight: bold;
+}
+
+.phone-tab-count {
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+.phone-screen {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid #2f4a3a;
+  border-radius: 8px;
+  image-rendering: pixelated;
+}
+
+.phone-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-top: 6px;
+  font-size: 11px;
+}
+
+.phone-legend i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 4px;
+  border-radius: 50%;
+}
+
+.phone-note {
+  margin: 6px 0 0;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.treasury-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.treasury-name {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  font-size: 13px;
+}
+
+.treasury-name small {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.treasury-row .inventory-use {
+  padding: 6px 9px;
+}
+
+.treasury-row .inventory-use:disabled {
+  opacity: 0.4;
+}
+
+.touch-btn--ability {
+  right: calc(var(--touch-attack) + var(--touch-btn) + 18px);
+  bottom: calc(var(--touch-btn) + 14px);
+  width: calc(var(--touch-btn) * 0.82);
+  height: calc(var(--touch-btn) * 0.82);
+  border-color: #e8c34a;
+}

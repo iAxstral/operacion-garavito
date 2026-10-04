@@ -13,7 +13,7 @@ let currentFloor = 1;
 let myBuilding = 'F';
 
 function emptyState() {
-  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null, boss: null, projectiles: [] };
+  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null, boss: null, projectiles: [], barricades: [] };
 }
 
 let latestState = emptyState();
@@ -48,6 +48,13 @@ let nearStairs = null;
 let nearDowned = null;
 const downedListeners = new Set();
 
+// Barricada al lado (solo la usa Infraestructura para repararla con E).
+let nearBarricade = null;
+
+// Paneles de habilidad abiertos: 'phone' (Seguridad), 'treasury' (Economia) o null.
+let abilityPanel = null;
+const abilityPanelListeners = new Set();
+
 // A quien sigue la camara mientras este jugador esta caido.
 let spectateTarget = null;
 const spectateListeners = new Set();
@@ -68,7 +75,7 @@ export function getMyBuilding() {
   return myBuilding;
 }
 
-export const touchInput = { moveX: 0, moveY: 0, attack: false, dash: false, charged: false, reload: false, cycleWeapon: false };
+export const touchInput = { moveX: 0, moveY: 0, attack: false, dash: false, charged: false, reload: false, cycleWeapon: false, ability: false };
 
 export function isTouchDevice() {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -195,6 +202,8 @@ function resetLocalState() {
   setNearStairs(null);
   setNearDowned(null);
   setSpectateTarget(null);
+  setNearBarricade(null);
+  setAbilityPanel(null);
 }
 
 export function leaveGame() {
@@ -251,6 +260,50 @@ export function requestReviveStart(targetId) {
 export function requestReviveCancel() {
   if (!joined || !socketService.isConnected()) return;
   socketService.publish(`/app/game/${gameId}/revive/cancel`, { playerId: myRole });
+}
+
+export function requestPlaceBarricade(x, y, facing) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/barricade/place`, { playerId: myRole, x, y, facing });
+}
+
+export function requestRepairBarricade(barricadeId) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/barricade/repair`, { playerId: myRole, barricadeId });
+}
+
+export function requestTransfer(targetId, amount) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/transfer`, { playerId: myRole, targetId, amount });
+}
+
+/** Barricadas de Infraestructura ({ id, ownerId, floor, col, row, health, maxHealth }). */
+export function getBarricades() {
+  return latestState.barricades ?? [];
+}
+
+export function setNearBarricade(barricade) {
+  nearBarricade = barricade;
+}
+
+export function getNearBarricade() {
+  return nearBarricade;
+}
+
+export function getAbilityPanel() {
+  return abilityPanel;
+}
+
+export function setAbilityPanel(panel) {
+  if (abilityPanel === panel) return;
+  abilityPanel = panel;
+  abilityPanelListeners.forEach((callback) => callback(abilityPanel));
+}
+
+export function onAbilityPanelChange(callback) {
+  abilityPanelListeners.add(callback);
+  callback(abilityPanel);
+  return () => abilityPanelListeners.delete(callback);
 }
 
 export function setNearDowned(player) {

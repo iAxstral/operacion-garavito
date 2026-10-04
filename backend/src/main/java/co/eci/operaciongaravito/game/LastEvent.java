@@ -88,6 +88,15 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("REVIVE_REJECTED", playerId, targetId, reason);
     }
 
+    /** {@code playerId} le envio {@code reason} Garavitos a {@code itemId}. */
+    public static LastEvent transfer(String fromId, String toId, int amount) {
+        return new LastEvent("TRANSFER", fromId, toId, String.valueOf(amount));
+    }
+
+    public static LastEvent abilityRejected(String playerId, String reason) {
+        return new LastEvent("ABILITY_REJECTED", playerId, null, reason);
+    }
+
     public static LastEvent useSuccess(String playerId, String itemId) {
         return new LastEvent("USE_SUCCESS", playerId, itemId, null);
     }

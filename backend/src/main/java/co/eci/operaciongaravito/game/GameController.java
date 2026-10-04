@@ -235,6 +235,38 @@ public class GameController {
         }
     }
 
+    @MessageMapping("/game/{gameId}/barricade/place")
+    public void placeBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptPlaceBarricade(request.playerId(), request.x(), request.y(), request.facing());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/barricade/repair")
+    public void repairBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptRepairBarricade(request.playerId(), request.barricadeId());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/transfer")
+    public void transfer(@DestinationVariable String gameId, TransferRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptTransfer(request.playerId(), request.targetId(), request.amount());
+        broadcast(gameId, session, result.success()
+                ? LastEvent.transfer(request.playerId(), request.targetId(), request.amount())
+                : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
     private void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
         sessionService.broadcast(gameId, session, lastEvent);
     }

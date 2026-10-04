@@ -11,6 +11,8 @@ import CashMission from './components/CashMission';
 import FuseMission from './components/FuseMission';
 import TouchControls from './components/TouchControls';
 import SpectatorPanel from './components/SpectatorPanel';
+import PhonePanel from './components/PhonePanel';
+import TreasuryPanel from './components/TreasuryPanel';
 import GameOverScreen from './components/GameOverScreen';
 import ConnectionStatus from './components/ConnectionStatus';
 import MainMenu from './components/MainMenu';
@@ -95,6 +97,8 @@ function App() {
         <FuseMission />
         <TouchControls />
         <SpectatorPanel />
+        <PhonePanel />
+        <TreasuryPanel />
         <GameOverScreen onExitToMenu={handleExitToMenu} />
       </div>
       <ConnectionStatus />

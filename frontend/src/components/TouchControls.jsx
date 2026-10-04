@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getMyPlayerState, isTouchDevice, onStateChange, touchInput } from '../game/gameSync';
 import { ownedWeapons, weaponById } from '../game/weaponCatalog';
+import { abilityFor } from '../game/abilityCatalog';
 
 const CHARGED_COOLDOWN_MS = 6000;
 
@@ -138,6 +139,19 @@ export default function TouchControls() {
             }}
           >
             {arms.weapon.icon ? <img src={arms.weapon.icon} alt="" /> : arms.weapon.glyph}
+          </button>
+        )}
+        {downed ? null : (
+          <button
+            type="button"
+            className="touch-btn touch-btn--ability"
+            aria-label={abilityFor(getMyPlayerState()?.role).name}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              touchInput.ability = true;
+            }}
+          >
+            {abilityFor(getMyPlayerState()?.role).icon}
           </button>
         )}
         {arms.canReload && (

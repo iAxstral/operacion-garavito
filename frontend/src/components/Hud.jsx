@@ -12,6 +12,8 @@ import {
   getNearStairs,
   getNearDowned,
   onNearDownedChange,
+  getNearBarricade,
+  getBarricades,
   isTouchDevice,
   isInputLocked,
   purchaseItem,
@@ -23,6 +25,7 @@ import { MISSIONS_PER_KINDER, missionType } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
 import { CAFETERIA_MENU, WEAPON_MACHINE_MENU } from '../game/shopCatalog';
 import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog';
+import { abilityFor, BARRICADE_COOLDOWN_MS, MAX_BARRICADES, priceFor } from '../game/abilityCatalog';
 import { roleInfo } from '../game/roleCatalog';
 import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
 
@@ -46,6 +49,9 @@ const REJECTION_MESSAGES = {
   no_ammo: 'Sin munición: cómprala en la máquina de armas (piso 2)',
   not_owned: 'No tienes esa arma',
   not_downed: 'Ese compañero ya está de pie',
+  too_many_barricades: 'Ya tienes 2 barricadas: repáralas o espera a que caigan',
+  blocked_spot: 'No se puede poner la barricada ahí',
+  unknown_barricade: 'Esa barricada ya no existe',
 };
 
 const FOOD_HEAL_DEFAULT = 15;
@@ -269,7 +275,7 @@ export default function Hud() {
         return;
       }
       if ((event.key === 'e' || event.key === 'E' || event.key === 'i' || event.key === 'I')
-        && !getNearMission() && !getNearStairs() && !getNearDowned()) {
+        && !getNearMission() && !getNearStairs() && !getNearDowned() && !getNearBarricade()) {
         event.preventDefault();
         setInventoryOpen((open) => !open);
         return;
@@ -286,10 +292,18 @@ export default function Hud() {
 
   useEffect(() => {
     const event = state.lastEvent;
-    if (!event || (event.playerId !== getMyRole() && event.type !== 'REVIVED')) return undefined;
+    if (!event || (event.playerId !== getMyRole() && event.type !== 'REVIVED' && event.type !== 'TRANSFER')) return undefined;
 
     let message = null;
     // Reanimaciones: se avisa a todos, no solo al que hizo la accion.
+    if (event.type === 'TRANSFER' && (event.playerId === getMyRole() || event.itemId === getMyRole())) {
+      message = event.playerId === getMyRole()
+        ? `Enviaste ${event.reason} Garavitos a ${roleInfo(event.itemId).name}`
+        : `¡Economía te envió +${event.reason} Garavitos!`;
+      setToast(message);
+      const timeout = setTimeout(() => setToast(null), 2500);
+      return () => clearTimeout(timeout);
+    }
     if (event.type === 'REVIVED') {
       const revived = roleInfo(event.playerId).name;
       const reviver = roleInfo(event.itemId).name;
@@ -323,6 +337,8 @@ export default function Hud() {
       message = `¡Recuperaste vida! +${healFor(event.itemId)}`;
     } else if (event.type === 'USE_REJECTED') {
       message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo usar ese objeto';
+    } else if (event.type === 'ABILITY_REJECTED') {
+      message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo usar la habilidad';
     } else if (event.type === 'REVIVE_REJECTED') {
       message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo revivir';
     } else if (event.type === 'MISSION_SUCCESS') {
@@ -399,6 +415,11 @@ export default function Hud() {
   const nearDoorState = state.doors?.find((d) => d.doorId === nearDoor?.doorId);
   const nearDoorOpen = nearDoorState?.open ?? true;
 
+  const ability = abilityFor(getMyRole());
+  const abilityCooling = (me?.abilityReadyInMs ?? 0) > 0;
+  const abilityPct = Math.round((1 - (me?.abilityReadyInMs ?? 0) / BARRICADE_COOLDOWN_MS) * 100);
+  const myBarricades = getBarricades().filter((b) => b.ownerId === getMyRole()).length;
+  const nearBarricade = getNearBarricade();
   const missions = me?.missions ?? [];
   const missionsDone = missions.filter((m) => m.done).length;
   const upNext = me ? nextMission(me) : null;
@@ -452,6 +473,16 @@ export default function Hud() {
           )}
           {!touch && <span className="hud-weapon-keys">1-4{weapon.ranged ? ' · R' : ''}</span>}
           {reloadingMs > 0 && <div className="hud-weapon-reload" style={{ width: `${reloadPct}%` }} />}
+        </div>
+
+        <div className={`hud-ability-chip${abilityCooling ? ' hud-ability-chip--cooling' : ''}`} title={ability.hint}>
+          {!touch && <span className="hud-ability-key">F</span>}
+          <span aria-hidden="true">{ability.icon}</span>
+          <span>{ability.name}</span>
+          {me?.role === 'INFRAESTRUCTURA' && (
+            <small>{myBarricades}/{MAX_BARRICADES}{abilityCooling ? ` · ${Math.ceil(me.abilityReadyInMs / 1000)}s` : ''}</small>
+          )}
+          {abilityCooling && <div className="hud-ability-fill" style={{ width: `${abilityPct}%` }} />}
         </div>
 
         {missions.length > 0 && (
@@ -539,7 +570,13 @@ export default function Hud() {
         </div>
       )}
 
-      {nearDoor && !nearDowned && (
+      {nearBarricade && (
+        <div className="hud-interact-hint">
+          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — Reparar barricada ({nearBarricade.health}/20)
+        </div>
+      )}
+
+      {nearDoor && !nearDowned && !nearBarricade && (
         <div className="hud-interact-hint">
           {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {nearDoorOpen ? 'Cerrar' : 'Abrir'} puerta
         </div>
@@ -654,7 +691,8 @@ export default function Hud() {
           <h3>{nearVendor.label}</h3>
           <div className="shop-items">
             {nearVendor.menu.map((item) => {
-              const canAfford = garavitos >= item.price;
+              const price = priceFor(getMyRole(), item.price);
+              const canAfford = garavitos >= price;
               const disabled = !canAfford || inventoryFull;
               return (
                 <button
@@ -669,7 +707,9 @@ export default function Hud() {
                   <span className="shop-item-name">{item.itemName}</span>
                   {item.healAmount > 0 && <span className="shop-item-heal">+{item.healAmount} vida</span>}
                   {item.detail && <span className="shop-item-heal">{item.detail}</span>}
-                  <span className="shop-item-price">{item.price} Garavitos</span>
+                  <span className="shop-item-price">
+                    {price !== item.price && <s>{item.price}</s>} {price} Garavitos
+                  </span>
                 </button>
               );
             })}
