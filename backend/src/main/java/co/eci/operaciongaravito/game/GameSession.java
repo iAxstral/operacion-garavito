@@ -12,7 +12,6 @@ public class GameSession {
     private static final int FOOD_HEALTH_BONUS = 15;
     private static final double SHOP_RANGE_PX = 110;
     private static final double MISSION_RANGE_PX = 90;
-    private static final long MISSION_COOLDOWN_MS = 60_000;
     private static final double DOOR_INTERACT_RANGE_PX = 90;
 
     private static final int GARAVITOS_PER_ZOMBIE = 1;
@@ -52,9 +51,9 @@ public class GameSession {
     private final Map<String, Player> players = new ConcurrentHashMap<>();
     private final Map<String, WorldItem> worldItems = WorldItemCatalog.defaultCatalog();
     private final Map<String, String> claimedItems = new ConcurrentHashMap<>();
-    private final Map<String, Long> missionCooldowns = new ConcurrentHashMap<>();
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final WaveDirector waveDirector;
+    private final MissionBoard missionBoard;
     private final BossConfig bossConfig;
     private volatile BossZombie boss;
     private long bossAloneSince;
@@ -81,6 +80,7 @@ public class GameSession {
                 .toList();
 
         this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, floors);
+        this.missionBoard = new MissionBoard(building, java.util.random.RandomGenerator.getDefault());
     }
 
     public Building getBuilding() {
@@ -118,6 +118,7 @@ public class GameSession {
 
     public synchronized void removePlayer(String role) {
         players.remove(role);
+        missionBoard.remove(role);
         if (role.equals(host)) {
             host = players.keySet().stream().sorted().findFirst().orElse(null);
         }
@@ -188,7 +189,8 @@ public class GameSession {
                             p.getLifeState(), p.isInvulnerable(), p.chargedReadyInMs(now),
                             weapon, p.magazine(weapon), p.getReserveAmmo(), reloadingMs,
                             p.getShotSeq(), p.getShotFacing(),
-                            p.getReviveTargetId(), p.reviveProgress(now));
+                            p.getReviveTargetId(), p.reviveProgress(now),
+                            missionBoard.viewFor(p.getPlayerId()));
                 })
                 .toList();
     }
@@ -219,7 +221,17 @@ public class GameSession {
     }
 
     public WaveState waveState() {
-        return waveDirector.state(System.currentTimeMillis());
+        int[] progress = missionBoard.teamProgress(players.values());
+        return waveDirector.state(System.currentTimeMillis()).withMissions(progress[0], progress[1]);
+    }
+
+    /** Reparte las misiones del Kinder que viene (al empezar su respiro) y a quien llegue tarde. */
+    private void dealMissions() {
+        int upcoming = waveDirector.upcomingKinder();
+        if (upcoming > 0 && upcoming != missionBoard.getKinder()) {
+            missionBoard.deal(upcoming, players.values());
+        }
+        players.values().forEach(missionBoard::ensureDealt);
     }
 
     private int aliveZombieCount() {
@@ -230,7 +242,8 @@ public class GameSession {
         if (!started) {
             return;
         }
-        waveDirector.update(now, aliveZombieCount(), players.values())
+        dealMissions();
+        waveDirector.update(now, aliveZombieCount(), players.values(), missionBoard.allDone(players.values()))
                 .forEach(spawned -> zombies.put(spawned.getId(), spawned));
         if (waveDirector.consumeBossDue()) {
             spawnBoss(now);
@@ -694,20 +707,12 @@ public class GameSession {
         if (player == null) {
             return MissionResult.rejected("unknown_player");
         }
-
-        MissionZone mission = MissionCatalog.byId(building, missionId);
-        if (mission == null) {
+        if (!player.isAlive()) {
+            return MissionResult.rejected("downed");
+        }
+        if (missionBoard.pending(playerId, missionId) == null) {
             return MissionResult.rejected("unknown_mission");
         }
-        if (!mission.role().equals(player.getRole())) {
-            return MissionResult.rejected("wrong_role");
-        }
-
-        Long lastCompletedAt = missionCooldowns.get(missionId);
-        if (lastCompletedAt != null && System.currentTimeMillis() - lastCompletedAt < MISSION_COOLDOWN_MS) {
-            return MissionResult.rejected("on_cooldown");
-        }
-
         player.setInvulnerable(true);
         return MissionResult.ok(0);
     }
@@ -730,13 +735,9 @@ public class GameSession {
 
         player.setInvulnerable(false);
 
-        MissionZone mission = MissionCatalog.byId(building, missionId);
+        MissionView mission = missionBoard.pending(playerId, missionId);
         if (mission == null) {
             return MissionResult.rejected("unknown_mission");
-        }
-
-        if (!mission.role().equals(player.getRole())) {
-            return MissionResult.rejected("wrong_role");
         }
 
         double dx = x - mission.x();
@@ -745,22 +746,16 @@ public class GameSession {
             return MissionResult.rejected("too_far");
         }
 
-        long now = System.currentTimeMillis();
-        boolean[] granted = { false };
-        missionCooldowns.compute(missionId, (key, lastCompletedAt) -> {
-            if (lastCompletedAt == null || now - lastCompletedAt >= MISSION_COOLDOWN_MS) {
-                granted[0] = true;
-                return now;
-            }
-            return lastCompletedAt;
-        });
-
-        if (!granted[0]) {
-            return MissionResult.rejected("on_cooldown");
+        if (!missionBoard.complete(playerId, missionId)) {
+            return MissionResult.rejected("unknown_mission");
         }
+        player.addGaravitos(mission.reward());
+        return MissionResult.ok(mission.reward());
+    }
 
-        player.addGaravitos(mission.rewardGaravitos());
-        return MissionResult.ok(mission.rewardGaravitos());
+    /** Misiones asignadas al jugador en el Kinder actual. */
+    public List<MissionView> missionsOf(String playerId) {
+        return missionBoard.viewFor(playerId);
     }
 
     public Set<String> claimedItemIdsSnapshot() {
@@ -806,7 +801,7 @@ public class GameSession {
         // nunca llegaba a aplicarse: el HUD mostraba "oleada 1 en 1s" al empezar.
         waveDirector.resetRun(System.currentTimeMillis(), FIRST_WAVE_PREP_MS);
         claimedItems.clear();
-        missionCooldowns.clear();
+        missionBoard.reset();
         floors.forEach(FloorGrid::resetDoors);
         players.values().forEach(Player::reset);
         wipedRun = false;

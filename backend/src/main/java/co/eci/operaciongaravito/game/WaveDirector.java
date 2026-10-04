@@ -36,6 +36,9 @@ public class WaveDirector {
     private int floorTurn;
     private boolean justCleared;
     private boolean bossDue;
+    private boolean bossDefeated;
+    /** Se cumplio la cuota (o cayo el jefe) pero faltan misiones: la horda sigue llegando. */
+    private boolean waitingForMissions;
 
     public WaveDirector(long now, long startDelayMs, List<FloorGrid> floors) {
         this.nextEventAt = now + startDelayMs;
@@ -47,11 +50,24 @@ public class WaveDirector {
         boolean bossStage = phase == Phase.ACTIVE && blueprint.boss();
         int remaining = phase == Phase.ACTIVE && !bossStage ? Math.max(0, quota - kills) : 0;
         return new WaveState(kinder, WaveCurve.KINDER_COUNT, kills, quota, remaining,
-                restingSeconds(now), bossStage, phase == Phase.VICTORY);
+                restingSeconds(now), bossStage, phase == Phase.VICTORY,
+                phase == Phase.ACTIVE && waitingForMissions, 0, 0);
     }
 
     public synchronized int getKinder() {
         return kinder;
+    }
+
+    /**
+     * Kinder para el que se juegan las misiones ahora: el que viene durante el respiro,
+     * el activo durante el Kinder, 0 tras ganar.
+     */
+    public synchronized int upcomingKinder() {
+        return switch (phase) {
+            case RESTING -> Math.min(kinder + 1, WaveCurve.KINDER_COUNT);
+            case ACTIVE -> kinder;
+            case VICTORY -> 0;
+        };
     }
 
     public synchronized boolean isVictory() {
@@ -70,6 +86,14 @@ public class WaveDirector {
      * ninguno). {@code alive} son los zombis vivos que ya hay en el mapa.
      */
     public synchronized List<Zombie> update(long now, int alive, Collection<Player> players) {
+        return update(now, alive, players, true);
+    }
+
+    /**
+     * Igual que {@link #update(long, int, Collection)}, pero el Kinder solo se pasa si
+     * ademas {@code missionsDone} (la barrera del MissionBoard esta abierta).
+     */
+    public synchronized List<Zombie> update(long now, int alive, Collection<Player> players, boolean missionsDone) {
         switch (phase) {
             case RESTING -> {
                 if (now >= nextEventAt) {
@@ -77,7 +101,9 @@ public class WaveDirector {
                 }
             }
             case ACTIVE -> {
-                if (!blueprint.boss() && kills >= blueprint.killQuota()) {
+                boolean goalMet = blueprint.boss() ? bossDefeated : kills >= blueprint.killQuota();
+                waitingForMissions = goalMet && !missionsDone;
+                if (goalMet && missionsDone) {
                     finishKinder(now);
                     return List.of();
                 }
@@ -103,7 +129,8 @@ public class WaveDirector {
     /** El jefe del ultimo Kinder cayo: se gana la corrida. */
     public synchronized void onBossDefeated(long now) {
         if (phase == Phase.ACTIVE && blueprint.boss()) {
-            finishKinder(now);
+            // Se cierra en el proximo update, cuando tambien esten las misiones.
+            bossDefeated = true;
         }
     }
 
@@ -130,6 +157,8 @@ public class WaveDirector {
         blueprint = null;
         justCleared = false;
         bossDue = false;
+        bossDefeated = false;
+        waitingForMissions = false;
     }
 
     private void startKinder(long now, int number) {
@@ -139,6 +168,8 @@ public class WaveDirector {
         phase = Phase.ACTIVE;
         nextEventAt = now;
         bossDue = blueprint.boss();
+        bossDefeated = false;
+        waitingForMissions = false;
     }
 
     private void finishKinder(long now) {

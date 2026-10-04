@@ -21,5 +21,6 @@ public record PlayerState(
         int shotSeq,
         double shotFacing,
         String reviving,
-        double reviveProgress) {
+        double reviveProgress,
+        List<MissionView> missions) {
 }

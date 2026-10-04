@@ -3,7 +3,7 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLay
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
-import { missionZonesFor, MISSION_RANGE_PX } from './missionCatalog';
+import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
 import {
   changeFloor,
   getLatestState,
@@ -30,7 +30,6 @@ import {
   setNearDoor,
   setNearStairs,
   touchInput,
-  requestMissionComplete,
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
 import WeaponLayer from './WeaponLayer';
@@ -135,9 +134,6 @@ const STAIRS_ARROW_GLYPH = { up: '▲', down: '▼' };
 
 const ITEM_TYPE_COLORS = { WEAPON: 0x8a3b3b, FOOD: 0x3b8a4e, AMMO: 0x8a7a3b };
 
-// Las 4 misiones son interactivas (abren un minijuego), sin importar en cual de las
-// 3 salas de su rol viva cada instancia — por eso se compara por rol, no por missionId.
-const INTERACTIVE_MISSION_ROLES = new Set(['SEGURIDAD', 'SALUD', 'ECONOMIA', 'INFRAESTRUCTURA']);
 
 const DIRECTIONS = ['down', 'up', 'right', 'left'];
 
@@ -160,7 +156,7 @@ export default class MainScene extends Phaser.Scene {
     this.doors = [];
     this.foodItems = [];
     this.vendors = [];
-    this.missionZones = [];
+    this.missionMarkers = new Map();
     this.unsubscribeGameState = null;
     this.zombieLayer = null;
     this.remotePlayers = new Map();
@@ -397,7 +393,7 @@ export default class MainScene extends Phaser.Scene {
     this.startRain();
     this.createFoodItems();
     this.createVendors();
-    this.createMissionZones();
+    this.missionMarkers = new Map();
     if (this.spectating) {
       this.enterSpectate();
     } else {
@@ -446,25 +442,35 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
-  createMissionZones() {
-    this.missionZones = missionZonesFor(getMyBuilding()).filter((zone) => zone.floor === this.floor).map((zone) => {
-      const mine = zone.role === getMyRole();
-      // En vez del nombre del salón, se marca con el objeto característico del rol
-      // (p.ej. 🧮 para Economía) y solo dice "Misión" — así no delata cuál de las 3
-      // salas posibles de ese rol es, en cualquier piso.
-      this.add
-        .text(zone.x, zone.y, `${roleInfo(zone.role).missionIcon}\nMisión`, {
+  // Marcadores de MIS misiones pendientes en este piso (las reparte el servidor por Kinder).
+  syncMissionMarkers() {
+    const me = getMyPlayerState();
+    const pending = (me?.missions ?? []).filter((m) => !m.done && m.floor === this.floor);
+    const keep = new Set(pending.map((m) => m.missionId));
+
+    this.missionMarkers.forEach((marker, id) => {
+      if (keep.has(id)) return;
+      this.tweens.killTweensOf(marker.text);
+      marker.text.destroy();
+      this.missionMarkers.delete(id);
+    });
+    pending.forEach((mission) => {
+      if (this.missionMarkers.has(mission.missionId)) return;
+      const info = missionType(mission.type);
+      const text = this.add
+        .text(mission.x, mission.y, `${info.icon}\nMisión`, {
           fontFamily: 'sans-serif',
           fontSize: '13px',
           color: '#ffffff',
           align: 'center',
-          backgroundColor: mine ? '#5b3fa0' : '#3a3a44',
+          backgroundColor: '#5b3fa0',
           padding: { x: 5, y: 3 },
         })
         .setOrigin(0.5)
         .setDepth(4)
-        .setAlpha(mine ? 0.95 : 0.55);
-      return { ...zone, mine, inRange: false };
+        .setAlpha(0.95);
+      this.tweens.add({ targets: text, scale: 1.12, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.missionMarkers.set(mission.missionId, { text, mission });
     });
   }
 
@@ -1028,29 +1034,18 @@ export default class MainScene extends Phaser.Scene {
   }
 
   updateMissionProximity() {
-    const px = this.player.x;
-    const py = this.player.y;
-
-    this.missionZones.forEach((zone) => {
-      const dx = px - zone.x;
-      const dy = py - zone.y;
-      const withinRange = dx * dx + dy * dy <= MISSION_RANGE_PX * MISSION_RANGE_PX;
-
-      if (withinRange && !zone.inRange) {
-        zone.inRange = true;
-        if (!zone.mine) return;
-        if (INTERACTIVE_MISSION_ROLES.has(zone.role)) {
-          setNearMission(zone);
-        } else {
-          requestMissionComplete(zone.missionId, px, py);
-        }
-      } else if (!withinRange && zone.inRange) {
-        zone.inRange = false;
-        if (zone.mine && INTERACTIVE_MISSION_ROLES.has(zone.role)) {
-          setNearMission(null);
-        }
+    this.syncMissionMarkers();
+    let closest = null;
+    let closestDistance = MISSION_RANGE_PX;
+    this.missionMarkers.forEach(({ mission }) => {
+      const distance = Math.hypot(this.player.x - mission.x, this.player.y - mission.y);
+      if (distance <= closestDistance) {
+        closest = mission;
+        closestDistance = distance;
       }
     });
+    // El minijuego que se abre depende del tipo de mision, no del rol.
+    setNearMission(closest ? { ...closest, role: missionType(closest.type).role } : null);
   }
 
   updateDoorProximity() {
@@ -1171,8 +1166,8 @@ export default class MainScene extends Phaser.Scene {
     VENDORS.filter((vendor) => vendor.floor === this.floor).forEach((vendor) => {
       this.lighting.addLight({ x: vendor.x, y: vendor.y, radius: 150, mode: 'steady', bulb: false });
     });
-    missionZonesFor(getMyBuilding()).filter((zone) => zone.floor === this.floor).forEach((zone) => {
-      this.lighting.addLight({ x: zone.x, y: zone.y, radius: 130, mode: 'steady', bulb: false });
+    missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor).forEach((site) => {
+      this.lighting.addLight({ x: site.x, y: site.y, radius: 130, mode: 'steady', bulb: false });
     });
 
     // Luces fluorescentes del techo del corredor porticado: parejas, sin foco visible.

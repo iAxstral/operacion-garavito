@@ -5,6 +5,10 @@ import SecurityMission from './components/SecurityMission';
 import WiresMission from './components/WiresMission';
 import MathMission from './components/MathMission';
 import StackMission from './components/StackMission';
+import CodeMission from './components/CodeMission';
+import VaccineMission from './components/VaccineMission';
+import CashMission from './components/CashMission';
+import FuseMission from './components/FuseMission';
 import TouchControls from './components/TouchControls';
 import SpectatorPanel from './components/SpectatorPanel';
 import GameOverScreen from './components/GameOverScreen';
@@ -85,6 +89,10 @@ function App() {
         <WiresMission />
         <MathMission />
         <StackMission />
+        <CodeMission />
+        <VaccineMission />
+        <CashMission />
+        <FuseMission />
         <TouchControls />
         <SpectatorPanel />
         <GameOverScreen onExitToMenu={handleExitToMenu} />

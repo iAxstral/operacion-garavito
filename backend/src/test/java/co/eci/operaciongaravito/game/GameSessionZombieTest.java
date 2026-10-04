@@ -168,12 +168,19 @@ class GameSessionZombieTest {
         assertTrue(session.waveState().restingSeconds() > 0, "deberia haber entrado al respiro");
     }
 
-    /** Registra kills en el director como si hubieran llegado por /attack. */
+    /**
+     * Registra kills en el director como si hubieran llegado por /attack, y completa las
+     * misiones del jugador: un Kinder pide las dos cosas.
+     */
     private void registerKills(int count) {
         try {
             java.lang.reflect.Field field = GameSession.class.getDeclaredField("waveDirector");
             field.setAccessible(true);
             ((WaveDirector) field.get(session)).onZombiesKilled(count);
+            java.lang.reflect.Field boardField = GameSession.class.getDeclaredField("missionBoard");
+            boardField.setAccessible(true);
+            MissionBoard board = (MissionBoard) boardField.get(session);
+            board.viewFor("SEGURIDAD").forEach(mission -> board.complete("SEGURIDAD", mission.missionId()));
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError(ex);
         }
@@ -279,6 +286,12 @@ class GameSessionZombieTest {
         now += 66;
         session.tick(now, 0.066);
         assertNull(session.bossView());
+        assertFalse(session.waveState().victory(), "sin las misiones del Kinder 5 todavia no se gana");
+        assertTrue(session.waveState().waitingForMissions());
+
+        registerKills(0);
+        now += 66;
+        session.tick(now, 0.066);
         assertTrue(session.waveState().victory());
         assertTrue(session.consumeVictory());
         assertFalse(session.consumeVictory());

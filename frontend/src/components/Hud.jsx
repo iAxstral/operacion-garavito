@@ -19,7 +19,7 @@ import {
 } from '../game/gameSync';
 import SettingsPanel from './SettingsPanel';
 import { playSfx } from '../game/sfx';
-import { missionZonesFor, REWARD_GARAVITOS } from '../game/missionCatalog';
+import { MISSIONS_PER_KINDER, missionType } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
 import { CAFETERIA_MENU, WEAPON_MACHINE_MENU } from '../game/shopCatalog';
 import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog';
@@ -88,7 +88,18 @@ function kinderStatus(wave, boss) {
       ? `Prepárate — Kinder 1 en ${wave.restingSeconds}s`
       : `Kinder ${wave.number} superado — Kinder ${wave.number + 1} en ${wave.restingSeconds}s`;
   }
-  return `Kinder ${wave.number}/${wave.total} — ${wave.kills}/${wave.quota} zombis`;
+  if (wave.waitingForMissions) {
+    return `Kinder ${wave.number}/${wave.total} — ¡Cuota lista! Faltan misiones (${wave.teamMissionsDone}/${wave.teamMissionsRequired})`;
+  }
+  return `Kinder ${wave.number}/${wave.total} — ${wave.kills}/${wave.quota} zombis · misiones ${wave.teamMissionsDone}/${wave.teamMissionsRequired}`;
+}
+
+// Mision pendiente mas cercana: primero las de mi piso, si no la primera de otro.
+function nextMission(me) {
+  const pending = (me?.missions ?? []).filter((m) => !m.done);
+  const here = pending.filter((m) => m.floor === me.floor)
+    .sort((a, b) => Math.hypot(a.x - me.x, a.y - me.y) - Math.hypot(b.x - me.x, b.y - me.y));
+  return here[0] ?? pending[0] ?? null;
 }
 
 function healthColor(health) {
@@ -171,7 +182,8 @@ export default function Hud() {
           ctx.fill();
         });
 
-      const missionHere = missionZonesFor(getMyBuilding()).find((zone) => zone.role === myRole && zone.floor === myFloor);
+      const target = me ? nextMission(me) : null;
+      const missionHere = target && target.floor === myFloor ? target : null;
 
       if (me) {
         const px = (me.x / TILE) * MAP_CELL_PX;
@@ -314,7 +326,9 @@ export default function Hud() {
     } else if (event.type === 'REVIVE_REJECTED') {
       message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo revivir';
     } else if (event.type === 'MISSION_SUCCESS') {
-      message = `¡Misión completada! +${REWARD_GARAVITOS} Garavitos`;
+      const reward = stateRef.current.players.find((p) => p.playerId === getMyRole())
+        ?.missions?.find((m) => m.missionId === event.itemId)?.reward;
+      message = `¡Misión completada! +${reward ?? ''} Garavitos`;
     }
     if (!message) return undefined;
 
@@ -338,7 +352,7 @@ export default function Hud() {
     announcedWaveRef.current = kinderNumber;
     setWaveBanner(bossStage
       ? `¡Kinder ${kinderNumber}! El Ingeniero de Sistemas viene por ustedes`
-      : `¡Kinder ${kinderNumber}! Maten ${kinderQuota} zombis para pasarlo`);
+      : `¡Kinder ${kinderNumber}! Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno`);
     const timeout = setTimeout(() => setWaveBanner(null), 3200);
     return () => clearTimeout(timeout);
   }, [kinderNumber, kinderActive, kinderQuota, bossStage]);
@@ -385,10 +399,11 @@ export default function Hud() {
   const nearDoorState = state.doors?.find((d) => d.doorId === nearDoor?.doorId);
   const nearDoorOpen = nearDoorState?.open ?? true;
 
-  const myMissionOnThisFloor = missionZonesFor(getMyBuilding()).find((zone) => zone.role === getMyRole() && zone.floor === floor);
-  const myMissionElsewhere = !myMissionOnThisFloor
-    ? missionZonesFor(getMyBuilding()).find((zone) => zone.role === getMyRole())
-    : null;
+  const missions = me?.missions ?? [];
+  const missionsDone = missions.filter((m) => m.done).length;
+  const upNext = me ? nextMission(me) : null;
+  const myMissionOnThisFloor = upNext && upNext.floor === floor ? upNext : null;
+  const myMissionElsewhere = upNext && upNext.floor !== floor ? upNext : null;
 
   const handleBuy = (item) => {
     if (!nearVendor) return;
@@ -438,6 +453,21 @@ export default function Hud() {
           {!touch && <span className="hud-weapon-keys">1-4{weapon.ranged ? ' · R' : ''}</span>}
           {reloadingMs > 0 && <div className="hud-weapon-reload" style={{ width: `${reloadPct}%` }} />}
         </div>
+
+        {missions.length > 0 && (
+          <div className="hud-missions">
+            <div className="hud-missions-title">
+              Misiones {missionsDone}/{missions.length}
+            </div>
+            {missions.map((mission) => (
+              <div key={mission.missionId} className={`hud-mission${mission.done ? ' hud-mission--done' : ''}`}>
+                <span aria-hidden="true">{mission.done ? '✓' : missionType(mission.type).icon}</span>
+                <span className="hud-mission-room">{mission.room}</span>
+                <span className="hud-mission-floor">P{mission.floor}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="hud-top-right">
@@ -533,16 +563,16 @@ export default function Hud() {
               <div className="map-legend">
                 <span><i className="map-legend-dot map-legend-dot--me" /> Tú</span>
                 <span><i className="map-legend-dot map-legend-dot--mate" /> Compañeros</span>
-                <span><i className="map-legend-dot map-legend-dot--mission" /> {role.missionIcon} Tu misión</span>
+                <span><i className="map-legend-dot map-legend-dot--mission" /> Tu próxima misión</span>
               </div>
               {myMissionOnThisFloor && (
                 <p className="map-mission-note">
-                  Sigue la estela punteada hasta {role.missionIcon} Misión, en este piso.
+                  Sigue la estela punteada hasta {missionType(myMissionOnThisFloor.type).icon} {myMissionOnThisFloor.room}, en este piso.
                 </p>
               )}
               {myMissionElsewhere && (
                 <p className="map-mission-note">
-                  Tu misión no está en este piso: sube o baja al piso {myMissionElsewhere.floor}.
+                  Tu próxima misión es en {myMissionElsewhere.room}: ve al piso {myMissionElsewhere.floor}.
                 </p>
               )}
             </div>

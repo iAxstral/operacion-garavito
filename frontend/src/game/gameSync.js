@@ -25,6 +25,9 @@ let lastMoveSentAt = 0;
 let lastSentX = null;
 let lastSentY = null;
 const listeners = new Set();
+// Cada evento del servidor, uno por uno y en orden. `latestState.lastEvent` solo guarda
+// el ultimo: si dos jugadores actuan casi a la vez, React puede ver solo el segundo.
+const eventListeners = new Set();
 let joined = false;
 let topicSubscription = null;
 
@@ -89,6 +92,12 @@ export function onStateChange(callback) {
   return () => listeners.delete(callback);
 }
 
+/** Llama a `callback(evento)` por cada evento nuevo que llegue del servidor. */
+export function onGameEvent(callback) {
+  eventListeners.add(callback);
+  return () => eventListeners.delete(callback);
+}
+
 function awaitEvent(predicate) {
   return new Promise((resolve, reject) => {
     const waiter = { predicate, resolve };
@@ -105,6 +114,7 @@ function handleMessage(body) {
     lastEvent: body.lastEvent ?? latestState.lastEvent,
   };
   if (body.lastEvent) {
+    eventListeners.forEach((callback) => callback(body.lastEvent));
     eventWaiters.forEach((waiter) => {
       if (waiter.predicate(body.lastEvent)) {
         eventWaiters.delete(waiter);
