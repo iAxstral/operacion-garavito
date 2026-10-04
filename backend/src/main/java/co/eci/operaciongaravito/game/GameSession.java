@@ -52,6 +52,7 @@ public class GameSession {
     private final Map<String, WorldItem> worldItems = WorldItemCatalog.defaultCatalog();
     private final Map<String, String> claimedItems = new ConcurrentHashMap<>();
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
+    private final Map<String, AcidProjectile> acids = new ConcurrentHashMap<>();
     private final WaveDirector waveDirector;
     private final MissionBoard missionBoard;
     private final BossConfig bossConfig;
@@ -203,6 +204,17 @@ public class GameSession {
         }
     }
 
+    private void collectAcid(Zombie zombie) {
+        AcidProjectile acid = zombie.consumeAcid();
+        if (acid != null) {
+            acids.put(acid.getId(), acid);
+        }
+    }
+
+    public List<ProjectileState> projectileStates() {
+        return acids.values().stream().map(AcidProjectile::toState).toList();
+    }
+
     public List<ZombieState> zombieStates() {
         return zombies.values().stream().map(Zombie::toState).toList();
     }
@@ -251,6 +263,7 @@ public class GameSession {
         if (waveDirector.consumeJustCleared()) {
             // Cuota cumplida (o jefe vencido): la horda que quedaba se retira.
             zombies.clear();
+            acids.clear();
             boss = null;
             if (waveDirector.isVictory()) {
                 victoryPending = true;
@@ -261,6 +274,7 @@ public class GameSession {
 
         if (targets.isEmpty() && !players.isEmpty()) {
             zombies.clear();
+            acids.clear();
             boss = null;
             waveDirector.resetRun(now, WaveCurve.WAVE_REST_MS);
             players.values().forEach(player -> player.revive(REVIVE_HEALTH));
@@ -280,13 +294,16 @@ public class GameSession {
             if (target == null) {
                 // Sin nadie en su piso igual termina la mordida o el aturdimiento en curso.
                 zombie.updateAttack(null, now);
+                collectAcid(zombie);
                 continue;
             }
             double[] separation = separationFor(zombie, living);
             zombie.step(floorGrid(zombie.getFloor()), fields.get(target.getPlayerId()), target.getX(), target.getY(),
                     separation[0], separation[1], deltaSeconds, now);
-            zombie.updateAttack(target, now);
+            zombie.updateAttack(target, floorGrid(zombie.getFloor()), now);
+            collectAcid(zombie);
         }
+        acids.values().removeIf(acid -> !acid.step(floorGrid(acid.getFloor()), players.values(), deltaSeconds, now));
 
         zombies.values().removeIf(zombie -> !zombie.isAlive());
         updateBoss(now, deltaSeconds, targets);
@@ -796,6 +813,7 @@ public class GameSession {
 
     public void resetGame() {
         zombies.clear();
+        acids.clear();
         boss = null;
         // Antes se reusaba el respiro corto entre oleadas y la preparacion de 45 s
         // nunca llegaba a aplicarse: el HUD mostraba "oleada 1 en 1s" al empezar.

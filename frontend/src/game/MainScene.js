@@ -11,6 +11,7 @@ import {
   getMyPlayerState,
   getMyRole,
   getBoss,
+  getProjectiles,
   getZombies,
   isInputLocked,
   onStateChange,
@@ -182,6 +183,8 @@ export default class MainScene extends Phaser.Scene {
     // Caido y mirando a un compañero: la escena muestra el piso de ese compañero.
     this.spectating = Boolean(data?.spectating);
     this.reviving = null;
+    // Los sprites del piso anterior ya se destruyeron con la escena.
+    this.acidSprites = new Map();
     this.changingFloor = false;
     this.spritePrefix = roleInfo(getMyRole()).spritePrefix;
   }
@@ -250,9 +253,17 @@ export default class MainScene extends Phaser.Scene {
   zombieHooks() {
     return {
       onWindup: (entry) => {
+        if (entry.spitting) {
+          playSfx('spitCharge', this.hearing(entry.x, entry.y));
+          return;
+        }
         if (Math.hypot(this.player.x - entry.x, this.player.y - entry.y) <= WINDUP_WARN_PX) playSfx('warn');
       },
       onStrike: (entry) => {
+        if (entry.spitting) {
+          playSfx('spit', this.hearing(entry.x, entry.y));
+          return;
+        }
         const volume = MAX_BITE_VOLUME * this.hearing(entry.x, entry.y) * channelVolume('zombies');
         if (volume > 0.01) this.sound.play('zombie_attack', { volume });
       },
@@ -591,8 +602,43 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
+  // Bolas de acido de los escupidores en este piso: bola verde con estela y salpicadura.
+  syncProjectiles(delta) {
+    if (!this.acidSprites) this.acidSprites = new Map();
+    const seen = new Set();
+    const blend = Math.min(1, (delta / 1000) * 14);
+    getProjectiles().filter((p) => p.floor === this.floor).forEach((p) => {
+      seen.add(p.id);
+      let entry = this.acidSprites.get(p.id);
+      if (!entry) {
+        const glow = this.add.circle(p.x, p.y, 13, 0x9dff3a, 0.25).setDepth(5200).setBlendMode(Phaser.BlendModes.ADD);
+        const ball = this.add.circle(p.x, p.y, 7, 0xb6ff5a, 1).setStrokeStyle(2, 0x3d5a10).setDepth(5201);
+        entry = { glow, ball };
+        this.acidSprites.set(p.id, entry);
+      }
+      const x = entry.ball.x + (p.x - entry.ball.x) * blend;
+      const y = entry.ball.y + (p.y - entry.ball.y) * blend;
+      entry.ball.setPosition(x, y);
+      entry.glow.setPosition(x, y).setScale(0.9 + Math.sin(this.time.now / 60) * 0.15);
+      if (Math.random() < 0.35) {
+        const drop = this.add.circle(x, y, 3, 0x9dff3a, 0.6).setDepth(5199);
+        this.tweens.add({ targets: drop, alpha: 0, scale: 0.3, duration: 260, onComplete: () => drop.destroy() });
+      }
+    });
+    this.acidSprites.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      const splash = this.add.ellipse(entry.ball.x, entry.ball.y + 4, 30, 14, 0x9dff3a, 0.55).setDepth(3);
+      this.tweens.add({ targets: splash, alpha: 0, scaleX: 1.6, duration: 600, onComplete: () => splash.destroy() });
+      playSfx('splash', this.hearing(entry.ball.x, entry.ball.y));
+      entry.ball.destroy();
+      entry.glow.destroy();
+      this.acidSprites.delete(id);
+    });
+  }
+
   // El jefe solo se dibuja si esta en el piso de este jugador.
   syncBoss(delta) {
+    this.syncProjectiles(delta);
     const boss = getBoss();
     this.bossLayer.sync(boss && boss.floor === this.floor ? boss : null);
     this.bossLayer.update(delta);

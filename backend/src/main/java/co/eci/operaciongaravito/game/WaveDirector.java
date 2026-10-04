@@ -199,13 +199,16 @@ public class WaveDirector {
             int floor = occupied.get(Math.floorMod(floorTurn++, occupied.size()));
             List<Player> onFloor = living.stream().filter(p -> p.getFloor() == floor).toList();
             FloorGrid.SpawnPoint point = pickSpawnPoint(floors.get(floor - 1).spawnPoints(), onFloor, random);
+            ZombieKind kind = WaveCurve.rollKind(blueprint, random.nextDouble());
+            int health = kind.health() > 0 ? kind.health() : WaveCurve.rollHealth(blueprint, random.nextDouble());
             burst.add(new Zombie(
                     "z" + (++zombieSequence),
                     floor,
                     point.x(),
                     point.y(),
-                    WaveCurve.rollHealth(blueprint, random.nextDouble()),
-                    WaveCurve.rollSpeed(blueprint, random.nextDouble())));
+                    health,
+                    WaveCurve.rollSpeed(blueprint, random.nextDouble()) * kind.speedFactor(),
+                    kind));
         }
         return burst;
     }

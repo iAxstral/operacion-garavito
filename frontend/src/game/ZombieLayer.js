@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 
 const TEXTURE = 'zombie';
 const TOUGH_TEXTURE = 'zombie-teso';
+const RUNNER_TEXTURE = 'zombie-corredor';
+const SPITTER_TEXTURE = 'zombie-escupidor';
 const TOUGH_HEALTH = 4;
 
 const LERP_PER_SECOND = 12;
@@ -10,8 +12,11 @@ const LERP_PER_SECOND = 12;
 // aviso se llena justo cuando llega la mordida.
 const WINDUP_MS = 420;
 const TOUGH_WINDUP_MS = 520;
+const RUNNER_WINDUP_MS = 300;
+const SPIT_WINDUP_MS = 700;
 
 const WINDUP_TINT = 0xff5a5a;
+const SPIT_TINT = 0xb6ff5a;
 const STAGGER_TINT = 0xb9c4ff;
 const LUNGE_PX = 16;
 
@@ -37,6 +42,28 @@ function bakeTexture(scene, key, { body, rot, w, h }) {
   g.destroy();
 }
 
+// Escupidor: cuerpo hinchado con una bolsa de acido en la garganta.
+function bakeSpitter(scene) {
+  if (scene.textures.exists(SPITTER_TEXTURE)) return;
+  const w = 38;
+  const h = 46;
+  const g = scene.make.graphics({ x: 0, y: 0, add: false });
+  g.fillStyle(0x3d4a1c, 1).fillEllipse(w / 2, h * 0.64, w * 0.86, h * 0.62);
+  g.fillStyle(0x6f8526, 1).fillEllipse(w * 0.44, h * 0.62, w * 0.6, h * 0.5);
+  g.fillStyle(0xc7e05a, 1).fillCircle(w * 0.5, h * 0.44, w * 0.18);
+  g.fillStyle(0xa5b95a, 1).fillCircle(w / 2, h * 0.2, w * 0.2);
+  g.fillStyle(0x1d2417, 1).fillCircle(w * 0.43, h * 0.18, 2).fillCircle(w * 0.57, h * 0.18, 2);
+  g.fillStyle(0x2a3510, 1).fillRect(w * 0.42, h * 0.27, w * 0.16, 3);
+  g.generateTexture(SPITTER_TEXTURE, w, h);
+  g.destroy();
+}
+
+function textureFor(state, tough) {
+  if (state.kind === 'RUNNER') return RUNNER_TEXTURE;
+  if (state.kind === 'SPITTER') return SPITTER_TEXTURE;
+  return tough ? TOUGH_TEXTURE : TEXTURE;
+}
+
 /**
  * Dibuja los zombis del piso y su ataque: en WINDUP se ponen rojos, aparece un "!" y
  * un anillo en el suelo que se llena hasta la mordida; en STRIKE embisten hacia su
@@ -55,6 +82,8 @@ export default class ZombieLayer {
 
     bakeTexture(scene, TEXTURE, { body: 0x4a6b38, rot: 0x86a86a, w: 28, h: 40 });
     bakeTexture(scene, TOUGH_TEXTURE, { body: 0x6b3838, rot: 0xa86a6a, w: 34, h: 48 });
+    bakeTexture(scene, RUNNER_TEXTURE, { body: 0x3d4f5c, rot: 0x8fa3b0, w: 22, h: 38 });
+    bakeSpitter(scene);
   }
 
   sync(zombieStates) {
@@ -79,6 +108,7 @@ export default class ZombieLayer {
       entry.health = state.health;
 
       const phase = state.phase ?? 'CHASE';
+      if (phase === 'WINDUP' && entry.phase !== 'WINDUP') entry.spitting = Boolean(state.spitting);
       if (phase !== entry.phase) this.changePhase(entry, phase);
     });
 
@@ -91,8 +121,9 @@ export default class ZombieLayer {
   }
 
   spawn(state) {
-    const tough = state.tough || state.health >= TOUGH_HEALTH;
-    const sprite = this.scene.add.sprite(state.x, state.y, tough ? TOUGH_TEXTURE : TEXTURE);
+    const kind = state.kind ?? 'WALKER';
+    const tough = kind === 'WALKER' && (state.tough || state.health >= TOUGH_HEALTH);
+    const sprite = this.scene.add.sprite(state.x, state.y, textureFor(state, tough));
     sprite.setDepth(state.y);
 
     const shadow = this.scene.add.ellipse(state.x, state.y + 16, tough ? 28 : 22, 9, 0x000000, 0.28);
@@ -120,6 +151,8 @@ export default class ZombieLayer {
       offset: { x: 0, y: 0 },
       health: state.health,
       tough,
+      kind,
+      spitting: false,
       phase: 'CHASE',
       warning: null,
       ring: null,
@@ -135,7 +168,7 @@ export default class ZombieLayer {
       this.showWarning(entry);
       this.hooks.onWindup?.(entry);
     } else if (phase === 'STRIKE' && previous === 'WINDUP') {
-      this.lunge(entry);
+      if (!entry.spitting) this.lunge(entry);
       this.hooks.onStrike?.(entry);
     } else if (phase === 'STAGGER') {
       this.scene.tweens.add({ targets: entry.offset, x: { from: -4, to: 4 }, duration: 70, yoyo: true, repeat: 3 });
@@ -148,14 +181,18 @@ export default class ZombieLayer {
     const { sprite } = entry;
     if (!sprite.active) return;
     sprite.setTintMode(Phaser.TintModes.MULTIPLY);
-    if (entry.phase === 'WINDUP') sprite.setTint(WINDUP_TINT);
+    if (entry.phase === 'WINDUP') sprite.setTint(entry.spitting ? SPIT_TINT : WINDUP_TINT);
     else if (entry.phase === 'STAGGER') sprite.setTint(STAGGER_TINT);
     else sprite.clearTint();
   }
 
   showWarning(entry) {
-    const duration = entry.tough ? TOUGH_WINDUP_MS : WINDUP_MS;
-    const radius = entry.tough ? 30 : 24;
+    const duration = entry.spitting ? SPIT_WINDUP_MS
+      : entry.tough ? TOUGH_WINDUP_MS
+        : entry.kind === 'RUNNER' ? RUNNER_WINDUP_MS : WINDUP_MS;
+    const radius = entry.tough || entry.kind === 'SPITTER' ? 30 : 24;
+    const color = entry.spitting ? '#b6ff5a' : '#ff4040';
+    entry.ringColor = entry.spitting ? 0x9dff3a : 0xff4040;
 
     entry.ring = this.scene.add.graphics().setDepth(2);
     entry.ring.progress = 0;
@@ -166,7 +203,7 @@ export default class ZombieLayer {
         fontFamily: 'sans-serif',
         fontSize: '22px',
         fontStyle: 'bold',
-        color: '#ff4040',
+        color,
         stroke: '#1a0000',
         strokeThickness: 5,
       })
@@ -260,9 +297,9 @@ export default class ZombieLayer {
         const ring = entry.ring;
         const footY = entry.y + (entry.tough ? 20 : 16);
         ring.clear();
-        ring.fillStyle(0xff2a2a, 0.12 + 0.2 * ring.progress);
+        ring.fillStyle(entry.ringColor, 0.12 + 0.2 * ring.progress);
         ring.fillEllipse(entry.x, footY, ring.radius * 2 * ring.progress, ring.radius * ring.progress);
-        ring.lineStyle(2, 0xff4040, 0.85);
+        ring.lineStyle(2, entry.ringColor, 0.85);
         ring.strokeEllipse(entry.x, footY, ring.radius * 2, ring.radius);
       }
     });

@@ -13,7 +13,7 @@ let currentFloor = 1;
 let myBuilding = 'F';
 
 function emptyState() {
-  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null, boss: null };
+  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null, boss: null, projectiles: [] };
 }
 
 let latestState = emptyState();
@@ -298,6 +298,11 @@ export function requestUseItem(itemId) {
 
 export function getZombies() {
   return latestState.zombies ?? [];
+}
+
+/** Bolas de acido de los escupidores ({ id, floor, x, y, angle }). */
+export function getProjectiles() {
+  return latestState.projectiles ?? [];
 }
 
 export function getWave() {

@@ -119,6 +119,19 @@ const SOUNDS = {
       setTimeout(() => noise(ctx, { gain: 0.3 * v, attack: 0.005, decay: 0.06, filter: 'bandpass', freq: 1200, q: 3 }), 260);
     },
   },
+  // Escupidor: gorgoteo al cargar y escupitajo al soltar.
+  spitCharge: {
+    channel: 'zombies',
+    play: (ctx, v) => noise(ctx, { gain: 0.2 * v, attack: 0.25, decay: 0.3, filter: 'bandpass', freq: 300, freqTo: 900, q: 4 }),
+  },
+  spit: {
+    channel: 'zombies',
+    play: (ctx, v) => {
+      noise(ctx, { gain: 0.35 * v, attack: 0.005, decay: 0.16, filter: 'bandpass', freq: 1400, freqTo: 500, q: 2 });
+      tone(ctx, { type: 'sine', from: 260, to: 120, gain: 0.15 * v, decay: 0.12 });
+    },
+  },
+  splash: { channel: 'zombies', play: (ctx, v) => noise(ctx, { gain: 0.2 * v, decay: 0.15, filter: 'lowpass', freq: 900 }) },
   // Zombi preparando la mordida justo a tu lado: siseo corto que sube.
   warn: {
     channel: 'zombies',

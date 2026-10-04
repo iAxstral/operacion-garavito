@@ -118,7 +118,8 @@ public class GameSessionService {
                 session.waveState(),
                 session.doorStates(),
                 session.lobbyState(),
-                session.bossView()
+                session.bossView(),
+                session.projectileStates()
         );
     }
 

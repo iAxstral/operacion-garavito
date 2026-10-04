@@ -11,9 +11,10 @@ public record GameStateMessage(
         WaveState wave,
         List<DoorState> doors,
         LobbyState lobby,
-        BossView boss) {
+        BossView boss,
+        List<ProjectileState> projectiles) {
 
     public static GameStateMessage eventOnly(LastEvent event) {
-        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null);
+        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of());
     }
 }
