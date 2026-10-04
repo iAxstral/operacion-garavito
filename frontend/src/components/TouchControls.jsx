@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { getMyPlayerState, isTouchDevice, onStateChange, touchInput } from '../game/gameSync';
+import { ownedWeapons, weaponById } from '../game/weaponCatalog';
 
-const KEY_TAP_MS = 90;
 const CHARGED_COOLDOWN_MS = 6000;
 
-function tapKey(key, keyCode) {
-  const init = { key, keyCode, which: keyCode, bubbles: true };
-  window.dispatchEvent(new KeyboardEvent('keydown', init));
-  setTimeout(() => window.dispatchEvent(new KeyboardEvent('keyup', init)), KEY_TAP_MS);
+function keyEvent(type, key, keyCode) {
+  window.dispatchEvent(new KeyboardEvent(type, { key, keyCode, which: keyCode, bubbles: true }));
 }
 
 function HoldButton({ label, className, field, ariaLabel, style }) {
@@ -40,15 +38,29 @@ function HoldButton({ label, className, field, ariaLabel, style }) {
 export default function TouchControls() {
   const [stick, setStick] = useState(null);
   const [chargedPct, setChargedPct] = useState(100);
+  const [arms, setArms] = useState({ weapon: weaponById('FISTS'), count: 1, canReload: false });
+  const [downed, setDowned] = useState(false);
+  const eHeldRef = useRef(false);
   const zoneRef = useRef(null);
 
   useEffect(() => onStateChange(() => {
     const readyIn = getMyPlayerState()?.chargedReadyInMs ?? 0;
     const pct = Math.round(((CHARGED_COOLDOWN_MS - readyIn) / CHARGED_COOLDOWN_MS) * 100);
     setChargedPct(Math.max(0, Math.min(100, pct)));
+    const me = getMyPlayerState();
+    setDowned(me?.lifeState === 'DOWNED');
+    const weapon = weaponById(me?.weapon);
+    const canReload = weapon.ranged && me?.reloadingMs === 0 && me.magazine < weapon.magazineSize && me.reserveAmmo > 0;
+    setArms((previous) => {
+      const count = ownedWeapons(me?.inventory).length;
+      return previous.weapon === weapon && previous.count === count && previous.canReload === canReload
+        ? previous
+        : { weapon, count, canReload };
+    });
   }), []);
 
-  if (!isTouchDevice()) return null;
+  // Caido no hay controles: el panel de espectador ocupa su lugar.
+  if (!isTouchDevice() || downed) return null;
 
   const radius = () => {
     const base = zoneRef.current?.querySelector('.touch-stick');
@@ -115,13 +127,52 @@ export default function TouchControls() {
           field="charged"
         />
         <HoldButton label="»" ariaLabel="Dash" className="touch-btn--dash" field="dash" />
+        {arms.count > 1 && (
+          <button
+            type="button"
+            className="touch-btn touch-btn--weapon"
+            aria-label={`Cambiar arma (${arms.weapon.name})`}
+            onPointerDown={(event) => {
+              event.preventDefault();
+              touchInput.cycleWeapon = true;
+            }}
+          >
+            {arms.weapon.icon ? <img src={arms.weapon.icon} alt="" /> : arms.weapon.glyph}
+          </button>
+        )}
+        {arms.canReload && (
+          <button
+            type="button"
+            className="touch-btn touch-btn--reload"
+            aria-label="Recargar"
+            onPointerDown={(event) => {
+              event.preventDefault();
+              touchInput.reload = true;
+            }}
+          >
+            ⟳
+          </button>
+        )}
         <button
           type="button"
           className="touch-btn touch-btn--e"
           aria-label="Interactuar o inventario"
           onPointerDown={(event) => {
             event.preventDefault();
-            tapKey('e', 69);
+            event.currentTarget.setPointerCapture(event.pointerId);
+            // E se mantiene apretada mientras el dedo siga encima (para revivir).
+            eHeldRef.current = true;
+            keyEvent('keydown', 'e', 69);
+          }}
+          onPointerUp={() => {
+            if (!eHeldRef.current) return;
+            eHeldRef.current = false;
+            keyEvent('keyup', 'e', 69);
+          }}
+          onPointerCancel={() => {
+            if (!eHeldRef.current) return;
+            eHeldRef.current = false;
+            keyEvent('keyup', 'e', 69);
           }}
         >
           E

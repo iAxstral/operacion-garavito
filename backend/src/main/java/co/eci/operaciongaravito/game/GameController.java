@@ -192,6 +192,49 @@ public class GameController {
         broadcast(gameId, session, event);
     }
 
+    @MessageMapping("/game/{gameId}/equip")
+    public void equip(@DestinationVariable String gameId, EquipRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptEquip(request.playerId(), request.itemId());
+        broadcast(gameId, session, result.success()
+                ? null
+                : LastEvent.equipRejected(request.playerId(), request.itemId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/reload")
+    public void reload(@DestinationVariable String gameId, PlayerRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptReload(request.playerId());
+        broadcast(gameId, session, result.success() ? null : LastEvent.reloadRejected(request.playerId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/revive/start")
+    public void startRevive(@DestinationVariable String gameId, ReviveRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptReviveStart(request.playerId(), request.targetId());
+        broadcast(gameId, session, result.success()
+                ? null
+                : LastEvent.reviveRejected(request.playerId(), request.targetId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/revive/cancel")
+    public void cancelRevive(@DestinationVariable String gameId, PlayerRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session != null) {
+            session.attemptReviveCancel(request.playerId());
+            broadcast(gameId, session, null);
+        }
+    }
+
     private void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
         sessionService.broadcast(gameId, session, lastEvent);
     }

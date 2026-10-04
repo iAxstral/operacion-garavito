@@ -6,6 +6,7 @@ import WiresMission from './components/WiresMission';
 import MathMission from './components/MathMission';
 import StackMission from './components/StackMission';
 import TouchControls from './components/TouchControls';
+import SpectatorPanel from './components/SpectatorPanel';
 import GameOverScreen from './components/GameOverScreen';
 import ConnectionStatus from './components/ConnectionStatus';
 import MainMenu from './components/MainMenu';
@@ -85,6 +86,7 @@ function App() {
         <MathMission />
         <StackMission />
         <TouchControls />
+        <SpectatorPanel />
         <GameOverScreen onExitToMenu={handleExitToMenu} />
       </div>
       <ConnectionStatus />

@@ -7,8 +7,11 @@ import {
   onNearDoorChange,
   requestDoorToggle,
   requestUseItem,
+  requestEquip,
   getNearMission,
   getNearStairs,
+  getNearDowned,
+  onNearDownedChange,
   isTouchDevice,
   isInputLocked,
   purchaseItem,
@@ -18,7 +21,8 @@ import SettingsPanel from './SettingsPanel';
 import { playSfx } from '../game/sfx';
 import { missionZonesFor, REWARD_GARAVITOS } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
-import { CAFETERIA_MENU } from '../game/shopCatalog';
+import { CAFETERIA_MENU, WEAPON_MACHINE_MENU } from '../game/shopCatalog';
+import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog';
 import { roleInfo } from '../game/roleCatalog';
 import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
 
@@ -39,6 +43,9 @@ const REJECTION_MESSAGES = {
   unknown_door: 'Esa puerta no existe',
   not_usable: 'Ese objeto no se puede usar',
   downed: 'Estás caído',
+  no_ammo: 'Sin munición: cómprala en la máquina de armas (piso 2)',
+  not_owned: 'No tienes esa arma',
+  not_downed: 'Ese compañero ya está de pie',
 };
 
 const FOOD_HEAL_DEFAULT = 15;
@@ -49,7 +56,25 @@ function healFor(itemId) {
 }
 
 function itemIcon(itemId) {
-  return CAFETERIA_MENU.find((item) => item.itemId === itemId)?.icon ?? null;
+  return [...CAFETERIA_MENU, ...WEAPON_MACHINE_MENU].find((item) => item.itemId === itemId)?.icon ?? null;
+}
+
+// Boton del inventario para sacar o guardar un arma.
+function WeaponAction({ slot, equipped }) {
+  const weapon = weaponForItem(slot.itemId);
+  if (!weapon) return <span className="inventory-tag">Munición</span>;
+  if (equipped.id === weapon.id) {
+    return (
+      <button type="button" className="inventory-use inventory-use--secondary" onClick={() => requestEquip(null)}>
+        Guardar
+      </button>
+    );
+  }
+  return (
+    <button type="button" className="inventory-use" onClick={() => requestEquip(weapon.itemId)}>
+      Equipar
+    </button>
+  );
 }
 
 function kinderStatus(wave, boss) {
@@ -80,6 +105,7 @@ export default function Hud() {
   const [shopOpen, setShopOpen] = useState(false);
   const [nearDoor, setNearDoorState] = useState(null);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [nearDowned, setNearDownedState] = useState(null);
   const [waveBanner, setWaveBanner] = useState(null);
   const announcedWaveRef = useRef(0);
   const [mapOpen, setMapOpen] = useState(false);
@@ -198,6 +224,7 @@ export default function Hud() {
   }), []);
 
   useEffect(() => onNearDoorChange(setNearDoorState), []);
+  useEffect(() => onNearDownedChange(setNearDownedState), []);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -230,7 +257,7 @@ export default function Hud() {
         return;
       }
       if ((event.key === 'e' || event.key === 'E' || event.key === 'i' || event.key === 'I')
-        && !getNearMission() && !getNearStairs()) {
+        && !getNearMission() && !getNearStairs() && !getNearDowned()) {
         event.preventDefault();
         setInventoryOpen((open) => !open);
         return;
@@ -247,16 +274,34 @@ export default function Hud() {
 
   useEffect(() => {
     const event = state.lastEvent;
-    if (!event || event.playerId !== getMyRole()) return undefined;
+    if (!event || (event.playerId !== getMyRole() && event.type !== 'REVIVED')) return undefined;
 
     let message = null;
+    // Reanimaciones: se avisa a todos, no solo al que hizo la accion.
+    if (event.type === 'REVIVED') {
+      const revived = roleInfo(event.playerId).name;
+      const reviver = roleInfo(event.itemId).name;
+      message = event.playerId === getMyRole() ? `¡${reviver} te levantó! Vuelves con 50 de vida`
+        : event.itemId === getMyRole() ? `¡Levantaste a ${revived}!`
+          : `${revived} volvió a la pelea`;
+      setToast(message);
+      const timeout = setTimeout(() => setToast(null), 2500);
+      return () => clearTimeout(timeout);
+    }
     if (
       event.type === 'PICKUP_REJECTED'
       || event.type === 'PURCHASE_REJECTED'
       || event.type === 'MISSION_REJECTED'
       || event.type === 'DOOR_REJECTED'
+      || event.type === 'EQUIP_REJECTED'
+      || (event.type === 'RELOAD_REJECTED' && event.reason === 'no_ammo')
+      || (event.type === 'ATTACK_REJECTED' && event.reason === 'no_ammo')
     ) {
       message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo completar la acción';
+    } else if (event.type === 'PURCHASE_SUCCESS' && event.itemId === 'shop-municion') {
+      message = `+${AMMO_PER_PACK} balas de reserva`;
+    } else if (event.type === 'PURCHASE_SUCCESS' && weaponForItem(event.itemId)) {
+      message = `¡${weaponForItem(event.itemId).name} comprada! Equípala con ${isTouchDevice() ? 'el botón de armas' : 'las teclas 1-4'}`;
     } else if (event.type === 'PURCHASE_SUCCESS') {
       message = '¡Compra exitosa! Está en tu inventario (E)';
     } else if (event.type === 'PICKUP_SUCCESS') {
@@ -266,6 +311,8 @@ export default function Hud() {
       message = `¡Recuperaste vida! +${healFor(event.itemId)}`;
     } else if (event.type === 'USE_REJECTED') {
       message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo usar ese objeto';
+    } else if (event.type === 'REVIVE_REJECTED') {
+      message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo revivir';
     } else if (event.type === 'MISSION_SUCCESS') {
       message = `¡Misión completada! +${REWARD_GARAVITOS} Garavitos`;
     }
@@ -331,6 +378,9 @@ export default function Hud() {
   const chargedReadyIn = me?.chargedReadyInMs ?? 0;
   const chargedPct = Math.min(100, Math.round(((CHARGED_COOLDOWN_MS - chargedReadyIn) / CHARGED_COOLDOWN_MS) * 100));
   const role = roleInfo(getMyRole());
+  const weapon = weaponById(me?.weapon);
+  const reloadingMs = me?.reloadingMs ?? 0;
+  const reloadPct = weapon.reloadMs ? Math.round((1 - reloadingMs / weapon.reloadMs) * 100) : 100;
 
   const nearDoorState = state.doors?.find((d) => d.doorId === nearDoor?.doorId);
   const nearDoorOpen = nearDoorState?.open ?? true;
@@ -372,6 +422,21 @@ export default function Hud() {
               {slot && itemIcon(slot.itemId) && <img src={itemIcon(slot.itemId)} alt={slot.itemName} className="hud-slot-icon" />}
             </div>
           ))}
+        </div>
+
+        <div className={`hud-weapon${weapon.ranged && me?.magazine === 0 ? ' hud-weapon--empty' : ''}`}>
+          {weapon.icon
+            ? <img src={weapon.icon} alt="" className="hud-weapon-icon" />
+            : <span className="hud-weapon-glyph" aria-hidden="true">{weapon.glyph}</span>}
+          <span className="hud-weapon-name">{weapon.name}</span>
+          {weapon.ranged && (
+            <span className="hud-weapon-ammo">
+              {reloadingMs > 0 ? 'Recargando…' : `${me?.magazine ?? 0}/${weapon.magazineSize}`}
+              <small> · {me?.reserveAmmo ?? 0}</small>
+            </span>
+          )}
+          {!touch && <span className="hud-weapon-keys">1-4{weapon.ranged ? ' · R' : ''}</span>}
+          {reloadingMs > 0 && <div className="hud-weapon-reload" style={{ width: `${reloadPct}%` }} />}
         </div>
       </div>
 
@@ -435,7 +500,16 @@ export default function Hud() {
         </div>
       )}
 
-      {nearDoor && (
+      {nearDowned && (
+        <div className="hud-interact-hint hud-interact-hint--revive">
+          {touch ? 'Mantén' : 'Mantén'} <strong>E</strong> — revivir a {nearDowned.name}
+          {me?.reviving === nearDowned.playerId && (
+            <div className="hud-revive-bar"><div style={{ width: `${Math.round((me.reviveProgress ?? 0) * 100)}%` }} /></div>
+          )}
+        </div>
+      )}
+
+      {nearDoor && !nearDowned && (
         <div className="hud-interact-hint">
           {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {nearDoorOpen ? 'Cerrar' : 'Abrir'} puerta
         </div>
@@ -507,7 +581,7 @@ export default function Hud() {
                         Comer +{healFor(slot.itemId)}
                       </button>
                     ) : (
-                      <span className="inventory-tag">{slot.type === 'WEAPON' ? 'Arma equipada' : 'Munición'}</span>
+                      <WeaponAction slot={slot} equipped={weapon} />
                     )}
                   </div>
                 ))}
@@ -535,7 +609,7 @@ export default function Hud() {
                     Comer +{healFor(slot.itemId)}
                   </button>
                 ) : (
-                  <span className="inventory-tag">{slot.type === 'WEAPON' ? 'Arma equipada' : 'Munición'}</span>
+                  <WeaponAction slot={slot} equipped={weapon} />
                 )}
               </div>
             ))}
@@ -564,6 +638,7 @@ export default function Hud() {
                   <img src={item.icon} alt={item.itemName} className="shop-item-icon" />
                   <span className="shop-item-name">{item.itemName}</span>
                   {item.healAmount > 0 && <span className="shop-item-heal">+{item.healAmount} vida</span>}
+                  {item.detail && <span className="shop-item-heal">{item.detail}</span>}
                   <span className="shop-item-price">{item.price} Garavitos</span>
                 </button>
               );

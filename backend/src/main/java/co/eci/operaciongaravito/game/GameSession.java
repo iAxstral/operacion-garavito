@@ -19,17 +19,28 @@ public class GameSession {
 
     private static final double ATTACK_HALF_ARC_RAD = Math.toRadians(55);
 
-    private record Melee(int damage, double range, long cooldownMs, double knockback) {
-    }
-
-    private static final Melee UNARMED = new Melee(1, 56, 700, 170);
-    private static final Melee ARMED = new Melee(2, 70, 400, 280);
-    private static final Melee CHARGED = new Melee(4, 150, 0, 520);
+    private static final int CHARGED_DAMAGE = 4;
+    private static final double CHARGED_RANGE_PX = 150;
+    private static final double CHARGED_KNOCKBACK = 520;
     private static final long CHARGED_COOLDOWN_MS = 6_000;
+
+    /** Radio con el que una bala alcanza a un zombi (centro a la linea del disparo). */
+    private static final double BULLET_HIT_RADIUS_PX = 16;
+    private static final double TOUGH_BULLET_HIT_RADIUS_PX = 20;
+    private static final double BOSS_BULLET_HIT_RADIUS_PX = 30;
+    private static final double BULLET_STEP_PX = 8;
     private static final double SEPARATION_RADIUS_PX = 26;
     private static final double SEPARATION_FORCE = 90;
 
     private static final int REVIVE_HEALTH = 100;
+
+    /** Solo Biomedica revive: a esta distancia del caido, manteniendo durante REVIVE_MS. */
+    static final String REVIVER_ROLE = "SALUD";
+    static final double REVIVE_RANGE_PX = 80;
+    /** Si se aleja mas que esto mientras revive, se corta. */
+    static final double REVIVE_BREAK_PX = 120;
+    static final long REVIVE_MS = 3_000;
+    static final int FIELD_REVIVE_HEALTH = 50;
 
     /** El cuerpo del jefe es grande: los golpes lo alcanzan desde un poco mas lejos. */
     private static final double BOSS_HIT_BONUS_PX = 24;
@@ -53,6 +64,7 @@ public class GameSession {
 
     private volatile boolean wipedRun = false;
     private volatile boolean victoryPending = false;
+    private final java.util.Queue<LastEvent> pendingEvents = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private volatile boolean started = false;
     private volatile String host;
 
@@ -166,16 +178,25 @@ public class GameSession {
     }
 
     public List<PlayerState> playerStates() {
+        long now = System.currentTimeMillis();
         return players.values().stream()
-                .map(p -> new PlayerState(p.getPlayerId(), p.getRole(), p.getHealth(), p.getGaravitos(),
-                        p.inventorySnapshot(), p.getFloor(), Math.round(p.getX()), Math.round(p.getY()),
-                        p.getLifeState(), p.isInvulnerable(), p.chargedReadyInMs(System.currentTimeMillis())))
+                .map(p -> {
+                    long reloadingMs = p.reloadingInMs(now);
+                    Weapon weapon = p.getEquipped();
+                    return new PlayerState(p.getPlayerId(), p.getRole(), p.getHealth(), p.getGaravitos(),
+                            p.inventorySnapshot(), p.getFloor(), Math.round(p.getX()), Math.round(p.getY()),
+                            p.getLifeState(), p.isInvulnerable(), p.chargedReadyInMs(now),
+                            weapon, p.magazine(weapon), p.getReserveAmmo(), reloadingMs,
+                            p.getShotSeq(), p.getShotFacing(),
+                            p.getReviveTargetId(), p.reviveProgress(now));
+                })
                 .toList();
     }
 
     public void reportPosition(String playerId, int floor, double x, double y) {
         Player player = players.get(playerId);
-        if (player != null && building.hasFloor(floor)) {
+        // Un caido se queda donde cayo: su cliente pasa a modo espectador.
+        if (player != null && player.isAlive() && building.hasFloor(floor)) {
             player.reportPosition(floor, x, y);
         }
     }
@@ -256,6 +277,7 @@ public class GameSession {
 
         zombies.values().removeIf(zombie -> !zombie.isAlive());
         updateBoss(now, deltaSeconds, targets);
+        updateRevives(now);
 
         if (waveDirector.restingSeconds(now) > 0) {
             players.values().forEach(player -> {
@@ -264,6 +286,68 @@ public class GameSession {
                 }
             });
         }
+    }
+
+    /** Termina (o corta) las reanimaciones en curso. */
+    private void updateRevives(long now) {
+        for (Player reviver : players.values()) {
+            String targetId = reviver.getReviveTargetId();
+            if (targetId == null) {
+                continue;
+            }
+            Player target = players.get(targetId);
+            boolean broken = target == null
+                    || target.isAlive()
+                    || !reviver.isAlive()
+                    || target.getFloor() != reviver.getFloor()
+                    || Math.hypot(target.getX() - reviver.getX(), target.getY() - reviver.getY()) > REVIVE_BREAK_PX
+                    || reviver.getLastDamagedAt() > reviver.getReviveStartedAt();
+            if (broken) {
+                reviver.stopRevive();
+            } else if (now >= reviver.getReviveUntil()) {
+                target.revive(FIELD_REVIVE_HEALTH);
+                reviver.stopRevive();
+                pendingEvents.add(LastEvent.revived(target.getPlayerId(), reviver.getPlayerId()));
+            }
+        }
+    }
+
+    /** Biomedica empieza a revivir a un compañero caido que tiene al lado. */
+    public PlayerActionResult attemptReviveStart(String reviverId, String targetId) {
+        Player reviver = players.get(reviverId);
+        Player target = targetId == null ? null : players.get(targetId);
+        if (reviver == null || target == null) {
+            return PlayerActionResult.rejected("unknown_player");
+        }
+        if (!REVIVER_ROLE.equals(reviver.getRole())) {
+            return PlayerActionResult.rejected("wrong_role");
+        }
+        if (!reviver.isAlive()) {
+            return PlayerActionResult.rejected("downed");
+        }
+        if (target.isAlive()) {
+            return PlayerActionResult.rejected("not_downed");
+        }
+        if (target.getFloor() != reviver.getFloor()
+                || Math.hypot(target.getX() - reviver.getX(), target.getY() - reviver.getY()) > REVIVE_RANGE_PX) {
+            return PlayerActionResult.rejected("too_far");
+        }
+        if (!targetId.equals(reviver.getReviveTargetId())) {
+            reviver.startRevive(targetId, System.currentTimeMillis(), REVIVE_MS);
+        }
+        return PlayerActionResult.ok();
+    }
+
+    public void attemptReviveCancel(String reviverId) {
+        Player reviver = players.get(reviverId);
+        if (reviver != null) {
+            reviver.stopRevive();
+        }
+    }
+
+    /** Siguiente aviso pendiente del tick (p. ej. alguien fue revivido), o null. */
+    public LastEvent pollEvent() {
+        return pendingEvents.poll();
     }
 
     /** El jefe aparece en el piso con mas jugadores vivos, lejos de ellos. */
@@ -373,66 +457,193 @@ public class GameSession {
         }
 
         long now = System.currentTimeMillis();
-        boolean charged = type == AttackType.CHARGED;
-        Melee melee;
-        if (charged) {
-            melee = CHARGED;
+        player.reportPosition(x, y);
+
+        if (type == AttackType.CHARGED) {
             if (!player.tryConsumeChargedCooldown(now, CHARGED_COOLDOWN_MS)) {
                 return AttackResult.rejected("on_cooldown");
             }
-        } else {
-            melee = player.hasWeapon() ? ARMED : UNARMED;
-            if (!player.tryConsumeAttackCooldown(now, melee.cooldownMs())) {
-                return AttackResult.rejected("on_cooldown");
-            }
+            return strikeArea(player, x, y, now);
         }
 
-        player.reportPosition(x, y);
+        Weapon weapon = player.getEquipped();
+        if (!player.tryConsumeAttackCooldown(now, weapon.cooldownMs())) {
+            return AttackResult.rejected("on_cooldown");
+        }
+        if (!weapon.ranged()) {
+            return strikeMelee(player, weapon, x, y, facing, now);
+        }
+        String misfire = player.tryFire(now, facing);
+        if (misfire != null) {
+            return AttackResult.rejected(misfire);
+        }
+        return shoot(player, weapon, x, y, facing, now);
+    }
 
+    /** Golpe cuerpo a cuerpo (puños o hacha): todos los zombis en el arco frente al jugador. */
+    private AttackResult strikeMelee(Player player, Weapon weapon, double x, double y, double facing, long now) {
         int hits = 0;
         int kills = 0;
+        int bossKills = 0;
         for (Zombie zombie : zombies.values()) {
             if (!zombie.isAlive() || zombie.getFloor() != player.getFloor()) {
                 continue;
             }
             double dx = zombie.getX() - x;
             double dy = zombie.getY() - y;
-            if (Math.hypot(dx, dy) > melee.range()) {
+            double angle = Math.atan2(dy, dx);
+            if (Math.hypot(dx, dy) > weapon.range() || Math.abs(wrapAngle(angle - facing)) > ATTACK_HALF_ARC_RAD) {
                 continue;
             }
-            double angleToZombie = Math.atan2(dy, dx);
-            if (!charged && Math.abs(wrapAngle(angleToZombie - facing)) > ATTACK_HALF_ARC_RAD) {
-                continue;
-            }
-
             hits++;
-            double knockback = melee.knockback();
-            if (zombie.hit(melee.damage(), Math.cos(angleToZombie) * knockback, Math.sin(angleToZombie) * knockback, now)) {
+            if (zombie.hit(weapon.damage(), Math.cos(angle) * weapon.knockback(), Math.sin(angle) * weapon.knockback(), now)) {
                 kills++;
             }
         }
-
-        if (kills > 0) {
-            player.addGaravitos(kills * GARAVITOS_PER_ZOMBIE);
-            waveDirector.onZombiesKilled(kills);
-        }
-
         BossZombie target = boss;
         if (target != null && target.isAlive() && target.getFloor() == player.getFloor()) {
             double dx = target.getX() - x;
             double dy = target.getY() - y;
-            double angle = Math.atan2(dy, dx);
-            boolean inRange = Math.hypot(dx, dy) <= melee.range() + BOSS_HIT_BONUS_PX;
-            if (inRange && (charged || Math.abs(wrapAngle(angle - facing)) <= ATTACK_HALF_ARC_RAD)) {
+            boolean inRange = Math.hypot(dx, dy) <= weapon.range() + BOSS_HIT_BONUS_PX;
+            if (inRange && Math.abs(wrapAngle(Math.atan2(dy, dx) - facing)) <= ATTACK_HALF_ARC_RAD) {
                 hits++;
-                if (target.hit(melee.damage(), charged, now)) {
-                    kills++;
-                    player.addGaravitos(BOSS_REWARD_GARAVITOS);
-                    waveDirector.onBossDefeated(now);
-                }
+                bossKills += hitBoss(player, target, weapon.damage(), false, now);
             }
         }
-        return AttackResult.ok(hits, kills);
+        return payKills(player, hits, kills, bossKills);
+    }
+
+    /** Ataque cargado: pega a todo lo que este alrededor, sin importar hacia donde mira. */
+    private AttackResult strikeArea(Player player, double x, double y, long now) {
+        int hits = 0;
+        int kills = 0;
+        int bossKills = 0;
+        for (Zombie zombie : zombies.values()) {
+            if (!zombie.isAlive() || zombie.getFloor() != player.getFloor()) {
+                continue;
+            }
+            double dx = zombie.getX() - x;
+            double dy = zombie.getY() - y;
+            if (Math.hypot(dx, dy) > CHARGED_RANGE_PX) {
+                continue;
+            }
+            hits++;
+            double angle = Math.atan2(dy, dx);
+            if (zombie.hit(CHARGED_DAMAGE, Math.cos(angle) * CHARGED_KNOCKBACK, Math.sin(angle) * CHARGED_KNOCKBACK, now)) {
+                kills++;
+            }
+        }
+        BossZombie target = boss;
+        if (target != null && target.isAlive() && target.getFloor() == player.getFloor()
+                && Math.hypot(target.getX() - x, target.getY() - y) <= CHARGED_RANGE_PX + BOSS_HIT_BONUS_PX) {
+            hits++;
+            bossKills += hitBoss(player, target, CHARGED_DAMAGE, true, now);
+        }
+        return payKills(player, hits, kills, bossKills);
+    }
+
+    /**
+     * Disparo: un rayo desde el jugador hacia {@code facing} que se corta en la primera
+     * pared o puerta cerrada. Alcanza a los zombis mas cercanos sobre la linea, hasta
+     * los que el arma puede atravesar.
+     */
+    private AttackResult shoot(Player player, Weapon weapon, double x, double y, double facing, long now) {
+        FloorGrid grid = floorGrid(player.getFloor());
+        double dirX = Math.cos(facing);
+        double dirY = Math.sin(facing);
+        double reach = 0;
+        while (reach < weapon.range() && grid.isWalkable(x + dirX * (reach + BULLET_STEP_PX), y + dirY * (reach + BULLET_STEP_PX))) {
+            reach += BULLET_STEP_PX;
+        }
+        final double maxReach = reach;
+
+        record Target(Zombie zombie, double along) {
+        }
+        List<Target> inLine = new java.util.ArrayList<>();
+        for (Zombie zombie : zombies.values()) {
+            if (!zombie.isAlive() || zombie.getFloor() != player.getFloor()) {
+                continue;
+            }
+            double along = alongRay(zombie.getX() - x, zombie.getY() - y, dirX, dirY,
+                    zombie.isTough() ? TOUGH_BULLET_HIT_RADIUS_PX : BULLET_HIT_RADIUS_PX, maxReach);
+            if (along >= 0) {
+                inLine.add(new Target(zombie, along));
+            }
+        }
+        inLine.sort(java.util.Comparator.comparingDouble(Target::along));
+
+        int hits = 0;
+        int kills = 0;
+        int bossKills = 0;
+        double knockback = weapon.knockback();
+        for (Target target : inLine.subList(0, Math.min(weapon.pierce(), inLine.size()))) {
+            hits++;
+            if (target.zombie().hit(weapon.damage(), dirX * knockback, dirY * knockback, now)) {
+                kills++;
+            }
+        }
+
+        BossZombie bossTarget = boss;
+        if (hits < weapon.pierce() && bossTarget != null && bossTarget.isAlive()
+                && bossTarget.getFloor() == player.getFloor()
+                && alongRay(bossTarget.getX() - x, bossTarget.getY() - y, dirX, dirY,
+                        BOSS_BULLET_HIT_RADIUS_PX, maxReach) >= 0) {
+            hits++;
+            bossKills += hitBoss(player, bossTarget, weapon.damage(), false, now);
+        }
+        return payKills(player, hits, kills, bossKills);
+    }
+
+    /** Distancia sobre el rayo hasta el punto (dx, dy) si lo toca dentro del radio, o -1. */
+    private static double alongRay(double dx, double dy, double dirX, double dirY, double radius, double maxReach) {
+        double along = dx * dirX + dy * dirY;
+        if (along < 0 || along > maxReach + radius) {
+            return -1;
+        }
+        double perpendicular = Math.abs(dx * dirY - dy * dirX);
+        return perpendicular <= radius ? along : -1;
+    }
+
+    private int hitBoss(Player player, BossZombie target, int damage, boolean charged, long now) {
+        if (!target.hit(damage, charged, now)) {
+            return 0;
+        }
+        player.addGaravitos(BOSS_REWARD_GARAVITOS);
+        waveDirector.onBossDefeated(now);
+        return 1;
+    }
+
+    /** Paga los zombis comunes muertos (el jefe ya se pago en {@link #hitBoss}). */
+    private AttackResult payKills(Player player, int hits, int zombieKills, int bossKills) {
+        if (zombieKills > 0) {
+            player.addGaravitos(zombieKills * GARAVITOS_PER_ZOMBIE);
+            waveDirector.onZombiesKilled(zombieKills);
+        }
+        return AttackResult.ok(hits, zombieKills + bossKills);
+    }
+
+    public PlayerActionResult attemptEquip(String playerId, String itemId) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return PlayerActionResult.rejected("unknown_player");
+        }
+        Weapon weapon = itemId == null || itemId.isBlank() ? Weapon.FISTS : Weapon.fromItemId(itemId);
+        if (weapon == null || !player.equip(weapon)) {
+            return PlayerActionResult.rejected("not_owned");
+        }
+        return PlayerActionResult.ok();
+    }
+
+    public PlayerActionResult attemptReload(String playerId) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return PlayerActionResult.rejected("unknown_player");
+        }
+        if (!player.isAlive()) {
+            return PlayerActionResult.rejected("downed");
+        }
+        String reason = player.startReload(System.currentTimeMillis());
+        return reason == null ? PlayerActionResult.ok() : PlayerActionResult.rejected(reason);
     }
 
     public UseItemResult attemptUseItem(String playerId, String itemId) {
@@ -600,5 +811,6 @@ public class GameSession {
         players.values().forEach(Player::reset);
         wipedRun = false;
         victoryPending = false;
+        pendingEvents.clear();
     }
 }

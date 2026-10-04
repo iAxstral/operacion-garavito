@@ -36,6 +36,7 @@ class GameSessionZombieTest {
 
     private void armPlayer() {
         player.tryAddItem(new InventorySlot(ItemType.WEAPON, "shop-hacha", "Hacha"));
+        assertTrue(session.attemptEquip("SEGURIDAD", "shop-hacha").success());
     }
 
     private void tickUntilZombies() {
@@ -142,11 +143,11 @@ class GameSessionZombieTest {
     }
 
     @Test
-    @DisplayName("el hacha cuesta lo que paga una mision de rol")
-    void axeCostsExactlyOneMissionReward() {
-        ShopItem axe = ShopCatalog.itemById("shop-hacha");
-        assertEquals(MissionCatalog.REWARD_GARAVITOS, axe.price());
-        assertEquals(ItemType.WEAPON, axe.type());
+    @DisplayName("una mision alcanza para el hacha, pero el rifle exige ahorrar")
+    void weaponPricesForceChoices() {
+        assertTrue(ShopCatalog.itemById("shop-hacha").price() <= MissionCatalog.REWARD_GARAVITOS);
+        assertTrue(ShopCatalog.itemById("shop-rifle").price() > 2 * MissionCatalog.REWARD_GARAVITOS);
+        assertEquals(ItemType.AMMO, ShopCatalog.itemById("shop-municion").type());
     }
 
     @Test

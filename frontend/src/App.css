@@ -2000,3 +2000,268 @@ body {
     align-items: flex-start;
   }
 }
+
+/* ---------- Armas ---------- */
+
+.hud-weapon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  padding: 3px 10px 3px 6px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+}
+
+.hud-weapon--empty {
+  border-color: #e05a5a;
+  animation: connection-blink 0.9s ease-in-out infinite;
+}
+
+.hud-weapon-icon {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.hud-weapon-glyph {
+  width: 26px;
+  text-align: center;
+  font-size: 18px;
+}
+
+.hud-weapon-name {
+  font-weight: bold;
+}
+
+.hud-weapon-ammo {
+  font-family: monospace;
+  font-size: 14px;
+  color: #e8c34a;
+}
+
+.hud-weapon-ammo small {
+  font-size: 11px;
+  color: #cfd8cf;
+}
+
+.hud-weapon-keys {
+  font-size: 11px;
+  opacity: 0.6;
+}
+
+.hud-weapon-reload {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  background: #e8c34a;
+}
+
+.inventory-use--secondary {
+  color: #f2fbe2;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.touch-btn--weapon {
+  right: calc(var(--touch-attack) + var(--touch-btn) + 18px);
+  bottom: 0;
+  width: calc(var(--touch-btn) * 0.82);
+  height: calc(var(--touch-btn) * 0.82);
+}
+
+.touch-btn--weapon img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.touch-btn--reload {
+  right: 0;
+  bottom: calc(var(--touch-attack) + var(--touch-btn) + 18px);
+  width: calc(var(--touch-btn) * 0.82);
+  height: calc(var(--touch-btn) * 0.82);
+  color: #e8c34a;
+}
+
+@media (max-width: 640px), (max-height: 500px) {
+  .hud-weapon {
+    font-size: 11px;
+    padding: 2px 8px 2px 4px;
+  }
+
+  .hud-weapon-icon,
+  .hud-weapon-glyph {
+    width: 20px;
+    height: 20px;
+    font-size: 14px;
+  }
+
+  .hud-weapon-ammo {
+    font-size: 12px;
+  }
+}
+
+/* ---------- Caido / espectador / revivir ---------- */
+
+.spectator {
+  position: absolute;
+  inset: 0;
+  z-index: 18;
+  pointer-events: none;
+  font-family: sans-serif;
+  color: #fff;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 45%, rgba(60, 0, 0, 0.55) 100%);
+}
+
+.spectator-banner {
+  position: absolute;
+  top: calc(18% + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: max-content;
+  max-width: calc(100vw - 32px);
+  padding: 10px 20px;
+  text-align: center;
+  background: rgba(40, 8, 8, 0.85);
+  border: 1px solid rgba(255, 140, 140, 0.5);
+  border-radius: 10px;
+}
+
+.spectator-banner strong {
+  font-size: 20px;
+  letter-spacing: 1px;
+  color: #ff8a8a;
+}
+
+.spectator-banner span {
+  font-size: 13px;
+  opacity: 0.9;
+}
+
+.spectator-picker {
+  position: absolute;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  pointer-events: auto;
+}
+
+.spectator-current {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+}
+
+.spectator-label {
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.spectator-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.spectator-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  color: #f2fbe2;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.spectator-chip--active {
+  color: #0b120b;
+  background: #86a86a;
+  border-color: #86a86a;
+  font-weight: bold;
+}
+
+.spectator-chip-hp {
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.spectator-arrow {
+  width: 48px;
+  height: 48px;
+  font-size: 18px;
+  color: #f2fbe2;
+  background: rgba(0, 0, 0, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.spectator-arrow:hover,
+.spectator-chip:hover {
+  border-color: #e8c34a;
+}
+
+.hud-interact-hint--revive {
+  border-color: #9bf0b8;
+}
+
+.hud-interact-hint--revive strong {
+  color: #9bf0b8;
+}
+
+.hud-revive-bar {
+  height: 4px;
+  margin-top: 5px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.hud-revive-bar div {
+  height: 100%;
+  background: #9bf0b8;
+}
+
+@media (max-width: 640px), (max-height: 500px) {
+  .spectator-banner strong {
+    font-size: 16px;
+  }
+
+  .spectator-banner {
+    top: calc(64px + env(safe-area-inset-top));
+    padding: 8px 14px;
+  }
+
+  .spectator-arrow {
+    width: 42px;
+    height: 42px;
+  }
+}

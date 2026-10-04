@@ -17,6 +17,14 @@ import {
   reportPosition,
   requestAttack,
   requestPickup,
+  requestEquip,
+  requestReload,
+  requestReviveStart,
+  requestReviveCancel,
+  setNearDowned,
+  getSpectateTarget,
+  setSpectateTarget,
+  spectatableTeammates,
   setNearVendor,
   setNearMission,
   setNearDoor,
@@ -25,6 +33,8 @@ import {
   requestMissionComplete,
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
+import WeaponLayer from './WeaponLayer';
+import { ownedWeapons, weaponById } from './weaponCatalog';
 import { channelVolume, getSettings, vibrate } from './settings';
 import { playSfx } from './sfx';
 import BossLayer, { preloadBoss } from './BossLayer';
@@ -36,6 +46,19 @@ const DASH_MS = 180;
 const DASH_COOLDOWN_MS = 1200;
 
 const ATTACK_REQUEST_MS = 400;
+const LOCAL_HOLDER = '__me';
+// Con el mouse quieto este tiempo se vuelve a apuntar hacia donde camina.
+const MOUSE_AIM_MS = 2500;
+// Asistencia de apuntado (teclado y celular): el zombi mas cercano dentro de este cono.
+const AIM_ASSIST_RAD = Math.PI / 4;
+const SHOT_STEP_PX = 8;
+const SHOT_RADIUS = { normal: 16, tough: 20, boss: 30 };
+const EMPTY_CLICK_MS = 300;
+const WEAPON_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR'];
+const AIM_DIRECTIONS = ['right', 'down', 'left', 'up'];
+// Debe coincidir con GameSession.REVIVE_RANGE_PX / REVIVER_ROLE.
+const REVIVE_RANGE_PX = 80;
+const REVIVER_ROLE = 'SALUD';
 const CHARGED_COOLDOWN_MS = 6000;
 const CHARGED_RADIUS = 150;
 const FLOOR_FADE_MS = 180;
@@ -160,6 +183,9 @@ export default class MainScene extends Phaser.Scene {
     this.remotePlayers = new Map();
     this.floor = data?.floor ?? 1;
     this.spawnOverride = data?.spawn ?? null;
+    // Caido y mirando a un compañero: la escena muestra el piso de ese compañero.
+    this.spectating = Boolean(data?.spectating);
+    this.reviving = null;
     this.changingFloor = false;
     this.spritePrefix = roleInfo(getMyRole()).spritePrefix;
   }
@@ -249,7 +275,9 @@ export default class MainScene extends Phaser.Scene {
 
     const amount = previous - me.health;
     this.player.setTint(0xff4040);
-    this.time.delayedCall(140, () => this.player?.clearTint());
+    this.time.delayedCall(140, () => {
+      if (!this.spectating) this.player?.clearTint();
+    });
     if (getSettings().screenShake) this.cameras.main.shake(140, 0.006);
     playSfx('hurt');
     vibrate(amount >= 7 ? [70, 40, 70] : 60);
@@ -341,6 +369,17 @@ export default class MainScene extends Phaser.Scene {
     this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.input.keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.Q, Phaser.Input.Keyboard.KeyCodes.C]);
     this.input.mouse?.disableContextMenu();
+    this.weaponLayer = new WeaponLayer(this, { onDraw: () => playSfx('draw') });
+    this.weaponKeys = WEAPON_KEYS.map((name) => this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes[name]));
+    this.reloadKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+    this.aimAngle = this.facingAngle;
+    this.mouseAimAt = -Infinity;
+    this.weaponSynced = false;
+    this.wasReloading = false;
+    this.nextEmptyClickAt = 0;
+    this.input.on('pointermove', (pointer) => {
+      if (!pointer.wasTouch) this.mouseAimAt = this.time.now;
+    });
     this.zombieLayer = new ZombieLayer(this, {
       hooks: this.zombieHooks(),
       findTarget: (x, y) => this.nearestPlayerTo(x, y),
@@ -359,11 +398,19 @@ export default class MainScene extends Phaser.Scene {
     this.createFoodItems();
     this.createVendors();
     this.createMissionZones();
-    changeFloor(this.floor, Math.round(spawn.x), Math.round(spawn.y));
+    if (this.spectating) {
+      this.enterSpectate();
+    } else {
+      changeFloor(this.floor, Math.round(spawn.x), Math.round(spawn.y));
+    }
+    this.reviveGfx = this.add.graphics().setDepth(5500);
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
     this.events.once('shutdown', () => {
       this.scale.off('resize', this.applyCameraZoom, this);
+      this.weaponLayer?.destroy();
+      if (this.reviving) requestReviveCancel();
+      setNearDowned(null);
       this.unsubscribeGameState?.();
       this.lighting?.destroy();
       setNearVendor(null);
@@ -489,7 +536,7 @@ export default class MainScene extends Phaser.Scene {
           })
           .setOrigin(0.5, 1)
           .setDepth(11);
-        entry = { sprite, label, prefix };
+        entry = { sprite, label, prefix, aim: Math.PI / 2, shotSeq: state.shotSeq ?? 0, weaponSeen: false };
         this.remotePlayers.set(state.playerId, entry);
       }
 
@@ -498,18 +545,42 @@ export default class MainScene extends Phaser.Scene {
       if (Math.hypot(dx, dy) > 3) {
         const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
         entry.sprite.setTexture(`${entry.prefix}_${direction}`);
+        entry.aim = Math.atan2(dy, dx);
+      }
+      if ((state.shotSeq ?? 0) > entry.shotSeq) {
+        // Un compañero disparo: se dibuja su bala con la direccion que reporto el servidor.
+        entry.shotSeq = state.shotSeq;
+        entry.aim = state.shotFacing;
+        const weapon = weaponById(state.weapon);
+        const end = this.traceShot(entry.sprite.x, entry.sprite.y, state.shotFacing, weapon);
+        this.weaponLayer.fire(state.playerId, end, { heavy: weapon.id === 'RIFLE' });
+        playSfx(weapon.id === 'RIFLE' ? 'rifle' : 'pistol', 0.7 * this.hearing(entry.sprite.x, entry.sprite.y));
       }
       const blend = Math.min(1, (delta / 1000) * REMOTE_LERP_PER_SECOND);
       entry.sprite.x += dx * blend;
       entry.sprite.y += dy * blend;
-      entry.sprite.setAlpha(state.lifeState === 'DOWNED' ? 0.4 : 1);
+      const downed = state.lifeState === 'DOWNED';
+      entry.sprite.setAlpha(downed ? 0.75 : 1).setAngle(downed ? 90 : 0);
+      if (downed) entry.sprite.setTint(0x9a9a9a);
+      else entry.sprite.clearTint();
+      entry.downed = downed;
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
+      this.weaponLayer.update(state.playerId, {
+        x: entry.sprite.x,
+        y: entry.sprite.y,
+        aim: entry.aim,
+        depth: entry.sprite.depth,
+        weaponId: state.lifeState === 'DOWNED' ? 'FISTS' : (state.weapon ?? 'FISTS'),
+        silent: !entry.weaponSeen,
+      });
+      entry.weaponSeen = true;
     });
 
     this.remotePlayers.forEach((entry, id) => {
       if (seen.has(id)) return;
       entry.sprite.destroy();
       entry.label.destroy();
+      this.weaponLayer.remove(id);
       this.remotePlayers.delete(id);
     });
   }
@@ -524,8 +595,11 @@ export default class MainScene extends Phaser.Scene {
   update(time, delta) {
     if (!this.player) return;
     this.syncRemotePlayers(delta);
-    this.lighting.update(time, this.player, this.remotePlayers);
+    this.lighting.update(time, this.focusSprite(), this.remotePlayers);
     this.checkDamageTaken();
+    this.drawReviveProgress();
+    if (this.updateSpectate(delta)) return;
+    this.updateRevive();
 
     if (isInputLocked()) {
       this.player.setVelocity(0, 0);
@@ -578,12 +652,20 @@ export default class MainScene extends Phaser.Scene {
     }
 
     reportPosition(Math.round(this.player.x), Math.round(this.player.y), time);
+    this.updateAim(time);
+    this.updateWeaponSelection();
     this.updateAttack(time);
     this.zombieLayer.sync(this.zombiesOnFloor());
     this.zombieLayer.update(delta);
     this.syncBoss(delta);
 
+    if (time - this.mouseAimAt < MOUSE_AIM_MS) {
+      // Con el mouse el personaje mira hacia donde apunta.
+      const quarter = Math.round(Phaser.Math.Angle.Wrap(this.aimAngle) / (Math.PI / 2));
+      this.currentDirection = AIM_DIRECTIONS[(quarter + 4) % 4];
+    }
     this.player.setTexture(this.roleTexture(this.currentDirection));
+    this.syncLocalWeapon();
     if (direction) {
       this.walkWobblePhaseMs += delta;
       const wobble = Math.sin((this.walkWobblePhaseMs / 1000) * WALK_WOBBLE_HZ * Math.PI * 2);
@@ -603,6 +685,245 @@ export default class MainScene extends Phaser.Scene {
     this.updateRain(time);
   }
 
+  // Lo que ilumina la luz "del jugador": el compañero que se mira si esta caido.
+  focusSprite() {
+    if (!this.spectating) return this.player;
+    return this.remotePlayers.get(getSpectateTarget())?.sprite ?? this.player;
+  }
+
+  enterSpectate() {
+    this.spectating = true;
+    this.player.setVelocity(0, 0);
+    if (this.reviving) {
+      requestReviveCancel();
+      this.reviving = null;
+    }
+    setNearDowned(null);
+    const me = getMyPlayerState();
+    // El cuerpo propio queda tirado donde cayo, si es este piso.
+    if (me && me.floor === this.floor) {
+      this.player.setPosition(me.x, me.y).setAngle(90).setTint(0x9a9a9a).setVisible(true);
+    } else {
+      this.player.setVisible(false);
+    }
+    this.player.body.enable = false;
+    this.cameras.main.stopFollow();
+  }
+
+  exitSpectate(me) {
+    if (me.floor !== this.floor) {
+      this.scene.restart({ floor: me.floor, spawn: { x: me.x, y: me.y } });
+      return;
+    }
+    this.spectating = false;
+    this.player.body.enable = true;
+    this.player.setPosition(me.x, me.y).setAngle(0).clearTint().setVisible(true);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.lastHealth = me.health;
+    setSpectateTarget(null);
+  }
+
+  /**
+   * Caido: la camara sigue al compañero elegido (si esta en otro piso, la escena se
+   * recarga en ese piso sin mover al jugador). Devuelve true mientras dura.
+   */
+  updateSpectate(delta) {
+    const me = getMyPlayerState();
+    if (!me) return false;
+    const downed = me.lifeState === 'DOWNED';
+    if (!downed) {
+      if (this.spectating) this.exitSpectate(me);
+      return this.spectating;
+    }
+    if (!this.spectating) this.enterSpectate();
+
+    const teammates = spectatableTeammates();
+    let target = teammates.find((p) => p.playerId === getSpectateTarget());
+    if (!target && teammates.length > 0) {
+      target = teammates[0];
+      setSpectateTarget(target.playerId);
+    }
+    if (target && target.floor !== this.floor && !this.changingFloor) {
+      this.changingFloor = true;
+      this.cameras.main.fadeOut(FLOOR_FADE_MS);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.restart({ floor: target.floor, spawn: { x: target.x, y: target.y }, spectating: true });
+      });
+    } else if (target) {
+      const sprite = this.remotePlayers.get(target.playerId)?.sprite;
+      const camera = this.cameras.main;
+      const goal = sprite ?? target;
+      const blend = Math.min(1, (delta / 1000) * 6);
+      camera.centerOn(
+        camera.midPoint.x + (goal.x - camera.midPoint.x) * blend,
+        camera.midPoint.y + (goal.y - camera.midPoint.y) * blend,
+      );
+    }
+
+    this.zombieLayer.sync(this.zombiesOnFloor());
+    this.zombieLayer.update(delta);
+    this.syncBoss(delta);
+    this.updateRain(this.time.now);
+    return true;
+  }
+
+  // Biomedica: mantener E al lado de un compañero caido lo revive (lo decide el servidor).
+  updateRevive() {
+    const me = getMyPlayerState();
+    if (!me || me.role !== REVIVER_ROLE || me.lifeState === 'DOWNED') {
+      setNearDowned(null);
+      return;
+    }
+    let near = null;
+    let best = REVIVE_RANGE_PX;
+    getLatestState().players.forEach((p) => {
+      if (p.playerId === me.playerId || p.lifeState !== 'DOWNED' || p.floor !== this.floor) return;
+      const distance = Math.hypot(p.x - this.player.x, p.y - this.player.y);
+      if (distance <= best) {
+        best = distance;
+        near = { playerId: p.playerId, role: p.role, name: roleInfo(p.role).name };
+      }
+    });
+    setNearDowned(near);
+
+    const holding = this.interactKey.isDown && near && !isInputLocked();
+    if (holding && this.reviving !== near.playerId) {
+      this.reviving = near.playerId;
+      requestReviveStart(near.playerId);
+    } else if (!holding && this.reviving) {
+      this.reviving = null;
+      requestReviveCancel();
+    }
+  }
+
+  // Anillo de progreso sobre cada caido que esta siendo revivido.
+  drawReviveProgress() {
+    const gfx = this.reviveGfx;
+    if (!gfx) return;
+    gfx.clear();
+    const players = getLatestState().players;
+    players.forEach((reviver) => {
+      if (!reviver.reviving || reviver.reviveProgress <= 0) return;
+      const target = players.find((p) => p.playerId === reviver.reviving);
+      if (!target || target.floor !== this.floor) return;
+      const body = target.playerId === getMyRole() ? this.player : this.remotePlayers.get(target.playerId)?.sprite;
+      const x = body?.x ?? target.x;
+      const y = (body?.y ?? target.y) - 46;
+      gfx.fillStyle(0x000000, 0.55).fillCircle(x, y, 17);
+      gfx.lineStyle(5, 0x9bf0b8, 1);
+      gfx.beginPath();
+      gfx.arc(x, y, 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * reviver.reviveProgress);
+      gfx.strokePath();
+      gfx.fillStyle(0x9bf0b8, 1).fillRect(x - 2, y - 7, 4, 14).fillRect(x - 7, y - 2, 14, 4);
+    });
+  }
+
+  myWeapon() {
+    const me = getMyPlayerState();
+    return { me, weapon: weaponById(me?.weapon) };
+  }
+
+  // Apunta al mouse si se esta usando; si no, hacia donde camina, corrigiendo hacia el
+  // zombi mas cercano dentro de un cono (en celular no hay como apuntar fino).
+  updateAim(time) {
+    if (time - this.mouseAimAt < MOUSE_AIM_MS) {
+      const pointer = this.input.activePointer;
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      this.aimAngle = Math.atan2(world.y - this.player.y, world.x - this.player.x);
+      return;
+    }
+    const { weapon } = this.myWeapon();
+    const reach = weapon.ranged ? weapon.range : weapon.range + 40;
+    let best = null;
+    const targets = [...this.zombiesOnFloor()];
+    const boss = getBoss();
+    if (boss && boss.floor === this.floor) targets.push(boss);
+    targets.forEach((target) => {
+      const distance = Math.hypot(target.x - this.player.x, target.y - this.player.y);
+      if (distance > reach) return;
+      const angle = Math.atan2(target.y - this.player.y, target.x - this.player.x);
+      if (Math.abs(Phaser.Math.Angle.Wrap(angle - this.facingAngle)) > AIM_ASSIST_RAD) return;
+      if (!best || distance < best.distance) best = { distance, angle };
+    });
+    this.aimAngle = best ? best.angle : this.facingAngle;
+  }
+
+  // Teclas 1-4 (puños + armas del inventario en orden), boton de cambiar en celular y R para recargar.
+  updateWeaponSelection() {
+    const { me, weapon } = this.myWeapon();
+    if (!me) return;
+    const owned = ownedWeapons(me.inventory);
+    let wanted = null;
+    this.weaponKeys.forEach((key, index) => {
+      if (Phaser.Input.Keyboard.JustDown(key) && owned[index]) wanted = owned[index];
+    });
+    if (touchInput.cycleWeapon) {
+      touchInput.cycleWeapon = false;
+      const index = owned.findIndex((entry) => entry.id === weapon.id);
+      wanted = owned[(index + 1) % owned.length];
+    }
+    if (wanted && wanted.id !== weapon.id) requestEquip(wanted.itemId);
+
+    const wantsReload = Phaser.Input.Keyboard.JustDown(this.reloadKey) || touchInput.reload;
+    touchInput.reload = false;
+    if (wantsReload && weapon.ranged && me.reloadingMs === 0 && me.magazine < weapon.magazineSize && me.reserveAmmo > 0) {
+      requestReload();
+    }
+
+    const reloading = me.reloadingMs > 0;
+    if (reloading && !this.wasReloading) {
+      this.weaponLayer.reload(LOCAL_HOLDER, me.reloadingMs);
+      playSfx('reload');
+    }
+    this.wasReloading = reloading;
+  }
+
+  syncLocalWeapon() {
+    const me = getMyPlayerState();
+    this.weaponLayer.update(LOCAL_HOLDER, {
+      x: this.player.x,
+      y: this.player.y,
+      aim: this.aimAngle,
+      depth: this.player.depth,
+      weaponId: me && me.lifeState !== 'DOWNED' ? (me.weapon ?? 'FISTS') : 'FISTS',
+      // Al cambiar de piso la escena se recrea: no se repite la animacion de sacar el arma.
+      silent: !this.weaponSynced,
+    });
+    this.weaponSynced = Boolean(me);
+  }
+
+  isOpenAt(x, y) {
+    const cell = this.layoutGrid?.[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
+    if (!cell || SOLID_GRID_TYPES.has(cell.type)) return false;
+    const col = Math.floor(x / TILE);
+    const row = Math.floor(y / TILE);
+    return !this.doors.some((door) => !door.open && door.col === col && door.row === row);
+  }
+
+  // Mismo calculo que GameSession.shoot en el servidor, solo para dibujar hasta donde llega la bala.
+  traceShot(x, y, angle, weapon) {
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+    let reach = 0;
+    while (reach < weapon.range && this.isOpenAt(x + dirX * (reach + SHOT_STEP_PX), y + dirY * (reach + SHOT_STEP_PX))) {
+      reach += SHOT_STEP_PX;
+    }
+    const hits = [];
+    const consider = (target, radius) => {
+      const dx = target.x - x;
+      const dy = target.y - y;
+      const along = dx * dirX + dy * dirY;
+      if (along < 0 || along > reach + radius) return;
+      if (Math.abs(dx * dirY - dy * dirX) <= radius) hits.push(along);
+    };
+    this.zombiesOnFloor().forEach((zombie) => consider(zombie, zombie.tough ? SHOT_RADIUS.tough : SHOT_RADIUS.normal));
+    const boss = getBoss();
+    if (boss && boss.floor === this.floor) consider(boss, SHOT_RADIUS.boss);
+    hits.sort((a, b) => a - b);
+    const end = hits.length >= weapon.pierce ? hits[weapon.pierce - 1] : reach;
+    return { x: x + dirX * end, y: y + dirY * end };
+  }
+
   updateAttack(time) {
     const wants = this.attackKey.isDown
       || this.attackAltKey.isDown
@@ -610,9 +931,33 @@ export default class MainScene extends Phaser.Scene {
       || (!this.input.activePointer.wasTouch && this.input.activePointer.leftButtonDown());
     if (!wants || time < this.nextAttackAt) return;
 
-    this.nextAttackAt = time + ATTACK_REQUEST_MS;
-    requestAttack('BASIC', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
-    this.drawSwing(this.facingAngle);
+    const { me, weapon } = this.myWeapon();
+    const x = Math.round(this.player.x);
+    const y = Math.round(this.player.y);
+    if (weapon.ranged) {
+      if (!me || me.reloadingMs > 0) return;
+      if (me.magazine <= 0) {
+        // Gatillo en seco: el servidor empieza a recargar solo si hay balas de reserva.
+        if (time >= this.nextEmptyClickAt) {
+          this.nextEmptyClickAt = time + EMPTY_CLICK_MS;
+          playSfx('empty');
+          requestAttack('BASIC', x, y, this.aimAngle);
+        }
+        return;
+      }
+      this.nextAttackAt = time + weapon.cooldownMs;
+      requestAttack('BASIC', x, y, this.aimAngle);
+      const heavy = weapon.id === 'RIFLE';
+      this.weaponLayer.fire(LOCAL_HOLDER, this.traceShot(this.player.x, this.player.y, this.aimAngle, weapon), { heavy });
+      playSfx(heavy ? 'rifle' : 'pistol');
+      if (heavy && getSettings().screenShake) this.cameras.main.shake(90, 0.003);
+      return;
+    }
+
+    this.nextAttackAt = time + Math.max(ATTACK_REQUEST_MS, weapon.cooldownMs);
+    requestAttack('BASIC', x, y, this.aimAngle);
+    this.drawSwing(this.aimAngle, weapon.range);
+    this.weaponLayer.swing(LOCAL_HOLDER);
     playSfx('swing');
   }
 
@@ -622,7 +967,7 @@ export default class MainScene extends Phaser.Scene {
     if (!pressed || time < this.chargedReadyAt) return;
 
     this.chargedReadyAt = time + CHARGED_COOLDOWN_MS;
-    requestAttack('CHARGED', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
+    requestAttack('CHARGED', Math.round(this.player.x), Math.round(this.player.y), this.aimAngle);
     this.drawShockwave();
     playSfx('charged');
   }
@@ -648,11 +993,11 @@ export default class MainScene extends Phaser.Scene {
     if (getSettings().screenShake) this.cameras.main.shake(160, 0.004);
   }
 
-  drawSwing(facing) {
+  drawSwing(facing, radius = 62) {
     const arc = this.add.graphics();
     arc.setDepth(this.player.y + 1);
     arc.fillStyle(0xfff2c4, 0.45);
-    arc.slice(this.player.x, this.player.y, 62, facing - Math.PI / 4, facing + Math.PI / 4);
+    arc.slice(this.player.x, this.player.y, radius, facing - Math.PI / 4, facing + Math.PI / 4);
     arc.fillPath();
     this.tweens.add({ targets: arc, alpha: 0, duration: 160, onComplete: () => arc.destroy() });
   }
@@ -746,7 +1091,7 @@ export default class MainScene extends Phaser.Scene {
     setNearStairs(active ? { kind: active.kind } : null);
 
     const pressed = Phaser.Input.Keyboard.JustDown(this.interactKey);
-    if (pressed && active && !this.changingFloor) {
+    if (pressed && active && !this.changingFloor && !this.reviving) {
       this.travel(active.kind);
     }
   }
@@ -771,6 +1116,7 @@ export default class MainScene extends Phaser.Scene {
     this.stairsZones = [];
     this.doors = [];
 
+    this.layoutGrid = layout.grid;
     this.lighting = new Lighting(this);
     renderOutside(this, layout.grid, this.lighting, getMyBuilding());
     this.renderGridTiles(layout.grid);
@@ -981,7 +1327,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.solids.add(image);
         image.body.enable = false;
-        this.doors.push({ image, x: cx, y: cy, open: true, doorId: deco.doorId });
+        this.doors.push({ image, x: cx, y: cy, open: true, doorId: deco.doorId, col: deco.x, row: deco.y });
       }
     });
   }

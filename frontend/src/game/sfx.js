@@ -89,6 +89,36 @@ const SOUNDS = {
       noise(ctx, { gain: 0.25 * v, decay: 0.12, filter: 'lowpass', freq: 700 });
     },
   },
+  // Armas
+  draw: {
+    channel: 'combat',
+    play: (ctx, v) => {
+      noise(ctx, { gain: 0.25 * v, attack: 0.02, decay: 0.12, filter: 'highpass', freq: 2500, freqTo: 6000, q: 0.6 });
+      tone(ctx, { type: 'triangle', from: 500, to: 1100, gain: 0.12 * v, decay: 0.1 });
+    },
+  },
+  pistol: {
+    channel: 'combat',
+    play: (ctx, v) => {
+      noise(ctx, { gain: 0.5 * v, attack: 0.001, decay: 0.09, filter: 'lowpass', freq: 3500, freqTo: 600 });
+      tone(ctx, { type: 'square', from: 170, to: 55, gain: 0.25 * v, attack: 0.001, decay: 0.07 });
+    },
+  },
+  rifle: {
+    channel: 'combat',
+    play: (ctx, v) => {
+      noise(ctx, { gain: 0.6 * v, attack: 0.001, decay: 0.22, filter: 'lowpass', freq: 2600, freqTo: 250 });
+      tone(ctx, { type: 'sawtooth', from: 120, to: 38, gain: 0.32 * v, attack: 0.001, decay: 0.24 });
+    },
+  },
+  empty: { channel: 'combat', play: (ctx, v) => tone(ctx, { type: 'square', from: 2200, to: 1800, gain: 0.12 * v, attack: 0.001, decay: 0.025 }) },
+  reload: {
+    channel: 'combat',
+    play: (ctx, v) => {
+      noise(ctx, { gain: 0.25 * v, attack: 0.005, decay: 0.05, filter: 'bandpass', freq: 1800, q: 3 });
+      setTimeout(() => noise(ctx, { gain: 0.3 * v, attack: 0.005, decay: 0.06, filter: 'bandpass', freq: 1200, q: 3 }), 260);
+    },
+  },
   // Zombi preparando la mordida justo a tu lado: siseo corto que sube.
   warn: {
     channel: 'zombies',

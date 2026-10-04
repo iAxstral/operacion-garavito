@@ -13,5 +13,13 @@ public record PlayerState(
         long y,
         PlayerLifeState lifeState,
         boolean invulnerable,
-        long chargedReadyInMs) {
+        long chargedReadyInMs,
+        Weapon weapon,
+        int magazine,
+        int reserveAmmo,
+        long reloadingMs,
+        int shotSeq,
+        double shotFacing,
+        String reviving,
+        double reviveProgress) {
 }

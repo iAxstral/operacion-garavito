@@ -41,6 +41,14 @@ const doorListeners = new Set();
 
 let nearStairs = null;
 
+// Compañero caido al lado (solo lo usa Biomedica para revivir con E).
+let nearDowned = null;
+const downedListeners = new Set();
+
+// A quien sigue la camara mientras este jugador esta caido.
+let spectateTarget = null;
+const spectateListeners = new Set();
+
 function notify() {
   listeners.forEach((callback) => callback(latestState));
 }
@@ -57,7 +65,7 @@ export function getMyBuilding() {
   return myBuilding;
 }
 
-export const touchInput = { moveX: 0, moveY: 0, attack: false, dash: false, charged: false };
+export const touchInput = { moveX: 0, moveY: 0, attack: false, dash: false, charged: false, reload: false, cycleWeapon: false };
 
 export function isTouchDevice() {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -175,6 +183,8 @@ function resetLocalState() {
   setNearMission(null);
   setNearDoor(null);
   setNearStairs(null);
+  setNearDowned(null);
+  setSpectateTarget(null);
 }
 
 export function leaveGame() {
@@ -210,6 +220,66 @@ export function changeFloor(floor, x, y) {
 export function requestAttack(type, x, y, facing) {
   if (!joined || !socketService.isConnected()) return;
   socketService.publish(`/app/game/${gameId}/attack`, { playerId: myRole, type, x, y, facing });
+}
+
+/** Equipa un arma del inventario (null = guardarla y pelear a puños). */
+export function requestEquip(itemId) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/equip`, { playerId: myRole, itemId });
+}
+
+export function requestReload() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/reload`, { playerId: myRole });
+}
+
+export function requestReviveStart(targetId) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/revive/start`, { playerId: myRole, targetId });
+}
+
+export function requestReviveCancel() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/revive/cancel`, { playerId: myRole });
+}
+
+export function setNearDowned(player) {
+  if (nearDowned?.playerId === player?.playerId) return;
+  nearDowned = player;
+  downedListeners.forEach((callback) => callback(nearDowned));
+}
+
+export function getNearDowned() {
+  return nearDowned;
+}
+
+export function onNearDownedChange(callback) {
+  downedListeners.add(callback);
+  callback(nearDowned);
+  return () => downedListeners.delete(callback);
+}
+
+export function setSpectateTarget(playerId) {
+  if (spectateTarget === playerId) return;
+  spectateTarget = playerId;
+  spectateListeners.forEach((callback) => callback(spectateTarget));
+}
+
+export function getSpectateTarget() {
+  return spectateTarget;
+}
+
+export function onSpectateChange(callback) {
+  spectateListeners.add(callback);
+  callback(spectateTarget);
+  return () => spectateListeners.delete(callback);
+}
+
+/** Compañeros vivos a los que se puede mirar en modo espectador, en orden estable. */
+export function spectatableTeammates() {
+  return latestState.players
+    .filter((p) => p.playerId !== myRole && p.lifeState !== 'DOWNED')
+    .sort((a, b) => a.playerId.localeCompare(b.playerId));
 }
 
 export function requestUseItem(itemId) {
@@ -342,6 +412,8 @@ if (import.meta.env.DEV) {
     getDoors,
     requestAttack,
     requestUseItem,
+    requestEquip,
+    requestReload,
     changeFloor,
     reportPosition,
     getZombies,

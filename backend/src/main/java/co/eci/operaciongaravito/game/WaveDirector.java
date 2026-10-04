@@ -32,6 +32,8 @@ public class WaveDirector {
     private Phase phase = Phase.RESTING;
     private long nextEventAt;
     private long zombieSequence;
+    /** Turno de piso para la proxima aparicion: se reparten por turnos, no al azar. */
+    private int floorTurn;
     private boolean justCleared;
     private boolean bossDue;
 
@@ -159,10 +161,11 @@ public class WaveDirector {
 
         ThreadLocalRandom random = ThreadLocalRandom.current();
         List<Zombie> burst = new ArrayList<>(Math.max(0, count));
+        // Pisos con gente viva, por turnos: asi la horda aparece en todos ellos (antes se
+        // sorteaba y a veces un piso ocupado se quedaba sin zombis) y nunca en uno vacio.
+        List<Integer> occupied = living.stream().map(Player::getFloor).distinct().sorted().toList();
         for (int i = 0; i < count; i++) {
-            // Se sortea un jugador vivo y se spawnea en SU piso: asi la horda aparece
-            // en todos los pisos donde hay gente, y nunca en uno que nadie pisa.
-            int floor = living.get(random.nextInt(living.size())).getFloor();
+            int floor = occupied.get(Math.floorMod(floorTurn++, occupied.size()));
             List<Player> onFloor = living.stream().filter(p -> p.getFloor() == floor).toList();
             FloorGrid.SpawnPoint point = pickSpawnPoint(floors.get(floor - 1).spawnPoints(), onFloor, random);
             burst.add(new Zombie(

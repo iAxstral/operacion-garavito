@@ -71,6 +71,23 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("DOOR_REJECTED", playerId, doorId, reason);
     }
 
+    public static LastEvent equipRejected(String playerId, String itemId, String reason) {
+        return new LastEvent("EQUIP_REJECTED", playerId, itemId, reason);
+    }
+
+    public static LastEvent reloadRejected(String playerId, String reason) {
+        return new LastEvent("RELOAD_REJECTED", playerId, null, reason);
+    }
+
+    /** {@code playerId} volvio a la partida gracias a {@code itemId} (quien lo revivio). */
+    public static LastEvent revived(String revivedId, String reviverId) {
+        return new LastEvent("REVIVED", revivedId, reviverId, null);
+    }
+
+    public static LastEvent reviveRejected(String playerId, String targetId, String reason) {
+        return new LastEvent("REVIVE_REJECTED", playerId, targetId, reason);
+    }
+
     public static LastEvent useSuccess(String playerId, String itemId) {
         return new LastEvent("USE_SUCCESS", playerId, itemId, null);
     }
