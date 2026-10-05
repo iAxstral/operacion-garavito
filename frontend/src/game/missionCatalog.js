@@ -52,6 +52,30 @@ const SITES_BY_BUILDING = {
     { siteId: 'c2-sala-de-estudio', room: 'Sala de Estudio', floor: 2, x: 608, y: 1248 },
     { siteId: 'c2-armero', room: 'Armero', floor: 2, x: 1760, y: 1248 },
   ],
+  G: [
+    { siteId: 'g1-sala-de-computo', room: 'Sala de Cómputo', floor: 1, x: 608, y: 288 },
+    { siteId: 'g1-laboratorio-de-suelos', room: 'Laboratorio de Suelos', floor: 1, x: 1760, y: 288 },
+    { siteId: 'g1-taller-de-modelos', room: 'Taller de Modelos', floor: 1, x: 608, y: 1248 },
+    { siteId: 'g1-cafeteria', room: 'Cafetería', floor: 1, x: 1760, y: 1248 },
+    { siteId: 'g2-laboratorio-de-hidraulica', room: 'Laboratorio de Hidráulica', floor: 2, x: 608, y: 288 },
+    { siteId: 'g2-sala-de-proyectos', room: 'Sala de Proyectos', floor: 2, x: 1888, y: 288 },
+    { siteId: 'g2-archivo-de-planos', room: 'Archivo de Planos', floor: 2, x: 608, y: 1248 },
+    { siteId: 'g2-armeria', room: 'Armería', floor: 2, x: 1760, y: 1248 },
+  ],
+  A: [
+    { siteId: 'a1-registro-academico', room: 'Registro Académico', floor: 1, x: 608, y: 288 },
+    { siteId: 'a1-tesoreria', room: 'Tesorería', floor: 1, x: 1760, y: 288 },
+    { siteId: 'a1-bienestar-universitario', room: 'Bienestar Universitario', floor: 1, x: 608, y: 1248 },
+    { siteId: 'a1-cafeteria', room: 'Cafetería', floor: 1, x: 1760, y: 1248 },
+    { siteId: 'a2-decanatura', room: 'Decanatura', floor: 2, x: 608, y: 288 },
+    { siteId: 'a2-sala-de-consejo', room: 'Sala de Consejo', floor: 2, x: 1888, y: 288 },
+    { siteId: 'a2-archivo-central', room: 'Archivo Central', floor: 2, x: 608, y: 1248 },
+    { siteId: 'a2-armeria', room: 'Armería', floor: 2, x: 1760, y: 1248 },
+    { siteId: 'a3-rectoria', room: 'Rectoría', floor: 3, x: 608, y: 288 },
+    { siteId: 'a3-centro-de-datos', room: 'Centro de Datos', floor: 3, x: 1760, y: 288 },
+    { siteId: 'a3-auditorio-principal', room: 'Auditorio Principal', floor: 3, x: 608, y: 1248 },
+    { siteId: 'a3-sala-de-prensa', room: 'Sala de Prensa', floor: 3, x: 1760, y: 1248 },
+  ],
 };
 
 export function missionSitesFor(building) {

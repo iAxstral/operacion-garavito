@@ -5,8 +5,8 @@ const IMAGE_H = 572;
 
 const BUILDINGS = [
   { id: 'F', enabled: true, button: [133, 105, 244, 146], marker: [820, 226, 866, 271] },
-  { id: 'G', button: [259, 105, 370, 146], marker: [700, 304, 745, 349], extra: [[634, 372, 656, 398]] },
-  { id: 'A', button: [385, 105, 497, 146], marker: [485, 287, 530, 331] },
+  { id: 'G', enabled: true, button: [259, 105, 370, 146], marker: [700, 304, 745, 349], extra: [[634, 372, 656, 398]] },
+  { id: 'A', enabled: true, button: [385, 105, 497, 146], marker: [485, 287, 530, 331] },
   { id: 'B', button: [511, 105, 623, 146], marker: [398, 218, 443, 262], extra: [[334, 306, 360, 334]] },
   { id: 'C', enabled: true, button: [637, 105, 749, 146], marker: [197, 258, 243, 303] },
   { id: 'Biblioteca', button: [763, 105, 889, 146], marker: [525, 232, 648, 266] },
@@ -29,7 +29,7 @@ export default function BuildingSelect({ onSelect, onBack }) {
       onSelect(building.id);
       return;
     }
-    setNotice(`El edificio ${building.id} todavía no está disponible. Por ahora solo los edificios F y C.`);
+    setNotice(`El edificio ${building.id} todavía no está disponible. Por ahora: F, C, G y A.`);
   };
 
   return (
@@ -63,7 +63,7 @@ export default function BuildingSelect({ onSelect, onBack }) {
           Volver
         </button>
         <span className="building-select-notice">
-          {notice ?? 'Elige el edificio F o el edificio C para comenzar la operación.'}
+          {notice ?? 'Elige un edificio para comenzar la operación: F, C, G o A.'}
         </span>
       </div>
     </div>

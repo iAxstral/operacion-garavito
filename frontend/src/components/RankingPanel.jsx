@@ -3,7 +3,7 @@ import { API_BASE } from '../services/socketService';
 import { roleInfo } from '../game/roleCatalog';
 import { playSfx } from '../game/sfx';
 
-const BUILDINGS = ['F', 'C'];
+const BUILDINGS = ['F', 'C', 'G', 'A'];
 const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 const formatDate = (iso) => new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
 

@@ -44,7 +44,29 @@ public final class MissionCatalog {
                     site("c2-biblioteca", "Biblioteca", 2, 608, 288),
                     site("c2-sala-de-reuniones", "Sala de Reuniones", 2, 1888, 288),
                     site("c2-sala-de-estudio", "Sala de Estudio", 2, 608, 1248),
-                    site("c2-armero", "Armero", 2, 1760, 1248))));
+                    site("c2-armero", "Armero", 2, 1760, 1248)),
+            Building.G, List.of(
+                    site("g1-sala-de-computo", "Sala de Cómputo", 1, 608, 288),
+                    site("g1-laboratorio-de-suelos", "Laboratorio de Suelos", 1, 1760, 288),
+                    site("g1-taller-de-modelos", "Taller de Modelos", 1, 608, 1248),
+                    site("g1-cafeteria", "Cafetería", 1, 1760, 1248),
+                    site("g2-laboratorio-de-hidraulica", "Laboratorio de Hidráulica", 2, 608, 288),
+                    site("g2-sala-de-proyectos", "Sala de Proyectos", 2, 1888, 288),
+                    site("g2-archivo-de-planos", "Archivo de Planos", 2, 608, 1248),
+                    site("g2-armeria", "Armería", 2, 1760, 1248)),
+            Building.A, List.of(
+                    site("a1-registro-academico", "Registro Académico", 1, 608, 288),
+                    site("a1-tesoreria", "Tesorería", 1, 1760, 288),
+                    site("a1-bienestar-universitario", "Bienestar Universitario", 1, 608, 1248),
+                    site("a1-cafeteria", "Cafetería", 1, 1760, 1248),
+                    site("a2-decanatura", "Decanatura", 2, 608, 288),
+                    site("a2-sala-de-consejo", "Sala de Consejo", 2, 1888, 288),
+                    site("a2-archivo-central", "Archivo Central", 2, 608, 1248),
+                    site("a2-armeria", "Armería", 2, 1760, 1248),
+                    site("a3-rectoria", "Rectoría", 3, 608, 288),
+                    site("a3-centro-de-datos", "Centro de Datos", 3, 1760, 288),
+                    site("a3-auditorio-principal", "Auditorio Principal", 3, 608, 1248),
+                    site("a3-sala-de-prensa", "Sala de Prensa", 3, 1760, 1248))));
 
     private MissionCatalog() {
     }
