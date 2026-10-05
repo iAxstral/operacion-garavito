@@ -90,3 +90,8 @@ class SocketService {
 }
 
 export const socketService = new SocketService();
+
+if (import.meta.env.DEV) {
+  // Para pruebas: simular un corte con window.__socket.client.forceDisconnect().
+  window.__socket = socketService;
+}

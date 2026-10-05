@@ -1,4 +1,5 @@
 package co.eci.operaciongaravito.game;
 
-public record JoinRequest(String role, String clientId) {
+/** {@code token}: secreto que genera el cliente para poder volver a su puesto si se desconecta. */
+public record JoinRequest(String role, String clientId, String token) {
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import GameCanvas from './game/GameCanvas';
 import Hud from './components/Hud';
 import SecurityMission from './components/SecurityMission';
@@ -20,12 +20,23 @@ import BuildingSelect from './components/BuildingSelect';
 import RoleSelect from './components/RoleSelect';
 import LobbyEntry from './components/LobbyEntry';
 import WaitingRoom from './components/WaitingRoom';
-import { leaveGame } from './game/gameSync';
+import { leaveGame, resumeSession } from './game/gameSync';
 import './App.css';
 
 function App() {
   const [view, setView] = useState('menu');
   const [building, setBuilding] = useState(null);
+
+  // Si se recargo la pagina en medio de una partida, se vuelve al mismo puesto.
+  useEffect(() => {
+    let cancelled = false;
+    resumeSession().then((resumed) => {
+      if (!cancelled && resumed) setView(resumed.started ? 'playing' : 'waiting');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleExitToMenu = () => {
     leaveGame();

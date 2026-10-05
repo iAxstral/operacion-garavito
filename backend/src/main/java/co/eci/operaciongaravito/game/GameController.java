@@ -45,13 +45,24 @@ public class GameController {
             return;
         }
 
-        String rejection = session.joinPlayer(request.role());
+        String rejection = session.joinPlayer(request.role(), request.token());
         if (rejection != null) {
             sessionService.broadcast(gameId, session, LastEvent.joinRejected(request.clientId(), rejection));
             return;
         }
         sessionService.registerSeat(headers.getSessionId(), gameId, request.role());
         sessionService.broadcast(gameId, session, LastEvent.joinOk(request.role(), request.clientId()));
+    }
+
+    @MessageMapping("/game/{gameId}/rejoin")
+    public void rejoin(@DestinationVariable String gameId, JoinRequest request, SimpMessageHeaderAccessor headers) {
+        GameSession session = sessionService.find(gameId);
+        String rejection = sessionService.rejoin(gameId, request.role(), request.token(), headers.getSessionId());
+        if (rejection != null) {
+            sessionService.broadcastRejected(gameId, LastEvent.rejoinRejected(request.clientId(), rejection));
+            return;
+        }
+        sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
     }
 
     @MessageMapping("/game/{gameId}/start")

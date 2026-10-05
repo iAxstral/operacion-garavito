@@ -188,8 +188,10 @@ export default class MainScene extends Phaser.Scene {
 
   init(data) {
     this.remotePlayers = new Map();
-    this.floor = data?.floor ?? 1;
-    this.spawnOverride = data?.spawn ?? null;
+    // Al volver de una desconexion la escena arranca donde el servidor tiene al jugador.
+    const me = getMyPlayerState();
+    this.floor = data?.floor ?? me?.floor ?? 1;
+    this.spawnOverride = data?.spawn ?? (me ? { x: me.x, y: me.y } : null);
     // Caido y mirando a un compañero: la escena muestra el piso de ese compañero.
     this.spectating = Boolean(data?.spectating);
     this.reviving = null;
@@ -596,6 +598,9 @@ export default class MainScene extends Phaser.Scene {
       else entry.sprite.clearTint();
       entry.downed = downed;
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
+      const labelText = state.connected === false ? `${roleInfo(state.role).name} (desconectado)` : roleInfo(state.role).name;
+      if (entry.label.text !== labelText) entry.label.setText(labelText);
+      entry.sprite.setAlpha(state.connected === false ? 0.45 : entry.sprite.alpha);
       this.weaponLayer.update(state.playerId, {
         x: entry.sprite.x,
         y: entry.sprite.y,

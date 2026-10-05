@@ -6,6 +6,38 @@ const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const EVENT_TIMEOUT_MS = 6000;
 
 let gameId = null;
+// Secreto de este jugador para volver a su puesto si se cae la conexion o recarga.
+let seatToken = null;
+const SEAT_KEY = 'garavito.seat';
+
+function saveSeat() {
+  try {
+    sessionStorage.setItem(SEAT_KEY, JSON.stringify({ gameId, role: myRole, token: seatToken, building: myBuilding }));
+  } catch {
+    // Sin almacenamiento no se puede volver tras recargar, pero si tras un corte.
+  }
+}
+
+function loadSeat() {
+  try {
+    return JSON.parse(sessionStorage.getItem(SEAT_KEY) ?? 'null');
+  } catch {
+    return null;
+  }
+}
+
+function clearSeat() {
+  try {
+    sessionStorage.removeItem(SEAT_KEY);
+  } catch {
+    // nada que limpiar
+  }
+}
+
+function newToken() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return Array.from({ length: 4 }, () => Math.random().toString(36).slice(2)).join('');
+}
 let myRole = 'SEGURIDAD';
 let currentFloor = 1;
 // Edificio de la sala. Lo decide quien la crea; quien entra con un codigo adopta el
@@ -162,15 +194,66 @@ export async function openLobby(code, create, building) {
 }
 
 export async function joinAs(role) {
+  const token = newToken();
   const reply = awaitEvent((event) => (event.type === 'JOIN_OK' && event.itemId === CLIENT_ID)
     || (event.type === 'JOIN_REJECTED' && event.playerId === CLIENT_ID));
-  socketService.publish(`/app/game/${gameId}/join`, { role, clientId: CLIENT_ID });
+  socketService.publish(`/app/game/${gameId}/join`, { role, clientId: CLIENT_ID, token });
 
   const event = await reply;
   if (event.type === 'JOIN_REJECTED') throw new Error(event.reason);
   myRole = role;
+  seatToken = token;
   joined = true;
+  saveSeat();
   return role;
+}
+
+function sendRejoin() {
+  socketService.publish(`/app/game/${gameId}/rejoin`, { role: myRole, clientId: CLIENT_ID, token: seatToken });
+}
+
+// Al reconectarse el socket (corte de Wi-Fi, celular que se bloqueo) la suscripcion
+// anterior ya no existe: se vuelve a suscribir y a reclamar el puesto.
+function handleReconnect() {
+  if (!joined || !gameId || !seatToken) return;
+  topicSubscription = socketService.subscribe(`/topic/game/${gameId}`, handleMessage);
+  sendRejoin();
+}
+socketService.connect({ onConnect: handleReconnect });
+
+/**
+ * Al abrir la pagina: si en esta pestaña habia una partida (se recargo), intenta
+ * volver al mismo puesto. Devuelve { started } o null si no habia o ya vencio.
+ */
+export async function resumeSession() {
+  const seat = loadSeat();
+  if (!seat?.gameId || !seat?.token) return null;
+  await socketService.whenConnected();
+  resetLocalState();
+  gameId = seat.gameId;
+  myRole = seat.role;
+  myBuilding = seat.building ?? 'F';
+  seatToken = seat.token;
+  topicSubscription = socketService.subscribe(`/topic/game/${gameId}`, handleMessage);
+
+  const reply = awaitEvent((event) => (event.type === 'REJOIN_OK' && event.itemId === CLIENT_ID)
+    || (event.type === 'REJOIN_REJECTED' && event.playerId === CLIENT_ID));
+  sendRejoin();
+  let event;
+  try {
+    event = await reply;
+  } catch {
+    event = null;
+  }
+  if (!event || event.type === 'REJOIN_REJECTED') {
+    closeTopic();
+    clearSeat();
+    resetLocalState();
+    return null;
+  }
+  joined = true;
+  myBuilding = latestState.lobby?.building ?? myBuilding;
+  return { started: Boolean(latestState.lobby?.started) };
 }
 
 export function startGame() {
@@ -182,7 +265,11 @@ export function getLobbyCode() {
 }
 
 function closeTopic() {
-  topicSubscription?.unsubscribe();
+  try {
+    topicSubscription?.unsubscribe();
+  } catch {
+    // La conexion ya se habia caido: no hay nada que desuscribir.
+  }
   topicSubscription = null;
   gameId = null;
   joined = false;
@@ -210,6 +297,8 @@ export function leaveGame() {
   if (joined && socketService.isConnected()) {
     socketService.publish(`/app/game/${gameId}/leave`, { playerId: myRole });
   }
+  clearSeat();
+  seatToken = null;
   closeTopic();
   resetLocalState();
   notify();

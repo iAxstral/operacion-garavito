@@ -83,6 +83,10 @@ public class GameSession {
     private volatile boolean started = false;
     private volatile String host;
 
+    /** Cuanto se le guarda el puesto a un jugador que se desconecto. */
+    public static final long RECONNECT_GRACE_MS = 30_000;
+    private final Map<String, String> seatTokens = new ConcurrentHashMap<>();
+
     // Al arrancar la partida los jugadores tienen que poder hacer sus misiones y comprar
     // recursos antes de que llegue la primera oleada — 4s no alcanzaba para eso.
     private static final long FIRST_WAVE_PREP_MS = 45_000;
@@ -117,6 +121,10 @@ public class GameSession {
     }
 
     public synchronized String joinPlayer(String role) {
+        return joinPlayer(role, null);
+    }
+
+    public synchronized String joinPlayer(String role, String token) {
         try {
             Role.valueOf(role);
         } catch (IllegalArgumentException | NullPointerException ex) {
@@ -126,6 +134,9 @@ public class GameSession {
             return "role_taken";
         }
         getOrCreatePlayer(role);
+        if (token != null && !token.isBlank()) {
+            seatTokens.put(role, token);
+        }
         if (host == null) {
             host = role;
         }
@@ -134,6 +145,7 @@ public class GameSession {
 
     public synchronized void removePlayer(String role) {
         players.remove(role);
+        seatTokens.remove(role);
         missionBoard.remove(role);
         if (role.equals(host)) {
             host = players.keySet().stream().sorted().findFirst().orElse(null);
@@ -149,6 +161,39 @@ public class GameSession {
             started = true;
         }
         return true;
+    }
+
+    /** Se cayo la conexion de este jugador: se le guarda el puesto un rato. */
+    public void markDisconnected(String role, long now) {
+        Player player = players.get(role);
+        if (player != null) {
+            player.markDisconnected(now);
+        }
+    }
+
+    /**
+     * Vuelve a su puesto quien presenta el token con el que entro. Devuelve null si
+     * pudo, o el motivo si no.
+     */
+    public synchronized String rejoin(String role, String token) {
+        Player player = role == null ? null : players.get(role);
+        String expected = role == null ? null : seatTokens.get(role);
+        if (player == null || expected == null) {
+            return "seat_expired";
+        }
+        if (!expected.equals(token)) {
+            return "bad_token";
+        }
+        player.markConnected();
+        return null;
+    }
+
+    /** Roles cuyo puesto vencio (desconectados hace mas de RECONNECT_GRACE_MS). */
+    public java.util.List<String> expiredSeats(long now) {
+        return players.values().stream()
+                .filter(p -> !p.isConnected() && now - p.getDisconnectedAt() >= RECONNECT_GRACE_MS)
+                .map(Player::getPlayerId)
+                .toList();
     }
 
     public boolean isStarted() {
@@ -206,7 +251,7 @@ public class GameSession {
                             weapon, p.magazine(weapon), p.getReserveAmmo(), reloadingMs,
                             p.getShotSeq(), p.getShotFacing(),
                             p.getReviveTargetId(), p.reviveProgress(now),
-                            missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now));
+                            missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now), p.isConnected());
                 })
                 .toList();
     }

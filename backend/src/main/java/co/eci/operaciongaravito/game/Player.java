@@ -43,6 +43,8 @@ public class Player {
     private volatile double shotFacing = 0;
 
     private volatile long lastDamagedAt = 0;
+    /** Momento en que se cayo su conexion, o 0 si esta conectado. */
+    private volatile long disconnectedAt = 0;
     /** Enfriamiento de la habilidad del rol (p. ej. la barricada de Infraestructura). */
     private volatile long abilityReadyAt = 0;
     /** Compañero caido que este jugador (Biomedica) esta reviviendo, o null. */
@@ -141,6 +143,22 @@ public class Player {
         }
         garavitos -= amount;
         return true;
+    }
+
+    public boolean isConnected() {
+        return disconnectedAt == 0;
+    }
+
+    public long getDisconnectedAt() {
+        return disconnectedAt;
+    }
+
+    public void markDisconnected(long now) {
+        disconnectedAt = now;
+    }
+
+    public void markConnected() {
+        disconnectedAt = 0;
     }
 
     public long getLastDamagedAt() {

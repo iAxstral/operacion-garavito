@@ -27,6 +27,14 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("JOIN_REJECTED", clientId, null, reason);
     }
 
+    public static LastEvent rejoinOk(String playerId, String clientId) {
+        return new LastEvent("REJOIN_OK", playerId, clientId, null);
+    }
+
+    public static LastEvent rejoinRejected(String clientId, String reason) {
+        return new LastEvent("REJOIN_REJECTED", clientId, null, reason);
+    }
+
     public static LastEvent lobbyOk(String clientId) {
         return new LastEvent("LOBBY_OK", clientId, null, null);
     }

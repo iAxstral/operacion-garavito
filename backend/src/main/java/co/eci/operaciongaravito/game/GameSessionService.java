@@ -93,11 +93,43 @@ public class GameSessionService {
         }
     }
 
+    /**
+     * Se cayo una conexion: el jugador NO sale de la sala enseguida. Se le guarda el
+     * puesto {@link GameSession#RECONNECT_GRACE_MS} para que pueda volver (/rejoin)
+     * con su rol, inventario y misiones; si no vuelve, el tick lo saca.
+     */
     @EventListener
     public void onDisconnect(SessionDisconnectEvent event) {
         Seat seat = seatsByConnection.remove(event.getSessionId());
-        if (seat != null) {
-            leave(seat.gameId(), seat.role());
+        if (seat == null) {
+            return;
+        }
+        GameSession session = sessions.get(seat.gameId());
+        if (session == null) {
+            return;
+        }
+        session.markDisconnected(seat.role(), System.currentTimeMillis());
+        broadcast(seat.gameId(), session, null);
+    }
+
+    /** Vuelve a su puesto quien se desconecto, desde una conexion nueva. */
+    public String rejoin(String gameId, String role, String token, String connectionId) {
+        GameSession session = sessions.get(gameId);
+        if (session == null) {
+            return "lobby_not_found";
+        }
+        String rejection = session.rejoin(role, token);
+        if (rejection == null) {
+            seatsByConnection.values().removeIf(seat -> seat.gameId().equals(gameId) && seat.role().equals(role));
+            registerSeat(connectionId, gameId, role);
+        }
+        return rejection;
+    }
+
+    private void expireSeats(String gameId, GameSession session, long now) {
+        for (String role : session.expiredSeats(now)) {
+            LOGGER.log(System.Logger.Level.INFO, "se libera el puesto de " + role + " en " + gameId);
+            leave(gameId, role);
         }
     }
 
@@ -134,6 +166,10 @@ public class GameSessionService {
                 throw new IllegalStateException("partida cerrada");
             }
 
+            expireSeats(gameId, session, System.currentTimeMillis());
+            if (!sessions.containsKey(gameId)) {
+                throw new IllegalStateException("partida cerrada");
+            }
             if (!session.hasPlayers() || !session.isStarted()) {
                 lastTickAt[0] = System.currentTimeMillis();
                 return;
