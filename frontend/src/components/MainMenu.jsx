@@ -3,6 +3,7 @@ import SettingsPanel from './SettingsPanel';
 import HowToPlay from './HowToPlay';
 import RankingPanel from './RankingPanel';
 import HalloweenCreatures from './HalloweenCreatures';
+import Icon from './Icon';
 import { playSfx } from '../game/sfx';
 import { channelVolume, onSettingsChange } from '../game/settings';
 import { startMusic, stopMusic } from '../game/music';
@@ -135,7 +136,7 @@ export default function MainMenu({ onPlay }) {
       {phase === 'intro' && (
         <div className="start-intro-controls">
           <button type="button" className="start-chip" onClick={toggleSound}>
-            {soundOn ? '🔊 Sonido' : '🔇 Activar sonido'}
+            <Icon name={soundOn ? 'sound' : 'mute'} /> {soundOn ? 'Sonido' : 'Activar sonido'}
           </button>
           <button type="button" className="start-chip start-chip--skip" onClick={showMenu}>
             Saltar ›
@@ -163,16 +164,16 @@ export default function MainMenu({ onPlay }) {
                 onPlay();
               }}
             >
-              <span aria-hidden="true">▶</span> Jugar
+              <Icon name="play" /> Jugar
             </button>
             <button type="button" className="start-btn" onClick={() => open('settings')}>
-              <span aria-hidden="true">⚙</span> Configuración
+              <Icon name="gear" /> Configuración
             </button>
             <button type="button" className="start-btn" onClick={() => open('howto')}>
-              <span aria-hidden="true">📖</span> Cómo jugar
+              <Icon name="book" /> Cómo jugar
             </button>
             <button type="button" className="start-btn" onClick={() => open('ranking')}>
-              <span aria-hidden="true">🏆</span> Ranking
+              <Icon name="trophy" /> Ranking
             </button>
           </nav>
 

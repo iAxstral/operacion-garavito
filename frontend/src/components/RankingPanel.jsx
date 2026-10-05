@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { API_BASE } from '../services/socketService';
 import { roleInfo } from '../game/roleCatalog';
 import { playSfx } from '../game/sfx';
+import Icon from './Icon';
 
 const BUILDINGS = ['F', 'C', 'G', 'A'];
 const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -43,7 +44,7 @@ export default function RankingPanel({ onClose, initialBuilding = 'F' }) {
     <div className="settings-overlay" onPointerDown={(event) => event.target === event.currentTarget && onClose()}>
       <div className="settings-panel ranking-panel" role="dialog" aria-modal="true" aria-labelledby="ranking-title">
         <header className="settings-header">
-          <h2 id="ranking-title">🏆 Ranking</h2>
+          <h2 id="ranking-title"><Icon name="trophy" /> Ranking</h2>
           <button type="button" className="settings-close" onClick={onClose} aria-label="Cerrar">✕</button>
         </header>
 
@@ -84,8 +85,8 @@ export default function RankingPanel({ onClose, initialBuilding = 'F' }) {
                       <th scope="col">#</th>
                       <th scope="col">Resultado</th>
                       <th scope="col">Tiempo</th>
-                      <th scope="col" title="Jugadores">👥</th>
-                      <th scope="col" title="Zombis eliminados">🧟</th>
+                      <th scope="col"><Icon name="people" title="Jugadores" /></th>
+                      <th scope="col"><Icon name="zombie" title="Zombis eliminados" /></th>
                       <th scope="col">MVP</th>
                       <th scope="col">Fecha</th>
                     </tr>
@@ -94,7 +95,7 @@ export default function RankingPanel({ onClose, initialBuilding = 'F' }) {
                     {data.best.map((match, index) => (
                       <tr key={match.id}>
                         <td>{index + 1}</td>
-                        <td>{match.victory ? '🏆 Victoria' : `Kinder ${match.kinderReached}`}</td>
+                        <td>{match.victory ? <><Icon name="trophy" /> Victoria</> : `Kinder ${match.kinderReached}`}</td>
                         <td>{formatTime(match.durationSeconds)}</td>
                         <td>{match.players}</td>
                         <td>{match.totalKills}</td>

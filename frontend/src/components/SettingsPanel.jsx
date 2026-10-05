@@ -10,6 +10,7 @@ import {
   updateSettings,
   vibrate,
 } from '../game/settings';
+import Icon, { Glyph } from './Icon';
 import { playSfx } from '../game/sfx';
 import { resetTutorial } from '../game/tutorial';
 import { isMusicPlaying, startMusic, stopMusic } from '../game/music';
@@ -123,7 +124,7 @@ export default function SettingsPanel({ onClose, inGame = false }) {
                 if (muted) playSfx('toggle');
               }}
             >
-              {muted ? '🔇 Silenciado' : '🔈 Silenciar todo'}
+              <Icon name={muted ? 'mute' : 'sound'} /> {muted ? 'Silenciado' : 'Silenciar todo'}
             </button>
           </div>
 
@@ -137,7 +138,7 @@ export default function SettingsPanel({ onClose, inGame = false }) {
               >
                 <div className="settings-slider-head">
                   <label htmlFor={`vol-${channel.id}`} className="settings-row-label">
-                    <span aria-hidden="true">{channel.icon}</span> {channel.label}
+                    <Glyph value={channel.icon} /> {channel.label}
                   </label>
                   <output htmlFor={`vol-${channel.id}`} className="settings-value">{value}%</output>
                 </div>

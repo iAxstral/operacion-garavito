@@ -11,6 +11,7 @@ import { TIPS, hasSeen, markSeen } from '../game/tutorial';
 import { abilityFor } from '../game/abilityCatalog';
 import { weaponForItem } from '../game/weaponCatalog';
 import { playSfx } from '../game/sfx';
+import { Glyph } from './Icon';
 
 const CHECK_MS = 500;
 const SHOW_MS = 9000;
@@ -71,7 +72,7 @@ export default function TutorialHints() {
 
   return (
     <div className="tutorial-tip" role="status">
-      <span className="tutorial-tip-icon" aria-hidden="true">{tip.icon}</span>
+      <span className="tutorial-tip-icon" aria-hidden="true"><Glyph value={tip.icon} /></span>
       <p>{tip.text}</p>
       <button
         type="button"

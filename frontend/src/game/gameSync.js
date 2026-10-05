@@ -596,5 +596,8 @@ if (import.meta.env.DEV) {
     getZombies,
     getBoss,
     getWave,
+    // Solo para revisar pantallas a mano o en pruebas: dispara un evento como si
+    // viniera del servidor (p. ej. { type: 'TEAM_WIPED' }).
+    emitEventForTest: (event) => eventListeners.forEach((callback) => callback(event)),
   };
 }

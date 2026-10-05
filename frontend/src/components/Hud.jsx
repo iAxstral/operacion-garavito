@@ -23,6 +23,7 @@ import {
   setInputLocked,
 } from '../game/gameSync';
 import SettingsPanel from './SettingsPanel';
+import Icon, { Glyph } from './Icon';
 import { playSfx } from '../game/sfx';
 import { MISSIONS_PER_KINDER, missionType } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
@@ -479,7 +480,7 @@ export default function Hud() {
         <div className={`hud-weapon${weapon.ranged && me?.magazine === 0 ? ' hud-weapon--empty' : ''}`}>
           {weapon.icon
             ? <img src={weapon.icon} alt="" className="hud-weapon-icon" />
-            : <span className="hud-weapon-glyph" aria-hidden="true">{weapon.glyph}</span>}
+            : <span className="hud-weapon-glyph" aria-hidden="true"><Glyph value={weapon.glyph} /></span>}
           <span className="hud-weapon-name">{weapon.name}</span>
           {weapon.ranged && (
             <span className="hud-weapon-ammo">
@@ -493,7 +494,7 @@ export default function Hud() {
 
         <div className={`hud-ability-chip${abilityCooling ? ' hud-ability-chip--cooling' : ''}`} title={ability.hint}>
           {!touch && <span className="hud-ability-key">F</span>}
-          <span aria-hidden="true">{ability.icon}</span>
+          <Glyph value={ability.icon} />
           <span>{ability.name}</span>
           {me?.role === 'INFRAESTRUCTURA' && (
             <small>{myBarricades}/{MAX_BARRICADES}{abilityCooling ? ` · ${Math.ceil(me.abilityReadyInMs / 1000)}s` : ''}</small>
@@ -508,7 +509,7 @@ export default function Hud() {
             </div>
             {missions.map((mission) => (
               <div key={mission.missionId} className={`hud-mission${mission.done ? ' hud-mission--done' : ''}`}>
-                <span aria-hidden="true">{mission.done ? '✓' : missionType(mission.type).icon}</span>
+                <Glyph value={mission.done ? '✓' : missionType(mission.type).icon} />
                 <span className="hud-mission-room">{mission.room}</span>
                 <span className="hud-mission-floor">P{mission.floor}</span>
               </div>
@@ -529,7 +530,7 @@ export default function Hud() {
                 setMapOpen((open) => !open);
               }}
             >
-              🗺
+              <Icon name="map" />
             </button>
           )}
           <button
@@ -542,7 +543,7 @@ export default function Hud() {
               openSettings();
             }}
           >
-            ⚙
+            <Icon name="gear" />
           </button>
         </div>
 
@@ -588,9 +589,10 @@ export default function Hud() {
 
       {state.event && (
         <div className={`hud-kinder-event hud-kinder-event--${state.event.type.toLowerCase()}`}>
+          <Icon name={state.event.type === 'BLACKOUT' ? 'bolt' : 'box'} />{' '}
           {state.event.type === 'BLACKOUT'
-            ? `⚡ Apagón — tablero en ${state.event.room} (piso ${state.event.floor})`
-            : `📦 Suministros en ${state.event.room} (piso ${state.event.floor})`}
+            ? `Apagón — tablero en ${state.event.room} (piso ${state.event.floor})`
+            : `Suministros en ${state.event.room} (piso ${state.event.floor})`}
           <strong> {Math.ceil(state.event.endsInMs / 1000)}s</strong>
         </div>
       )}

@@ -25,6 +25,7 @@ import LobbyEntry from './components/LobbyEntry';
 import WaitingRoom from './components/WaitingRoom';
 import { leaveGame, resumeSession } from './game/gameSync';
 import './App.css';
+import './halloween.css';
 
 function App() {
   const [view, setView] = useState('menu');
@@ -41,17 +42,20 @@ function App() {
     };
   }, []);
 
+  // Cada pantalla entra con un fundido desde negro (la clave reinicia la animacion).
+  const fade = (screen) => <div key={view} className="hw-screen">{screen}</div>;
+
   const handleExitToMenu = () => {
     leaveGame();
     setView('menu');
   };
 
   if (view === 'menu') {
-    return <MainMenu onPlay={() => setView('buildings')} />;
+    return fade(<MainMenu onPlay={() => setView('buildings')} />);
   }
 
   if (view === 'buildings') {
-    return (
+    return fade(
       <BuildingSelect
         onSelect={(id) => {
           setBuilding(id);
@@ -63,7 +67,7 @@ function App() {
   }
 
   if (view === 'lobby') {
-    return (
+    return fade(
       <LobbyEntry
         building={building}
         onEntered={() => setView('roles')}
@@ -73,7 +77,7 @@ function App() {
   }
 
   if (view === 'roles') {
-    return (
+    return fade(
       <RoleSelect
         onJoined={() => setView('waiting')}
         onBack={() => {
@@ -85,7 +89,7 @@ function App() {
   }
 
   if (view === 'waiting') {
-    return (
+    return fade(
       <WaitingRoom
         onStarted={() => setView('playing')}
         onLeave={() => {
@@ -97,7 +101,7 @@ function App() {
   }
 
   return (
-    <div id="game-root">
+    <div id="game-root" className="hw-screen">
       <div className="game-stage">
         <Suspense fallback={<div className="game-loading">Cargando el edificio…</div>}>
           <GameCanvas />

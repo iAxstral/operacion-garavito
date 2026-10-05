@@ -1,0 +1,455 @@
+/*
+ * Tema de Halloween para las pantallas fuera del mapa (rol, sala de espera,
+ * resultados, configuracion, como jugar, ranking) y el HUD. Va despues de App.css
+ * y solo cambia la apariencia: las medidas y el acomodo siguen saliendo de App.css.
+ */
+
+@font-face {
+  font-family: 'Pirata One';
+  src: url('./assets/fonts/pirata-one/PirataOne-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Creepster';
+  src: url('./assets/fonts/creepster/Creepster-Regular.ttf') format('truetype');
+  font-display: swap;
+}
+
+:root {
+  --hw-ink: #07040a;
+  --hw-panel: rgba(20, 8, 10, 0.95);
+  --hw-panel-2: rgba(34, 10, 12, 0.95);
+  --hw-bone: #ecdfcc;
+  --hw-bone-dim: rgba(236, 223, 204, 0.72);
+  --hw-blood: #b3140c;
+  --hw-blood-bright: #e8321f;
+  --hw-blood-dark: #4a0505;
+  --hw-border: rgba(190, 36, 26, 0.5);
+  --hw-ghost: #9dff8a;
+  --hw-gold: #e8b64a;
+  --hw-title-font: 'Pirata One', 'Georgia', serif;
+  --hw-scary-font: 'Creepster', 'Pirata One', 'Georgia', serif;
+}
+
+/* ---------- Fondo comun: piedra oscura, neblina roja y vineta ---------- */
+
+.role-select {
+  color: var(--hw-bone);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(120, 10, 10, 0.35), transparent 60%),
+    radial-gradient(ellipse at 50% 110%, rgba(60, 90, 70, 0.18), transparent 55%),
+    linear-gradient(rgba(7, 4, 10, 0.9), rgba(7, 4, 10, 0.96)),
+    url('/tiles/v2_wall_concreto_64.png');
+  background-size: auto, auto, auto, 128px 128px;
+}
+
+.role-select .main-menu-vignette {
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(0, 0, 0, 0.85) 100%);
+}
+
+.role-select-content {
+  z-index: 3;
+}
+
+.main-menu-kicker {
+  color: var(--hw-blood-bright);
+  text-shadow: 0 0 10px rgba(232, 50, 31, 0.45);
+}
+
+.role-select-title,
+.settings-header h2,
+.game-over-panel h2 {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  letter-spacing: 1.5px;
+}
+
+.role-select-title {
+  font-size: clamp(34px, 5.5vw, 56px);
+  color: var(--hw-bone);
+  text-shadow: 0 0 18px rgba(232, 50, 31, 0.55), 0 4px 0 rgba(0, 0, 0, 0.8);
+}
+
+.lobby-help {
+  color: var(--hw-bone-dim);
+  opacity: 1;
+}
+
+.lobby-error {
+  color: #ff8a7a;
+}
+
+/* ---------- Botones ---------- */
+
+.main-menu-play-btn {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 24px;
+  letter-spacing: 1.5px;
+  color: #fff1ec;
+  background: linear-gradient(180deg, #c41c12, #6e0606);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 0 #2e0202, 0 0 26px rgba(200, 20, 10, 0.45);
+}
+
+.main-menu-play-btn:hover {
+  background: linear-gradient(180deg, #e0281a, #860808);
+}
+
+.main-menu-play-btn:active {
+  box-shadow: 0 2px 0 #2e0202;
+}
+
+.main-menu-play-btn:disabled {
+  filter: grayscale(0.7) brightness(0.6);
+  cursor: not-allowed;
+}
+
+.screen-back-btn,
+.game-over-btn,
+.settings-mute,
+.howto-tab,
+.settings-close {
+  color: var(--hw-bone);
+  background: rgba(40, 10, 12, 0.7);
+  border: 1px solid var(--hw-border);
+}
+
+.screen-back-btn:hover,
+.game-over-btn:hover,
+.settings-mute:hover,
+.howto-tab:hover,
+.settings-close:hover {
+  background: rgba(110, 14, 10, 0.75);
+  border-color: var(--hw-blood-bright);
+}
+
+.game-over-btn--primary,
+.howto-tab--active,
+.settings-mute--on {
+  color: #fff1ec;
+  background: linear-gradient(180deg, #c41c12, #6e0606);
+  border-color: #c41c12;
+}
+
+.game-over-btn--primary:hover {
+  background: linear-gradient(180deg, #e0281a, #860808);
+}
+
+/* ---------- Elegir rol: cartas como lapidas ---------- */
+
+.role-card {
+  position: relative;
+  overflow: hidden;
+  color: var(--hw-bone);
+  background:
+    radial-gradient(ellipse at 50% 30%, rgba(140, 20, 16, 0.28), transparent 65%),
+    linear-gradient(180deg, #1f1114 0%, #0d0709 100%);
+  border: 2px solid rgba(120, 30, 26, 0.6);
+  border-radius: 90px 90px 10px 10px;
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8), 0 10px 24px rgba(0, 0, 0, 0.6);
+}
+
+.role-card::after {
+  /* Telarana en la esquina. */
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 46px;
+  height: 46px;
+  pointer-events: none;
+  opacity: 0.35;
+  background:
+    repeating-radial-gradient(circle at 100% 0, transparent 0 8px, rgba(230, 230, 230, 0.8) 8px 9px),
+    linear-gradient(225deg, transparent 49%, rgba(230, 230, 230, 0.8) 49% 51%, transparent 51%);
+  -webkit-mask: radial-gradient(circle at 100% 0, #000 70%, transparent 71%);
+  mask: radial-gradient(circle at 100% 0, #000 70%, transparent 71%);
+}
+
+.role-card:hover:not(:disabled),
+.role-card:focus-visible {
+  outline: none;
+  border-color: var(--hw-blood-bright);
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.7), 0 0 28px rgba(232, 50, 31, 0.5), 0 14px 26px rgba(0, 0, 0, 0.6);
+}
+
+.role-card:hover:not(:disabled) .role-card-portrait {
+  transform: translateY(-4px) scale(1.03);
+  filter: drop-shadow(0 0 14px rgba(232, 50, 31, 0.55)) drop-shadow(0 10px 12px rgba(0, 0, 0, 0.7));
+}
+
+.role-card-portrait {
+  transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+.role-card-name {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 26px;
+  letter-spacing: 1px;
+  color: var(--hw-bone);
+}
+
+.role-card-blurb {
+  color: var(--hw-bone-dim);
+  opacity: 1;
+}
+
+.role-card-mission {
+  color: var(--hw-gold);
+}
+
+.role-card--taken {
+  opacity: 0.55;
+  filter: grayscale(1) brightness(0.6);
+}
+
+.role-card--taken .role-card-mission {
+  padding: 2px 10px;
+  color: #ff8a7a;
+  border: 2px solid #ff8a7a;
+  border-radius: 4px;
+  transform: rotate(-6deg);
+}
+
+.role-card--taken:hover {
+  border-color: rgba(120, 30, 26, 0.6);
+}
+
+/* ---------- Sala de espera ---------- */
+
+.waiting-code {
+  font-family: 'Courier New', monospace;
+  color: var(--hw-ghost);
+  text-shadow: 0 0 14px rgba(110, 255, 80, 0.75), 0 0 40px rgba(110, 255, 80, 0.35);
+  animation: hw-ghost-pulse 3s ease-in-out infinite;
+}
+
+@keyframes hw-ghost-pulse {
+  50% { text-shadow: 0 0 22px rgba(110, 255, 80, 0.95), 0 0 60px rgba(110, 255, 80, 0.5); }
+}
+
+.waiting-slot {
+  color: var(--hw-bone);
+  background: linear-gradient(180deg, #1c0f12, #0b0608);
+  border: 2px solid rgba(120, 30, 26, 0.35);
+  border-radius: 60px 60px 8px 8px;
+  filter: grayscale(1);
+}
+
+.waiting-slot--present {
+  filter: none;
+  border-color: var(--hw-blood-bright);
+  box-shadow: 0 0 20px rgba(232, 50, 31, 0.4);
+  animation: hw-slot-in 0.5s ease-out;
+}
+
+@keyframes hw-slot-in {
+  from { transform: translateY(16px) scale(0.92); opacity: 0; }
+}
+
+.waiting-slot-name {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 18px;
+}
+
+.waiting-slot--present .waiting-slot-tag {
+  color: var(--hw-ghost);
+}
+
+/* ---------- Resultados ---------- */
+
+.game-over-screen {
+  background:
+    radial-gradient(ellipse at center, rgba(60, 0, 0, 0.55), rgba(0, 0, 0, 0.92) 75%);
+  animation: hw-fade-in 0.8s ease-out;
+}
+
+.game-over-panel {
+  color: var(--hw-bone);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(140, 16, 12, 0.35), transparent 60%),
+    linear-gradient(180deg, #1c0a0c, #0a0507);
+  border: 2px solid var(--hw-border);
+  border-radius: 12px;
+  box-shadow: 0 0 60px rgba(160, 10, 10, 0.35), inset 0 0 40px rgba(0, 0, 0, 0.7);
+}
+
+.game-over-panel h2 {
+  font-family: var(--hw-scary-font);
+  font-size: clamp(36px, 7vw, 56px);
+  letter-spacing: 3px;
+  color: var(--hw-blood-bright);
+  text-shadow: 0 0 18px rgba(232, 50, 31, 0.6), 0 4px 0 #1a0202;
+  animation: hw-drip-in 0.9s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+
+@keyframes hw-drip-in {
+  from { transform: translateY(-30px) scaleY(1.3); opacity: 0; }
+}
+
+.results-panel--victory {
+  border-color: rgba(232, 182, 74, 0.6);
+  box-shadow: 0 0 60px rgba(232, 182, 74, 0.25), inset 0 0 40px rgba(0, 0, 0, 0.7);
+}
+
+.results-panel--victory h2 {
+  font-family: var(--hw-title-font);
+  color: var(--hw-gold);
+  text-shadow: 0 0 18px rgba(232, 182, 74, 0.6), 0 4px 0 #2a1a02;
+}
+
+.results-meta strong {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 24px;
+  color: var(--hw-bone);
+}
+
+.results-table th,
+.results-table td {
+  border-bottom-color: rgba(190, 36, 26, 0.2);
+}
+
+.results-table thead th {
+  color: var(--hw-blood-bright);
+}
+
+.results-table thead .hw-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+}
+
+.results-me {
+  background: rgba(232, 50, 31, 0.14);
+}
+
+.results-awards {
+  color: var(--hw-gold);
+}
+
+/* ---------- Configuracion, Como jugar y Ranking ---------- */
+
+.settings-overlay {
+  background: radial-gradient(ellipse at center, rgba(40, 0, 0, 0.55), rgba(0, 0, 0, 0.85));
+}
+
+.settings-panel {
+  color: var(--hw-bone);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(140, 16, 12, 0.25), transparent 55%),
+    linear-gradient(180deg, rgba(28, 10, 12, 0.98), rgba(10, 5, 7, 0.98));
+  border: 2px solid var(--hw-border);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(160, 10, 10, 0.25), inset 0 0 30px rgba(0, 0, 0, 0.6);
+}
+
+.settings-header h2 {
+  font-size: 30px;
+  color: var(--hw-bone);
+  text-shadow: 0 0 12px rgba(232, 50, 31, 0.5);
+}
+
+.settings-note {
+  color: var(--hw-gold);
+  background: rgba(232, 182, 74, 0.08);
+}
+
+.settings-section {
+  border-top-color: rgba(190, 36, 26, 0.25);
+}
+
+.settings-section-head h3,
+.howto-section h3 {
+  color: var(--hw-blood-bright);
+}
+
+.settings-slider--master {
+  background: rgba(232, 50, 31, 0.1);
+}
+
+.settings-row-label {
+  color: var(--hw-bone);
+}
+
+.settings-value {
+  color: var(--hw-gold);
+}
+
+.settings-slider input[type='range']::-webkit-slider-runnable-track {
+  background: linear-gradient(90deg, var(--hw-blood) var(--fill), rgba(255, 255, 255, 0.12) var(--fill));
+}
+
+.settings-slider input[type='range']::-moz-range-progress {
+  background: var(--hw-blood);
+}
+
+.settings-slider input[type='range']::-webkit-slider-thumb {
+  background: var(--hw-bone);
+  border-color: var(--hw-blood-dark);
+}
+
+.settings-slider input[type='range']::-moz-range-thumb {
+  background: var(--hw-bone);
+  border-color: var(--hw-blood-dark);
+}
+
+.settings-slider input[type='range']:focus-visible {
+  outline-color: var(--hw-blood-bright);
+}
+
+.settings-toggle input:checked + .settings-switch {
+  background: var(--hw-blood);
+}
+
+.settings-switch::after {
+  background: var(--hw-bone);
+}
+
+.ranking-table td {
+  color: var(--hw-bone);
+}
+
+kbd {
+  color: var(--hw-bone);
+  background: rgba(40, 10, 12, 0.9);
+  border-color: var(--hw-border);
+}
+
+/* ---------- Iconos dibujados (components/Icon.jsx) ---------- */
+
+.hw-icon {
+  display: inline-block;
+  width: 1.15em;
+  height: 1.15em;
+  vertical-align: -0.2em;
+  flex-shrink: 0;
+}
+
+.start-btn .hw-icon {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------- Fundido entre pantallas ---------- */
+
+.hw-screen {
+  animation: hw-fade-in 0.45s ease-out;
+}
+
+@keyframes hw-fade-in {
+  from { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waiting-code,
+  .waiting-slot--present,
+  .game-over-panel h2,
+  .game-over-screen,
+  .hw-screen {
+    animation: none;
+  }
+}
