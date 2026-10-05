@@ -24,6 +24,7 @@ import RoleSelect from './components/RoleSelect';
 import LobbyEntry from './components/LobbyEntry';
 import WaitingRoom from './components/WaitingRoom';
 import { leaveGame, resumeSession } from './game/gameSync';
+import { startAmbience, stopAmbience } from './game/ambience';
 import './App.css';
 import './halloween.css';
 
@@ -44,6 +45,12 @@ function App() {
 
   // Cada pantalla entra con un fundido desde negro (la clave reinicia la animacion).
   const fade = (screen) => <div key={view} className="hw-screen">{screen}</div>;
+
+  // Viento y crujidos en las pantallas de afuera; adentro del edificio suena la partida.
+  useEffect(() => {
+    if (view === 'playing') stopAmbience();
+    else startAmbience();
+  }, [view]);
 
   const handleExitToMenu = () => {
     leaveGame();

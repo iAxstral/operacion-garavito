@@ -736,6 +736,117 @@ kbd {
   }
 }
 
+/* ---------- Letrero de Kinder y del jefe ---------- */
+
+.hud-wave-banner {
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  transform: none;
+  width: auto;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 16px;
+  background: radial-gradient(ellipse at center, rgba(40, 0, 0, 0.55), rgba(0, 0, 0, 0.2) 60%, transparent 80%);
+  border: none;
+  border-radius: 0;
+  font-weight: normal;
+  pointer-events: none;
+  animation: hw-banner-life 3.6s ease forwards;
+}
+
+@keyframes hw-banner-life {
+  0% { opacity: 0; }
+  8%, 82% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Franjas negras de cine arriba y abajo. */
+.hud-wave-banner-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 11vh;
+  background: #000;
+  animation: hw-banner-bar 3.6s ease forwards;
+  transform-origin: top;
+}
+
+.hud-wave-banner-bar--bottom {
+  top: auto;
+  bottom: 0;
+  transform-origin: bottom;
+}
+
+@keyframes hw-banner-bar {
+  0% { transform: scaleY(0); }
+  10%, 85% { transform: scaleY(1); }
+  100% { transform: scaleY(0); }
+}
+
+.hud-wave-banner-kicker {
+  font-family: var(--hw-title-font);
+  font-size: clamp(20px, 3.5vw, 30px);
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--hw-bone-dim);
+}
+
+.hud-wave-banner-title {
+  font-family: var(--hw-scary-font);
+  font-weight: normal;
+  font-size: clamp(56px, 13vw, 140px);
+  line-height: 1;
+  letter-spacing: 4px;
+  text-align: center;
+  color: var(--hw-blood-bright);
+  text-shadow: 0 0 30px rgba(232, 50, 31, 0.7), 0 6px 0 #1a0202;
+  animation: hw-banner-slam 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+
+@keyframes hw-banner-slam {
+  from { transform: scale(2.4); opacity: 0; filter: blur(6px); }
+  to { transform: scale(1); opacity: 1; filter: blur(0); }
+}
+
+.hud-wave-banner-sub {
+  max-width: 640px;
+  font-size: clamp(14px, 2.2vw, 19px);
+  text-align: center;
+  color: var(--hw-bone);
+  animation: hw-fade-in 0.6s 0.35s ease both;
+}
+
+/* Jefe: rojo que late y el nombre tiembla. */
+.hud-wave-banner--boss {
+  background: radial-gradient(ellipse at center, rgba(120, 0, 0, 0.6), rgba(30, 0, 0, 0.45) 60%, rgba(0, 0, 0, 0.2));
+}
+
+.hud-wave-banner--boss .hud-wave-banner-title {
+  font-size: clamp(38px, 8.5vw, 100px);
+  animation: hw-banner-slam 0.6s cubic-bezier(0.2, 1.6, 0.4, 1) both, hw-banner-shake 0.12s 0.6s linear 8;
+}
+
+@keyframes hw-banner-shake {
+  25% { transform: translate(-3px, 2px); }
+  50% { transform: translate(3px, -2px); }
+  75% { transform: translate(-2px, -2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-wave-banner-title,
+  .hud-wave-banner--boss .hud-wave-banner-title,
+  .hud-wave-banner-bar {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .waiting-code,
   .waiting-slot--present,

@@ -397,9 +397,10 @@ export default function Hud() {
 
     announcedWaveRef.current = kinderNumber;
     setWaveBanner(bossStage
-      ? `¡Kinder ${kinderNumber}! El Ingeniero de Sistemas viene por ustedes`
-      : `¡Kinder ${kinderNumber}! Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno`);
-    const timeout = setTimeout(() => setWaveBanner(null), 3200);
+      ? { boss: true, title: `Kinder ${kinderNumber}`, big: 'El Ingeniero de Sistemas', sub: 'viene por ustedes' }
+      : { boss: false, title: `Kinder ${kinderNumber}`, big: `Kinder ${kinderNumber}`, sub: `Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno` });
+    playSfx(bossStage ? 'bossStinger' : 'kinderStinger');
+    const timeout = setTimeout(() => setWaveBanner(null), 3600);
     return () => clearTimeout(timeout);
   }, [kinderNumber, kinderActive, kinderQuota, bossStage]);
 
@@ -633,7 +634,15 @@ export default function Hud() {
       )}
 
       {toast && <div className="hud-toast">{toast}</div>}
-      {waveBanner && <div className="hud-wave-banner">{waveBanner}</div>}
+      {waveBanner && (
+        <div className={`hud-wave-banner${waveBanner.boss ? ' hud-wave-banner--boss' : ''}`} role="status">
+          <span className="hud-wave-banner-bar" aria-hidden="true" />
+          {waveBanner.boss && <span className="hud-wave-banner-kicker">{waveBanner.title}</span>}
+          <strong className="hud-wave-banner-title">{waveBanner.big}</strong>
+          <span className="hud-wave-banner-sub">{waveBanner.sub}</span>
+          <span className="hud-wave-banner-bar hud-wave-banner-bar--bottom" aria-hidden="true" />
+        </div>
+      )}
 
       {mapOpen && (
         <div className="map-modal map-modal--overview">

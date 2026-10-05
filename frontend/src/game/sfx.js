@@ -162,6 +162,26 @@ const SOUNDS = {
     play: (ctx, v) => noise(ctx, { gain: 0.22 * v, attack: 0.12, decay: 0.1, filter: 'highpass', freq: 900, freqTo: 3200, q: 0.7 }),
   },
   stagger: { channel: 'combat', play: (ctx, v) => tone(ctx, { type: 'triangle', from: 1400, to: 1900, gain: 0.12 * v, decay: 0.12 }) },
+  // Letrero de Kinder: campanada grave con un golpe de tambor.
+  kinderStinger: {
+    channel: 'music',
+    play: (ctx, v) => {
+      tone(ctx, { type: 'sine', from: 110, to: 104, gain: 0.5 * v, attack: 0.005, decay: 2.2 });
+      tone(ctx, { type: 'triangle', from: 220.5, to: 218, gain: 0.18 * v, attack: 0.005, decay: 1.6 });
+      tone(ctx, { type: 'sine', from: 331, to: 329, gain: 0.08 * v, attack: 0.005, decay: 1.2 });
+      noise(ctx, { gain: 0.45 * v, attack: 0.002, decay: 0.35, filter: 'lowpass', freq: 400, freqTo: 80 });
+    },
+  },
+  // Llega el jefe: acorde disonante que se arrastra y un retumbo.
+  bossStinger: {
+    channel: 'music',
+    play: (ctx, v) => {
+      tone(ctx, { type: 'sawtooth', from: 82, to: 55, gain: 0.3 * v, attack: 0.05, decay: 2.4 });
+      tone(ctx, { type: 'sawtooth', from: 116.5, to: 77, gain: 0.22 * v, attack: 0.05, decay: 2.4 });
+      tone(ctx, { type: 'square', from: 174.6, to: 116, gain: 0.08 * v, attack: 0.05, decay: 2 });
+      noise(ctx, { gain: 0.5 * v, attack: 0.02, decay: 1.4, filter: 'lowpass', freq: 300, freqTo: 40 });
+    },
+  },
 };
 
 /** Reproduce un efecto. `scale` (0..1) atenua por distancia u otra razon. */
