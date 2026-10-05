@@ -26,9 +26,9 @@ function freshState() {
 
 function draw(ctx, game) {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  ctx.fillStyle = '#18222b';
+  ctx.fillStyle = '#150b0d';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.fillStyle = '#2a3944';
+  ctx.fillStyle = '#2a1518';
   ctx.fillRect(0, FLOOR_Y, WIDTH, HEIGHT - FLOOR_Y);
 
   const blockTop = (index) => FLOOR_Y - (index + 1) * BLOCK_H;

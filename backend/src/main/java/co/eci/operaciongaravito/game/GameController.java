@@ -50,6 +50,7 @@ public class GameController {
             sessionService.broadcast(gameId, session, LastEvent.joinRejected(request.clientId(), rejection));
             return;
         }
+        session.setPlayerName(request.role(), request.name());
         sessionService.registerSeat(headers.getSessionId(), gameId, request.role());
         sessionService.broadcast(gameId, session, LastEvent.joinOk(request.role(), request.clientId()));
     }
@@ -62,7 +63,20 @@ public class GameController {
             sessionService.broadcastRejected(gameId, LastEvent.rejoinRejected(request.clientId(), rejection));
             return;
         }
+        session.setPlayerName(request.role(), request.name());
         sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
+    }
+
+    @MessageMapping("/game/{gameId}/ping")
+    public void ping(@DestinationVariable String gameId, PingRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        LastEvent event = session.attemptPing(request.playerId(), request.kind(), System.currentTimeMillis());
+        if (event != null) {
+            broadcast(gameId, session, event);
+        }
     }
 
     @MessageMapping("/game/{gameId}/start")

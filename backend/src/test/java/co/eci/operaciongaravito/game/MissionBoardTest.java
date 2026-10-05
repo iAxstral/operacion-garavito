@@ -39,15 +39,31 @@ class MissionBoardTest {
     }
 
     @Test
-    @DisplayName("cada jugador recibe 3 misiones de su rol, en 3 salas distintas")
+    @DisplayName("cada jugador recibe 3 misiones distintas de su rol, en 3 salas distintas")
     void dealsThreeMissionsOfTheRole() {
         List<MissionView> missions = board.viewFor("SEGURIDAD");
         assertEquals(MissionBoard.MISSIONS_PER_KINDER, missions.size());
         assertTrue(missions.stream().allMatch(m -> m.type().role() == Role.SEGURIDAD));
         assertEquals(3, missions.stream().map(MissionView::siteId).distinct().count());
-        assertEquals(Set.copyOf(MissionType.forRole(Role.SEGURIDAD)),
-                Set.copyOf(missions.stream().map(MissionView::type).toList()),
-                "los dos minijuegos del rol aparecen");
+        assertEquals(3, missions.stream().map(MissionView::type).distinct().count(), "no repite minijuego en el Kinder");
+    }
+
+    @Test
+    @DisplayName("cada rol tiene cuatro minijuegos y el que falto en un Kinder aparece en el siguiente")
+    void missionTypesRotate() {
+        for (Role role : Role.values()) {
+            assertEquals(4, MissionType.forRole(role).size(), role.name());
+        }
+        for (int kinder = 2; kinder <= 6; kinder++) {
+            Set<MissionType> before = new HashSet<>();
+            board.viewFor("SEGURIDAD").forEach(m -> before.add(m.type()));
+            Set<MissionType> missing = new HashSet<>(MissionType.forRole(Role.SEGURIDAD));
+            missing.removeAll(before);
+            board.deal(kinder, team);
+            Set<MissionType> now = new HashSet<>();
+            board.viewFor("SEGURIDAD").forEach(m -> now.add(m.type()));
+            assertTrue(now.containsAll(missing), "Kinder " + kinder + ": faltaba " + missing + " y salio " + now);
+        }
     }
 
     @Test

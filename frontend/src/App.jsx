@@ -11,6 +11,14 @@ import CodeMission from './components/CodeMission';
 import VaccineMission from './components/VaccineMission';
 import CashMission from './components/CashMission';
 import FuseMission from './components/FuseMission';
+import RondaMission from './components/RondaMission';
+import SensoresMission from './components/SensoresMission';
+import PulsoMission from './components/PulsoMission';
+import MedicamentosMission from './components/MedicamentosMission';
+import PresupuestoMission from './components/PresupuestoMission';
+import FacturasMission from './components/FacturasMission';
+import TuberiasMission from './components/TuberiasMission';
+import NivelMission from './components/NivelMission';
 import TouchControls from './components/TouchControls';
 import SpectatorPanel from './components/SpectatorPanel';
 import TutorialHints from './components/TutorialHints';
@@ -27,6 +35,7 @@ import { leaveGame, resumeSession } from './game/gameSync';
 import { startAmbience, stopAmbience } from './game/ambience';
 import './App.css';
 import './halloween.css';
+import './minigames.css';
 
 function App() {
   const [view, setView] = useState('menu');
@@ -122,6 +131,14 @@ function App() {
         <VaccineMission />
         <CashMission />
         <FuseMission />
+        <RondaMission />
+        <SensoresMission />
+        <PulsoMission />
+        <MedicamentosMission />
+        <PresupuestoMission />
+        <FacturasMission />
+        <TuberiasMission />
+        <NivelMission />
         <TouchControls />
         <SpectatorPanel />
         <TutorialHints />

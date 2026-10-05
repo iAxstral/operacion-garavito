@@ -237,6 +237,52 @@ const PATHS = {
       <path d="M7.5 11.5l2 1.5-2 .5zM16.5 11.5l-2 1.5 2 .5zM7.5 16c2 1.5 7 1.5 9 0l-1.5 1.5-1.5-1-1.5 1-1.5-1-1.5 1z" fill="#120708" />
     </>
   ),
+  eye: (
+    <>
+      <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" strokeWidth="2" />
+      <circle cx="12" cy="12" r="3.2" fill="currentColor" />
+    </>
+  ),
+  radar: (
+    <path
+      d="M12 20a8 8 0 1 1 8-8M12 16a4 4 0 1 1 4-4M12 12l6-6M10 21h4"
+      fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"
+    />
+  ),
+  pulse: (
+    <path d="M2 12h4l2-5 3 10 3-13 2 8h6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" strokeLinecap="round" />
+  ),
+  pill: (
+    <g transform="rotate(-40 12 12)">
+      <rect x="3" y="8.5" width="18" height="7" rx="3.5" fill="none" stroke="currentColor" strokeWidth="2" />
+      <path d="M3 12a3.5 3.5 0 0 1 3.5-3.5H12v7H6.5A3.5 3.5 0 0 1 3 12z" fill="currentColor" />
+    </g>
+  ),
+  chart: (
+    <path d="M3 21h18M6 18v-6M11 18V6M16 18v-9M21 18V3" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
+  ),
+  receipt: (
+    <path
+      d="M5 2h14v20l-2.3-1.6L14.3 22 12 20.4 9.7 22l-2.4-1.6L5 22zM8 7h8M8 11h8M8 15h5"
+      fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinejoin="round" strokeLinecap="round"
+    />
+  ),
+  wrench: (
+    <path
+      d="M14.7 6.3a4 4 0 0 0 5 5L22 14l-8 8-2.3-2.3 6.6-6.6-1.3-1.3-6.6 6.6L3 11l2.3-2.3 6.6 6.6 1.3-1.3L6.6 7.4 9 5l2.3 2.3a4 4 0 0 1 3.4-1z"
+      fill="currentColor"
+    />
+  ),
+  ruler: (
+    <path d="M3 21L21 3M3 21h18L3 3zM7 17h3M7 13h2M7 9h1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
+  ),
+  megaphone: (
+    <path
+      d="M3 10v4h3l9 5V5L6 10zM18 9a4 4 0 0 1 0 6M6 14l1.5 6h3L9 15"
+      fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
+    />
+  ),
+  arrow: <path d="M4 12h14M13 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" />,
   question: (
     <path
       d="M8.5 8.5a3.5 3.5 0 1 1 5 3.2c-1 .5-1.5 1.2-1.5 2.3v.5M12 18.5v.5"
@@ -273,6 +319,7 @@ const EMOJI_ICONS = {
   '🔫': 'gun', '★': 'star', '❤': 'heart', '❤️': 'heart', '✊': 'fist', '🪓': 'axe', '🎯': 'rifle',
   '💥': 'burst', '🗺': 'map', '🗺️': 'map', '⚙': 'gear', '⚙️': 'gear', '🏆': 'trophy', '📖': 'book',
   '☠': 'skull', '👥': 'people', '📦': 'box', '✓': 'check', '⟳': 'reload', '»': 'dash', '✕': 'close',
+  '👁': 'eye', '📡': 'radar', '💓': 'pulse', '💊': 'pill', '📊': 'chart', '🧾': 'receipt', '🔧': 'wrench', '📐': 'ruler',
 };
 
 function iconForEmoji(value) {

@@ -24,5 +24,6 @@ public record PlayerState(
         double reviveProgress,
         List<MissionView> missions,
         long abilityReadyInMs,
-        boolean connected) {
+        boolean connected,
+        String name) {
 }

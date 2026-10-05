@@ -15,9 +15,11 @@ public record GameStateMessage(
         List<ProjectileState> projectiles,
         List<BarricadeState> barricades,
         MatchSummary summary,
-        KinderEvent event) {
+        KinderEvent event,
+        List<PuddleState> puddles) {
 
     public static GameStateMessage eventOnly(LastEvent event) {
-        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of(), List.of(), null, null);
+        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of(), List.of(),
+                null, null, List.of());
     }
 }

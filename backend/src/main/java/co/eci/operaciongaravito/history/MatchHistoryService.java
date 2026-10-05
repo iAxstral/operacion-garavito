@@ -48,7 +48,8 @@ public class MatchHistoryService {
         MatchRecord record = new MatchRecord(summary.building().name(), summary.victory(),
                 summary.kinderReached(), summary.durationSeconds(), Instant.now());
         summary.players().forEach(p -> record.addPlayer(new MatchPlayerRecord(
-                p.role(), p.kills(), p.missions(), p.garavitosEarned(), p.damageTaken(), p.revives(), p.downs())));
+                p.role(), p.kills(), p.missions(), p.garavitosEarned(), p.damageTaken(), p.revives(), p.downs(),
+                p.name())));
         return repository.save(record);
     }
 
@@ -57,7 +58,7 @@ public class MatchHistoryService {
     }
 
     public record RankedMatch(long id, boolean victory, int kinderReached, long durationSeconds, Instant playedAt,
-                              int players, int totalKills, int totalMissions, String mvpRole) {
+                              int players, int totalKills, int totalMissions, String mvpRole, String mvpName) {
     }
 
     @Transactional(readOnly = true)
@@ -74,12 +75,12 @@ public class MatchHistoryService {
     private static RankedMatch toRanked(MatchRecord record) {
         int kills = record.getPlayers().stream().mapToInt(MatchPlayerRecord::getKills).sum();
         int missions = record.getPlayers().stream().mapToInt(MatchPlayerRecord::getMissions).sum();
-        String mvp = record.getPlayers().stream()
+        MatchPlayerRecord mvp = record.getPlayers().stream()
                 .max(java.util.Comparator.comparingInt(p -> p.getKills() + 3 * p.getMissions() + 5 * p.getRevives()))
-                .map(MatchPlayerRecord::getRole)
                 .orElse(null);
         return new RankedMatch(record.getId(), record.isVictory(), record.getKinderReached(), record.getDurationSeconds(),
-                record.getPlayedAt(), record.getPlayerCount(), kills, missions, mvp);
+                record.getPlayedAt(), record.getPlayerCount(), kills, missions,
+                mvp == null ? null : mvp.getRole(), mvp == null ? null : mvp.getPlayerName());
     }
 
     @PreDestroy

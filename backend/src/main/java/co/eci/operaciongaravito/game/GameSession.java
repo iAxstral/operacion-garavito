@@ -66,6 +66,12 @@ public class GameSession {
     private final Map<String, String> claimedItems = new ConcurrentHashMap<>();
     private final Map<String, Zombie> zombies = new ConcurrentHashMap<>();
     private final Map<String, AcidProjectile> acids = new ConcurrentHashMap<>();
+    private final Map<String, AcidPuddle> puddles = new ConcurrentHashMap<>();
+    private long puddleSequence = 0;
+
+    /** Avisos al equipo que se aceptan, y cada cuanto puede mandar uno cada jugador. */
+    static final java.util.Set<String> PING_KINDS = java.util.Set.of("ZOMBIES", "HELP", "REVIVE", "GO", "AMMO");
+    static final long PING_COOLDOWN_MS = 1_500;
     private final Map<String, Barricade> barricades = new ConcurrentHashMap<>();
     private long barricadeSequence;
     private final WaveDirector waveDirector;
@@ -291,7 +297,8 @@ public class GameSession {
                             weapon, p.magazine(weapon), p.getReserveAmmo(), reloadingMs,
                             p.getShotSeq(), p.getShotFacing(),
                             p.getReviveTargetId(), p.reviveProgress(now),
-                            missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now), p.isConnected());
+                            missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now), p.isConnected(),
+                            p.getName());
                 })
                 .toList();
     }
@@ -359,6 +366,32 @@ public class GameSession {
         }
     }
 
+    public List<PuddleState> puddleStates() {
+        long now = System.currentTimeMillis();
+        return puddles.values().stream().map(puddle -> puddle.toState(now)).toList();
+    }
+
+    /** Apodo del jugador (se llama al unirse o al volver a su puesto). */
+    public synchronized void setPlayerName(String role, String name) {
+        Player player = players.get(role);
+        if (player != null && name != null) {
+            player.setName(name);
+        }
+    }
+
+    /**
+     * Aviso al equipo ("¡zombis aqui!", "necesito ayuda"...). Va con la posicion que el
+     * servidor tiene del jugador. Devuelve null si el tipo no existe o si mando uno hace
+     * muy poco.
+     */
+    public LastEvent attemptPing(String playerId, String kind, long now) {
+        Player player = players.get(playerId);
+        if (player == null || kind == null || !PING_KINDS.contains(kind) || !player.tryPing(now, PING_COOLDOWN_MS)) {
+            return null;
+        }
+        return LastEvent.ping(playerId, kind, player.getFloor(), Math.round(player.getX()), Math.round(player.getY()));
+    }
+
     public List<ProjectileState> projectileStates() {
         return acids.values().stream().map(AcidProjectile::toState).toList();
     }
@@ -412,6 +445,7 @@ public class GameSession {
             // Cuota cumplida (o jefe vencido): la horda que quedaba se retira.
             zombies.clear();
             acids.clear();
+            puddles.clear();
             boss = null;
             if (waveDirector.isVictory()) {
                 victoryPending = true;
@@ -425,6 +459,7 @@ public class GameSession {
             closeRun(false, waveDirector.getKinder(), now);
             zombies.clear();
             acids.clear();
+            puddles.clear();
             boss = null;
             waveDirector.resetRun(now, WaveCurve.WAVE_REST_MS);
             players.values().forEach(player -> player.revive(REVIVE_HEALTH));
@@ -455,6 +490,14 @@ public class GameSession {
         }
         acids.values().removeIf(acid -> !acid.step(floorGrid(acid.getFloor()), players.values(), deltaSeconds, now));
 
+        // El escupidor muerto deja un charco de acido donde cayo.
+        zombies.values().stream()
+                .filter(zombie -> !zombie.isAlive() && zombie.getKind() == ZombieKind.SPITTER)
+                .forEach(zombie -> {
+                    String id = "pz" + (++puddleSequence);
+                    puddles.put(id, new AcidPuddle(id, zombie.getFloor(), zombie.getX(), zombie.getY(), now));
+                });
+        puddles.values().removeIf(puddle -> !puddle.step(players.values(), now));
         zombies.values().removeIf(zombie -> !zombie.isAlive());
         updateBoss(now, deltaSeconds, targets);
         updateRevives(now);
@@ -1211,6 +1254,7 @@ public class GameSession {
     public void resetGame() {
         zombies.clear();
         acids.clear();
+        puddles.clear();
         boss = null;
         // Antes se reusaba el respiro corto entre oleadas y la preparacion de 45 s
         // nunca llegaba a aplicarse: el HUD mostraba "oleada 1 en 1s" al empezar.

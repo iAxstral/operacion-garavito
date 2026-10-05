@@ -65,9 +65,42 @@ public class Player {
     private volatile long reviveStartedAt = 0;
     private volatile long reviveUntil = 0;
 
+    /** Apodo que eligio el jugador, o null (entonces se le llama por su rol). */
+    private volatile String name = null;
+    /** Ultimo aviso al equipo (pings): se limita para que nadie llene la pantalla. */
+    private volatile long lastPingAt = 0;
+
+    static final int MAX_NAME_LENGTH = 16;
+
     public Player(String role) {
         this.playerId = role;
         this.role = role;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    /** Guarda el apodo sin caracteres de control, con espacios simples y de largo maximo 16. */
+    public void setName(String raw) {
+        if (raw == null) {
+            name = null;
+            return;
+        }
+        String clean = raw.replaceAll("\\p{Cntrl}", "").replaceAll("\\s+", " ").strip();
+        if (clean.length() > MAX_NAME_LENGTH) {
+            clean = clean.substring(0, MAX_NAME_LENGTH).strip();
+        }
+        name = clean.isEmpty() ? null : clean;
+    }
+
+    /** true si ya paso el enfriamiento y registra este aviso. */
+    public synchronized boolean tryPing(long now, long cooldownMs) {
+        if (now - lastPingAt < cooldownMs) {
+            return false;
+        }
+        lastPingAt = now;
+        return true;
     }
 
     public String getPlayerId() {
@@ -439,7 +472,7 @@ public class Player {
     }
 
     public synchronized MatchSummary.PlayerSummary statsSnapshot() {
-        return new MatchSummary.PlayerSummary(role, statKills, statMissions, statEarned, statDamage, statRevives, statDowns);
+        return new MatchSummary.PlayerSummary(role, statKills, statMissions, statEarned, statDamage, statRevives, statDowns, name);
     }
 
     public synchronized void resetStats() {

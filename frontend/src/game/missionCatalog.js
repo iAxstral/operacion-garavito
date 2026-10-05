@@ -1,4 +1,4 @@
-// Espejo de backend/.../MissionType.java y MissionCatalog.java. Las misiones de cada
+// Espejo de backend/.../MissionType.java (cuatro minijuegos por rol) y MissionCatalog.java. Las misiones de cada
 // jugador las reparte el servidor (3 por Kinder); aqui solo esta como mostrarlas.
 
 export const MISSIONS_PER_KINDER = 3;
@@ -13,6 +13,14 @@ export const MISSION_TYPES = {
   CAJA: { role: 'ECONOMIA', name: 'Dar el cambio', icon: '💵', action: 'Dar el cambio exacto' },
   TORRE: { role: 'INFRAESTRUCTURA', name: 'Levantar la estructura', icon: '🧱', action: 'Apilar los bloques' },
   FUSIBLES: { role: 'INFRAESTRUCTURA', name: 'Tablero de fusibles', icon: '⚡', action: 'Restablecer los fusibles' },
+  RONDA: { role: 'SEGURIDAD', name: 'Ronda de vigilancia', icon: '👁', action: 'Hacer la ronda' },
+  SENSORES: { role: 'SEGURIDAD', name: 'Calibrar sensores', icon: '📡', action: 'Calibrar los sensores' },
+  PULSO: { role: 'SALUD', name: 'Tomar el pulso', icon: '💓', action: 'Tomar el pulso' },
+  MEDICAMENTOS: { role: 'SALUD', name: 'Ordenar medicamentos', icon: '💊', action: 'Ordenar el botiquín' },
+  PRESUPUESTO: { role: 'ECONOMIA', name: 'Cuadrar el presupuesto', icon: '📊', action: 'Cuadrar el presupuesto' },
+  FACTURAS: { role: 'ECONOMIA', name: 'Revisar facturas', icon: '🧾', action: 'Buscar la factura mala' },
+  TUBERIAS: { role: 'INFRAESTRUCTURA', name: 'Conectar tuberías', icon: '🔧', action: 'Conectar la tubería' },
+  NIVEL: { role: 'INFRAESTRUCTURA', name: 'Nivelar la viga', icon: '📐', action: 'Nivelar la viga' },
 };
 
 export function missionType(type) {
