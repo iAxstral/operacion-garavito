@@ -17,12 +17,11 @@ test('una partida arranca con 3 misiones y se puede caminar sin correcciones', a
   expect(me.missions).toHaveLength(3);
   await expect(page.locator('.hud-missions')).toContainText('Misiones 0/3');
 
+  // Se mantiene la tecla hasta que el servidor ve el avance (en CI, sin GPU, el juego
+  // corre a pocos cuadros por segundo y tarda mas en recorrer lo mismo).
   await page.keyboard.down('d');
-  await page.waitForTimeout(1500);
+  await expect.poll(async () => (await myState(page)).x, { timeout: 15_000 }).toBeGreaterThan(me.x + 100);
   await page.keyboard.up('d');
-  await page.waitForTimeout(500);
-  const after = await myState(page);
-  expect(after.x).toBeGreaterThan(me.x + 100);
   const corrections = await page.evaluate(() => window.__phaserGame.scene.getScene('MainScene').corrections ?? 0);
   expect(corrections).toBe(0);
 });
