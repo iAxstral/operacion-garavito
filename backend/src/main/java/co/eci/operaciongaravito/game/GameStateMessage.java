@@ -14,9 +14,10 @@ public record GameStateMessage(
         BossView boss,
         List<ProjectileState> projectiles,
         List<BarricadeState> barricades,
-        MatchSummary summary) {
+        MatchSummary summary,
+        KinderEvent event) {
 
     public static GameStateMessage eventOnly(LastEvent event) {
-        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of(), List.of(), null);
+        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of(), List.of(), null, null);
     }
 }

@@ -3214,3 +3214,39 @@ kbd {
     font-size: 12px;
   }
 }
+
+/* ---------- Eventos de Kinder ---------- */
+
+.hud-kinder-event {
+  position: absolute;
+  top: calc(56px + env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  padding: 7px 14px;
+  font-size: 13px;
+  text-align: center;
+  border-radius: 999px;
+  animation: hud-event-pulse 1.2s ease-in-out infinite;
+}
+
+.hud-kinder-event--blackout {
+  color: #1a1400;
+  background: rgba(255, 210, 63, 0.92);
+}
+
+.hud-kinder-event--supply {
+  color: #062006;
+  background: rgba(111, 211, 111, 0.92);
+}
+
+@keyframes hud-event-pulse {
+  50% { box-shadow: 0 0 18px rgba(255, 255, 255, 0.45); }
+}
+
+@media (max-width: 640px), (max-height: 500px) {
+  .hud-kinder-event {
+    top: calc(96px + env(safe-area-inset-top));
+    font-size: 11px;
+  }
+}

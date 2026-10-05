@@ -54,6 +54,11 @@ public class WaveDirector {
                 phase == Phase.ACTIVE && waitingForMissions, 0, 0);
     }
 
+    /** True si hay un Kinder en curso (no respiro ni victoria). */
+    public synchronized boolean isActive() {
+        return phase == Phase.ACTIVE;
+    }
+
     public synchronized int getKinder() {
         return kinder;
     }
@@ -183,12 +188,26 @@ public class WaveDirector {
     }
 
     private List<Zombie> spawnBurst(int alive, Collection<Player> players) {
+        int room = WaveCurve.maxAlive(blueprint, players.size()) - alive;
+        return spawn(Math.min(blueprint.spawnBurst(), room), players);
+    }
+
+    /**
+     * Horda extra (p. ej. si nadie recogio los suministros): {@code count} zombis del
+     * Kinder activo aunque se pase el tope de vivos. Vacia si no hay Kinder activo.
+     */
+    public synchronized List<Zombie> surge(Collection<Player> players, int count) {
+        if (phase != Phase.ACTIVE) {
+            return List.of();
+        }
+        return spawn(count, players);
+    }
+
+    private List<Zombie> spawn(int count, Collection<Player> players) {
         List<Player> living = players.stream().filter(Player::isAlive).toList();
         if (living.isEmpty()) {
             return List.of();
         }
-        int room = WaveCurve.maxAlive(blueprint, players.size()) - alive;
-        int count = Math.min(blueprint.spawnBurst(), room);
 
         ThreadLocalRandom random = ThreadLocalRandom.current();
         List<Zombie> burst = new ArrayList<>(Math.max(0, count));

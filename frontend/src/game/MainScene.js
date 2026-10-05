@@ -33,6 +33,9 @@ import {
   getAbilityPanel,
   setAbilityPanel,
   onGameEvent,
+  getKinderEvent,
+  requestEventInteract,
+  setNearEvent,
   setNearVendor,
   setNearMission,
   setNearDoor,
@@ -200,6 +203,7 @@ export default class MainScene extends Phaser.Scene {
     // Los sprites del piso anterior ya se destruyeron con la escena.
     this.acidSprites = new Map();
     this.barricadeSprites = new Map();
+    this.eventMarker = null;
     this.changingFloor = false;
     this.spritePrefix = roleInfo(getMyRole()).spritePrefix;
   }
@@ -629,6 +633,43 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
+  // Evento del Kinder: apagon (oscuridad + tablero) o caja de suministros.
+  syncKinderEvent() {
+    const event = getKinderEvent();
+    this.lighting?.setBlackout(event?.type === 'BLACKOUT');
+    const here = event && event.floor === this.floor ? event : null;
+    if (this.eventMarker && this.eventMarker.id !== here?.id) {
+      this.tweens.killTweensOf(this.eventMarker.text);
+      this.eventMarker.text.destroy();
+      this.eventMarker.glow.destroy();
+      this.eventMarker = null;
+    }
+    if (here && !this.eventMarker) {
+      const blackout = here.type === 'BLACKOUT';
+      const glow = this.add.circle(here.x, here.y, 34, blackout ? 0xffd23f : 0x6fd36f, 0.35)
+        .setDepth(5300).setBlendMode(Phaser.BlendModes.ADD);
+      const text = this.add.text(here.x, here.y, blackout ? '⚡\nTablero' : '📦\nSuministros', {
+        fontFamily: 'sans-serif',
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        align: 'center',
+        backgroundColor: blackout ? '#7a5a00' : '#2d6a2d',
+        padding: { x: 6, y: 3 },
+      }).setOrigin(0.5).setDepth(5301);
+      this.tweens.add({ targets: [text, glow], scale: 1.15, duration: 500, yoyo: true, repeat: -1 });
+      this.eventMarker = { id: here.id, text, glow };
+    }
+
+    const near = Boolean(here && this.player && !this.spectating
+      && Math.hypot(this.player.x - here.x, this.player.y - here.y) <= 90);
+    setNearEvent(near);
+    if (near && this.interactKey && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      requestEventInteract();
+      playSfx(here.type === 'BLACKOUT' ? 'hammer' : 'coins');
+    }
+  }
+
   bakeBarricadeTexture() {
     if (this.textures.exists(BARRICADE_TEXTURE)) return;
     const g = this.make.graphics({ x: 0, y: 0, add: false });
@@ -763,6 +804,7 @@ export default class MainScene extends Phaser.Scene {
   syncBoss(delta) {
     this.syncProjectiles(delta);
     this.syncBarricades();
+    this.syncKinderEvent();
     const boss = getBoss();
     this.bossLayer.sync(boss && boss.floor === this.floor ? boss : null);
     this.bossLayer.update(delta);

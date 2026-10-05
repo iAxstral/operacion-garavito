@@ -6,6 +6,7 @@ import {
   getMyPlayerState,
   getMyRole,
   getZombies,
+  getKinderEvent,
   onAbilityPanelChange,
   setAbilityPanel,
 } from '../game/gameSync';
@@ -121,6 +122,17 @@ export default function PhonePanel() {
           ctx.fillRect(cam.x * scale - 2, cam.y * scale - 2, 4, 4);
         });
 
+        // Apagon: las camaras no tienen energia.
+        if (getKinderEvent()?.type === 'BLACKOUT') {
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.fillStyle = '#ffd23f';
+          ctx.font = 'bold 16px sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('📵 SIN ENERGÍA — cámaras apagadas', canvas.width / 2, canvas.height / 2);
+          rafId = requestAnimationFrame(draw);
+          return;
+        }
         getZombies()
           .filter((z) => z.floor === floor && seenBy(cameras, z.x, z.y))
           .forEach((z) => {

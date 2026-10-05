@@ -156,7 +156,8 @@ public class GameSessionService {
                 session.bossView(),
                 session.projectileStates(),
                 session.barricadeStates(),
-                session.lastSummary()
+                session.lastSummary(),
+                session.kinderEvent()
         );
     }
 

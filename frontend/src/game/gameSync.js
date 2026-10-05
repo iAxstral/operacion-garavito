@@ -366,6 +366,26 @@ export function requestTransfer(targetId, amount) {
   socketService.publish(`/app/game/${gameId}/transfer`, { playerId: myRole, targetId, amount });
 }
 
+/** Evento del Kinder en curso ({ id, type: 'BLACKOUT'|'SUPPLY', room, floor, x, y, endsInMs }) o null. */
+export function getKinderEvent() {
+  return latestState.event ?? null;
+}
+
+export function requestEventInteract() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/event/interact`, { playerId: myRole });
+}
+
+let nearEvent = false;
+
+export function setNearEvent(near) {
+  nearEvent = near;
+}
+
+export function getNearEvent() {
+  return nearEvent;
+}
+
 /** Barricadas de Infraestructura ({ id, ownerId, floor, col, row, health, maxHealth }). */
 export function getBarricades() {
   return latestState.barricades ?? [];

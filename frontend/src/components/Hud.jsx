@@ -14,6 +14,7 @@ import {
   onNearDownedChange,
   getNearBarricade,
   getBarricades,
+  getNearEvent,
   isTouchDevice,
   isInputLocked,
   purchaseItem,
@@ -52,6 +53,8 @@ const REJECTION_MESSAGES = {
   too_many_barricades: 'Ya tienes 2 barricadas: repáralas o espera a que caigan',
   blocked_spot: 'No se puede poner la barricada ahí',
   unknown_barricade: 'Esa barricada ya no existe',
+  needs_builder: 'Solo Infraestructura sabe arreglar el tablero eléctrico',
+  no_event: 'Eso ya se resolvió',
 };
 
 const FOOD_HEAL_DEFAULT = 15;
@@ -275,7 +278,7 @@ export default function Hud() {
         return;
       }
       if ((event.key === 'e' || event.key === 'E' || event.key === 'i' || event.key === 'I')
-        && !getNearMission() && !getNearStairs() && !getNearDowned() && !getNearBarricade()) {
+        && !getNearMission() && !getNearStairs() && !getNearDowned() && !getNearBarricade() && !getNearEvent()) {
         event.preventDefault();
         setInventoryOpen((open) => !open);
         return;
@@ -292,10 +295,23 @@ export default function Hud() {
 
   useEffect(() => {
     const event = state.lastEvent;
-    if (!event || (event.playerId !== getMyRole() && event.type !== 'REVIVED' && event.type !== 'TRANSFER')) return undefined;
+    const broadcastTypes = ['REVIVED', 'TRANSFER', 'EVENT_STARTED', 'EVENT_RESOLVED', 'EVENT_FAILED'];
+    if (!event || (event.playerId !== getMyRole() && !broadcastTypes.includes(event.type))) return undefined;
 
     let message = null;
     // Reanimaciones: se avisa a todos, no solo al que hizo la accion.
+    const KINDER_EVENT_MESSAGES = {
+      EVENT_STARTED: { BLACKOUT: '⚡ ¡Apagón! Infraestructura tiene que llegar al tablero eléctrico', SUPPLY: '📦 ¡Suministros urgentes! Recójanlos antes de que se acabe el tiempo' },
+      EVENT_RESOLVED: { BLACKOUT: '💡 ¡Volvió la luz!', SUPPLY: `📦 ¡Suministros recogidos! +20 Garavitos y +25 de vida para todos` },
+      EVENT_FAILED: { SUPPLY: '📦 Se perdieron los suministros… ¡viene una horda!' },
+    };
+    if (KINDER_EVENT_MESSAGES[event.type]) {
+      message = KINDER_EVENT_MESSAGES[event.type][event.reason] ?? null;
+      if (!message) return undefined;
+      setToast(message);
+      const timeout = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(timeout);
+    }
     if (event.type === 'TRANSFER' && (event.playerId === getMyRole() || event.itemId === getMyRole())) {
       message = event.playerId === getMyRole()
         ? `Enviaste ${event.reason} Garavitos a ${roleInfo(event.itemId).name}`
@@ -567,6 +583,21 @@ export default function Hud() {
           {me?.reviving === nearDowned.playerId && (
             <div className="hud-revive-bar"><div style={{ width: `${Math.round((me.reviveProgress ?? 0) * 100)}%` }} /></div>
           )}
+        </div>
+      )}
+
+      {state.event && (
+        <div className={`hud-kinder-event hud-kinder-event--${state.event.type.toLowerCase()}`}>
+          {state.event.type === 'BLACKOUT'
+            ? `⚡ Apagón — tablero en ${state.event.room} (piso ${state.event.floor})`
+            : `📦 Suministros en ${state.event.room} (piso ${state.event.floor})`}
+          <strong> {Math.ceil(state.event.endsInMs / 1000)}s</strong>
+        </div>
+      )}
+
+      {getNearEvent() && state.event && (
+        <div className="hud-interact-hint">
+          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {state.event.type === 'BLACKOUT' ? 'Restablecer la luz' : 'Recoger los suministros'}
         </div>
       )}
 

@@ -10,6 +10,9 @@ const DARKNESS_COLOR = 'rgba(6, 12, 20, 0.58)';
 const RESOLUTION = 0.5;
 
 const PLAYER_RADIUS = 340;
+// Apagon: casi negro, solo una linterna corta alrededor de cada jugador.
+const BLACKOUT_COLOR = 'rgba(2, 4, 8, 0.94)';
+const BLACKOUT_PLAYER_RADIUS = 170;
 const REMOTE_RADIUS = 140;
 
 const DEPTH_FOG = 4990;
@@ -150,6 +153,10 @@ export default class Lighting {
       .setDisplaySize(width / camera.zoom, height / camera.zoom);
   }
 
+  setBlackout(on) {
+    this.blackout = Boolean(on);
+  }
+
   // mode: 'steady' | 'flicker' | 'broken'. Con bulb=true dibuja el foco con su resplandor.
   addLight({ x, y, radius, mode = 'steady', bulb = true }) {
     const additive = (tint) => this.scene.add
@@ -210,12 +217,12 @@ export default class Lighting {
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = DARKNESS_COLOR;
+    ctx.fillStyle = this.blackout ? BLACKOUT_COLOR : DARKNESS_COLOR;
     ctx.fillRect(0, 0, width, height);
 
     ctx.globalCompositeOperation = 'destination-out';
     this.lights.forEach((light) => {
-      const level = this.intensity(light, time);
+      const level = this.blackout ? 0 : this.intensity(light, time);
       if (light.glow) {
         light.glow.setAlpha(0.5 * level).setDisplaySize(70 + 40 * level, 70 + 40 * level);
         light.halo.setAlpha(0.22 * level).setDisplaySize(light.radius * 0.9, light.radius * 0.9);
@@ -224,7 +231,7 @@ export default class Lighting {
       this.punch(ctx, view, light.x, light.y, light.radius * (0.85 + 0.15 * level), 0.9 * level);
     });
     remotePlayers?.forEach((entry) => this.punch(ctx, view, entry.sprite.x, entry.sprite.y, REMOTE_RADIUS, 0.85));
-    if (player) this.punch(ctx, view, player.x, player.y - 8, PLAYER_RADIUS, 1);
+    if (player) this.punch(ctx, view, player.x, player.y - 8, this.blackout ? BLACKOUT_PLAYER_RADIUS : PLAYER_RADIUS, 1);
 
     this.texture.refresh();
   }

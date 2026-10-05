@@ -104,6 +104,25 @@ public class GameSession {
     /** Una accion (ataque) puede venir con la posicion un poco mas fresca que la del servidor. */
     static final double ACTION_POSITION_TOLERANCE_PX = 48;
 
+    /* Eventos de Kinder (desde el 2): uno por Kinder, en un momento al azar. */
+    static final int FIRST_EVENT_KINDER = 2;
+    static final long EVENT_MIN_DELAY_MS = 20_000;
+    static final long EVENT_MAX_DELAY_MS = 45_000;
+    static final long BLACKOUT_MS = 50_000;
+    static final long SUPPLY_MS = 40_000;
+    static final double EVENT_RANGE_PX = 90;
+    static final int SUPPLY_GARAVITOS = 20;
+    static final int SUPPLY_HEAL = 25;
+    static final int SUPPLY_FAIL_SURGE = 6;
+
+    private record ActiveEvent(String id, KinderEvent.Type type, MissionSite site, long endsAt) {
+    }
+
+    private volatile ActiveEvent activeEvent;
+    private long nextEventAt;
+    private int eventKinder;
+    private long eventSequence;
+
     /** Cuanto se le guarda el puesto a un jugador que se desconecto. */
     public static final long RECONNECT_GRACE_MS = 30_000;
     private final Map<String, String> seatTokens = new ConcurrentHashMap<>();
@@ -440,6 +459,7 @@ public class GameSession {
         updateBoss(now, deltaSeconds, targets);
         updateRevives(now);
         updateBarricades(deltaSeconds);
+        updateKinderEvent(now);
 
         if (waveDirector.restingSeconds(now) > 0) {
             players.values().forEach(player -> {
@@ -475,6 +495,107 @@ public class GameSession {
     /** Siguiente resumen que todavia no se guardo en el historial, o null. */
     public MatchSummary pollSummaryToSave() {
         return summariesToSave.poll();
+    }
+
+    /** Programa, vence o limpia el evento del Kinder. */
+    private void updateKinderEvent(long now) {
+        int kinder = waveDirector.getKinder();
+        if (!waveDirector.isActive()) {
+            // Termino el Kinder (o cayo el equipo): el evento que quedaba se cancela.
+            if (activeEvent != null) {
+                activeEvent = null;
+            }
+            nextEventAt = 0;
+            return;
+        }
+        ActiveEvent current = activeEvent;
+        if (current != null) {
+            if (now >= current.endsAt()) {
+                activeEvent = null;
+                if (current.type() == KinderEvent.Type.SUPPLY) {
+                    waveDirector.surge(players.values(), SUPPLY_FAIL_SURGE).forEach(z -> zombies.put(z.getId(), z));
+                    pendingEvents.add(new LastEvent("EVENT_FAILED", null, current.id(), current.type().name()));
+                } else {
+                    pendingEvents.add(new LastEvent("EVENT_RESOLVED", null, current.id(), current.type().name()));
+                }
+            }
+            return;
+        }
+        if (kinder < FIRST_EVENT_KINDER || eventKinder == kinder) {
+            return;
+        }
+        java.util.concurrent.ThreadLocalRandom random = java.util.concurrent.ThreadLocalRandom.current();
+        if (nextEventAt == 0) {
+            nextEventAt = now + random.nextLong(EVENT_MIN_DELAY_MS, EVENT_MAX_DELAY_MS);
+            return;
+        }
+        if (now < nextEventAt) {
+            return;
+        }
+        // Kinder par: apagon; impar: suministros. Asi en una corrida aparecen los dos.
+        KinderEvent.Type type = kinder % 2 == 0 ? KinderEvent.Type.BLACKOUT : KinderEvent.Type.SUPPLY;
+        startKinderEvent(type, now, random);
+    }
+
+    private void startKinderEvent(KinderEvent.Type type, long now, java.util.random.RandomGenerator random) {
+        List<MissionSite> sites = MissionCatalog.sitesFor(building);
+        MissionSite site = sites.get(random.nextInt(sites.size()));
+        long duration = type == KinderEvent.Type.BLACKOUT ? BLACKOUT_MS : SUPPLY_MS;
+        activeEvent = new ActiveEvent("ev" + (++eventSequence), type, site, now + duration);
+        eventKinder = waveDirector.getKinder();
+        nextEventAt = 0;
+        pendingEvents.add(new LastEvent("EVENT_STARTED", null, activeEvent.id(), type.name()));
+    }
+
+    /** Para pruebas y para forzar un evento en el Kinder actual. */
+    void forceKinderEvent(KinderEvent.Type type, long now) {
+        startKinderEvent(type, now, java.util.random.RandomGenerator.getDefault());
+    }
+
+    public KinderEvent kinderEvent() {
+        ActiveEvent current = activeEvent;
+        if (current == null) {
+            return null;
+        }
+        MissionSite site = current.site();
+        return new KinderEvent(current.id(), current.type(), site.room(), site.floor(),
+                Math.round(site.x()), Math.round(site.y()), Math.max(0, current.endsAt() - System.currentTimeMillis()));
+    }
+
+    /**
+     * Un jugador interactua con el evento (tablero electrico o caja). El apagon lo
+     * arregla Infraestructura (o cualquiera si nadie tiene ese rol vivo); los
+     * suministros los recoge cualquiera y le sirven a todo el equipo.
+     */
+    public synchronized PlayerActionResult attemptEventInteract(String playerId) {
+        Player player = players.get(playerId);
+        ActiveEvent current = activeEvent;
+        if (player == null || current == null) {
+            return PlayerActionResult.rejected("no_event");
+        }
+        if (!player.isAlive()) {
+            return PlayerActionResult.rejected("downed");
+        }
+        MissionSite site = current.site();
+        if (player.getFloor() != site.floor()
+                || Math.hypot(player.getX() - site.x(), player.getY() - site.y()) > EVENT_RANGE_PX) {
+            return PlayerActionResult.rejected("too_far");
+        }
+        if (current.type() == KinderEvent.Type.BLACKOUT) {
+            boolean builderAround = players.values().stream()
+                    .anyMatch(p -> p.isAlive() && BUILDER_ROLE.equals(p.getRole()));
+            if (builderAround && !BUILDER_ROLE.equals(player.getRole())) {
+                return PlayerActionResult.rejected("needs_builder");
+            }
+        } else {
+            players.values().stream().filter(Player::isAlive).forEach(p -> {
+                p.addEarnings(SUPPLY_GARAVITOS);
+                p.heal(SUPPLY_HEAL);
+            });
+        }
+        activeEvent = null;
+        pendingEvents.add(new LastEvent("EVENT_RESOLVED", playerId, current.id(), current.type().name()));
+        return PlayerActionResult.ok();
     }
 
     /** Los zombis pegados a una barricada la van rompiendo. */
@@ -1097,6 +1218,9 @@ public class GameSession {
         claimedItems.clear();
         missionBoard.reset();
         barricades.clear();
+        activeEvent = null;
+        nextEventAt = 0;
+        eventKinder = 0;
         runStartedAt = System.currentTimeMillis();
         lastSummary = null;
         floors.forEach(FloorGrid::resetDoors);

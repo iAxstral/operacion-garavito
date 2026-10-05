@@ -248,6 +248,17 @@ public class GameController {
         }
     }
 
+    @MessageMapping("/game/{gameId}/event/interact")
+    public void interactEvent(@DestinationVariable String gameId, PlayerRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptEventInteract(request.playerId());
+        // El exito lo anuncia el tick (EVENT_RESOLVED); aqui solo el rechazo.
+        broadcast(gameId, session, result.success() ? session.pollEvent() : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
     @MessageMapping("/game/{gameId}/barricade/place")
     public void placeBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
         GameSession session = sessionService.find(gameId);
