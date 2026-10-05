@@ -45,6 +45,7 @@ import { ownedWeapons, weaponById } from './weaponCatalog';
 import { BARRICADE_REPAIR_RANGE_PX } from './abilityCatalog';
 import { channelVolume, getSettings, vibrate } from './settings';
 import { playSfx } from './sfx';
+import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
 import Lighting from './Lighting';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
@@ -417,6 +418,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.nextZombieSoundAt = 0;
     this.lastHealth = null;
+    startMusic(this.musicLevel());
     this.startRain();
     this.createFoodItems();
     this.createVendors();
@@ -859,6 +861,17 @@ export default class MainScene extends Phaser.Scene {
     this.updateMissionProximity();
     this.updateZombieAudio(time);
     this.updateRain(time);
+    setMusicIntensity(this.musicLevel());
+  }
+
+  // Calma en el respiro, latido en el Kinder, peligro con el jefe, cuando ya solo
+  // faltan misiones (la horda no para) o con poca vida.
+  musicLevel() {
+    const wave = getLatestState().wave;
+    const me = getMyPlayerState();
+    if (!wave || wave.victory || wave.restingSeconds > 0) return 0;
+    if (wave.bossStage || wave.waitingForMissions || (me && me.health > 0 && me.health <= 30)) return 2;
+    return 1;
   }
 
   applyServerPosition() {

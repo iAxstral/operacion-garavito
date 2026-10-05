@@ -4,6 +4,7 @@ import HowToPlay from './HowToPlay';
 import RankingPanel from './RankingPanel';
 import { playSfx } from '../game/sfx';
 import { channelVolume, onSettingsChange } from '../game/settings';
+import { startMusic, stopMusic } from '../game/music';
 
 const VIDEO_SRC = '/video/inicio.mp4';
 const POSTER_SRC = '/video/inicio-poster.jpg';
@@ -41,6 +42,7 @@ export default function MainMenu({ onPlay }) {
 
   const showMenu = () => {
     markIntroSeen();
+    startMusic(0);
     const video = videoRef.current;
     if (video) {
       video.pause();
@@ -54,6 +56,7 @@ export default function MainMenu({ onPlay }) {
     const video = videoRef.current;
     if (!video) return;
     video.currentTime = 0;
+    stopMusic();
     setPhase('intro');
     video.play().catch(showMenu);
   };
@@ -68,6 +71,8 @@ export default function MainMenu({ onPlay }) {
     } else {
       video.pause();
       if (Math.abs(video.currentTime - MENU_FRAME_S) > 0.2) video.currentTime = MENU_FRAME_S;
+      // Suena desde el primer toque del jugador (los navegadores no dejan antes).
+      startMusic(0);
     }
     // Solo al montar: despues las transiciones las hacen showMenu y replayIntro.
     // eslint-disable-next-line react-hooks/exhaustive-deps

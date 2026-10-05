@@ -12,6 +12,7 @@ import {
 } from '../game/settings';
 import { playSfx } from '../game/sfx';
 import { resetTutorial } from '../game/tutorial';
+import { isMusicPlaying, startMusic, stopMusic } from '../game/music';
 
 // Muestra que se escucha al soltar cada barra, con el volumen recien elegido.
 const PREVIEW_FILES = { ambient: '/sounds/rain.wav', zombies: '/sounds/zombie_groan.wav' };
@@ -63,6 +64,14 @@ export default function SettingsPanel({ onClose, inGame = false }) {
 
   const preview = (channel) => {
     previewRef.current?.pause();
+    if (channel === 'music') {
+      // Si no estaba sonando, se escucha un momento para probar el volumen.
+      if (!isMusicPlaying()) {
+        startMusic(0);
+        setTimeout(stopMusic, 3500);
+      }
+      return;
+    }
     const file = PREVIEW_FILES[channel];
     if (!file) {
       playSfx(PREVIEW_SFX[channel] ?? 'click');

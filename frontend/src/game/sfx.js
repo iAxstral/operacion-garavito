@@ -8,7 +8,8 @@ import { channelVolume } from './settings';
 let context = null;
 let noiseBuffer = null;
 
-function audio() {
+/** AudioContext compartido (efectos y musica). null si el navegador no tiene Web Audio. */
+export function audio() {
   if (!context) {
     const AudioContextClass = window.AudioContext ?? window.webkitAudioContext;
     if (!AudioContextClass) return null;
