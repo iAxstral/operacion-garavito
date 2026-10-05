@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import SettingsPanel from './SettingsPanel';
 import HowToPlay from './HowToPlay';
 import RankingPanel from './RankingPanel';
+import HalloweenCreatures from './HalloweenCreatures';
 import { playSfx } from '../game/sfx';
 import { channelVolume, onSettingsChange } from '../game/settings';
 import { startMusic, stopMusic } from '../game/music';
@@ -122,6 +123,9 @@ export default function MainMenu({ onPlay }) {
         aria-hidden="true"
       />
       <div className="start-shade" />
+      <div className="start-fog" aria-hidden="true" />
+      <div className="start-flash" aria-hidden="true" />
+      {phase === 'menu' && <HalloweenCreatures bats={5} spiders={3} />}
       <div className="start-embers" aria-hidden="true">
         {Array.from({ length: EMBERS }, (_, i) => (
           <span key={i} style={{ '--i': i, '--x': `${(i * 37) % 100}%`, '--d': `${6 + (i % 5) * 1.3}s` }} />
@@ -141,13 +145,13 @@ export default function MainMenu({ onPlay }) {
 
       {phase === 'menu' && (
         <main className="start-menu">
-          <p className="start-kicker">ECI · Edificios F y C</p>
+          <p className="start-kicker">ECI · Noche de Halloween</p>
           <h1 className="start-title">
             <span>Operación</span>
             <span className="start-title-big">Garavito</span>
           </h1>
           <p className="start-tagline">
-            Cuatro roles, cinco Kinders y una horda que no para. Cumplan sus misiones, cuídense y no caigan.
+            Cuatro roles, cinco Kinders y una horda que no duerme. Cumplan sus misiones, cuídense… y no miren atrás.
           </p>
 
           <nav className="start-actions" aria-label="Menú principal">

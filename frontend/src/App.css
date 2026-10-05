@@ -685,15 +685,18 @@
   align-items: center;
   justify-content: center;
   gap: 12px;
-  background: #0b120b;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 50% 40%, #1a0c10 0%, #07040a 70%);
   font-family: sans-serif;
-  color: #e7f2e7;
+  color: #efe3dc;
 }
 
 .building-select-stage {
   position: relative;
-  width: min(100vw, calc((100dvh - 64px) * 1024 / 572));
-  aspect-ratio: 1024 / 572;
+  width: min(100vw, calc((100dvh - 64px) * 1647 / 955));
+  aspect-ratio: 1647 / 955;
+  overflow: hidden;
+  box-shadow: 0 0 60px rgba(120, 0, 0, 0.35);
 }
 
 .building-select-map {
@@ -701,44 +704,148 @@
   height: 100%;
   display: block;
   user-select: none;
+  animation: building-map-flicker 9s steps(1) infinite;
+}
+
+/* Parpadeo de luz electrica: casi siempre igual, con dos bajones cortos. */
+@keyframes building-map-flicker {
+  0%, 100% { filter: brightness(1); }
+  61% { filter: brightness(0.82); }
+  62% { filter: brightness(1); }
+  64% { filter: brightness(0.7); }
+  65% { filter: brightness(1); }
+}
+
+/* Neblina que se arrastra por el campus. */
+.building-select-fog {
+  position: absolute;
+  inset: 30% -50% 0 -50%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 22% 30% at 20% 70%, rgba(170, 160, 190, 0.16), transparent 70%),
+    radial-gradient(ellipse 28% 24% at 55% 85%, rgba(150, 140, 170, 0.14), transparent 70%),
+    radial-gradient(ellipse 20% 26% at 85% 65%, rgba(170, 160, 190, 0.12), transparent 70%);
+  animation: building-fog 38s linear infinite alternate;
+}
+
+@keyframes building-fog {
+  from { transform: translateX(-12%); }
+  to { transform: translateX(12%); }
+}
+
+/* Relampago: un destello cada tanto sobre todo el mapa. */
+.building-select-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: rgba(210, 220, 255, 0.55);
+  mix-blend-mode: overlay;
+  opacity: 0;
+  animation: building-lightning 13s linear infinite;
+  animation-delay: 4s;
+}
+
+@keyframes building-lightning {
+  0%, 89%, 100% { opacity: 0; }
+  90% { opacity: 0.9; }
+  91% { opacity: 0.1; }
+  92.5% { opacity: 0.7; }
+  95% { opacity: 0; }
+}
+
+.building-select-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.75) 100%);
 }
 
 .building-hotspot {
   position: absolute;
+  z-index: 2;
   padding: 0;
   border: none;
   border-radius: 6px;
   background: transparent;
   cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
 }
 
 .building-hotspot--enabled {
-  box-shadow: 0 0 0 2px rgba(255, 224, 120, 0.9), 0 0 16px rgba(255, 224, 120, 0.7);
-  animation: building-pulse 1.4s ease-in-out infinite;
+  box-shadow: 0 0 0 2px rgba(255, 60, 40, 0.75), 0 0 14px rgba(255, 40, 20, 0.55);
+  animation: building-pulse 1.8s ease-in-out infinite;
 }
 
-.building-hotspot--enabled:hover {
-  background: rgba(255, 224, 120, 0.25);
+.building-hotspot--enabled.building-hotspot--hover,
+.building-hotspot--enabled:focus-visible {
+  outline: none;
+  background: rgba(255, 70, 40, 0.18);
+  transform: scale(1.06);
+  box-shadow: 0 0 0 3px #ff4a2a, 0 0 34px rgba(255, 50, 20, 0.95);
+  animation: none;
 }
 
 .building-hotspot--locked {
-  background: rgba(10, 14, 12, 0.55);
+  background: rgba(0, 0, 0, 0.45);
   cursor: not-allowed;
+}
+
+.building-hotspot--locked.building-hotspot--hover {
+  background: rgba(0, 0, 0, 0.6);
+  box-shadow: inset 0 0 0 1px rgba(120, 120, 120, 0.5);
 }
 
 @keyframes building-pulse {
   50% {
-    box-shadow: 0 0 0 3px rgba(255, 224, 120, 1), 0 0 26px rgba(255, 224, 120, 0.95);
+    box-shadow: 0 0 0 3px rgba(255, 60, 40, 1), 0 0 26px rgba(255, 30, 10, 0.9);
   }
 }
 
 .building-select-bar {
+  position: relative;
+  z-index: 3;
   display: flex;
   align-items: center;
   gap: 16px;
   min-height: 40px;
   padding: 0 16px;
   font-size: 14px;
+}
+
+.building-select-bar .screen-back-btn {
+  color: #f0dcd6;
+  background: rgba(70, 8, 8, 0.55);
+  border-color: rgba(255, 70, 50, 0.45);
+}
+
+.building-select-bar .screen-back-btn:hover {
+  background: rgba(130, 14, 10, 0.7);
+}
+
+/* Alto fijo de dos lineas: si el texto cambiara el alto de la barra, el mapa se
+   moveria bajo el puntero al pasar sobre un edificio. */
+.building-select-notice {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  height: 2.8em;
+  line-height: 1.4em;
+  width: min(560px, calc(100vw - 150px));
+  align-content: center;
+  letter-spacing: 0.3px;
+  text-shadow: 0 0 10px rgba(255, 40, 20, 0.45);
+}
+
+.building-select-notice--locked {
+  color: #ff8a7a;
+  animation: building-notice-shake 0.4s ease;
+}
+
+@keyframes building-notice-shake {
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
 }
 
 .screen-back-btn {
@@ -1943,11 +2050,15 @@ body {
   }
 
   .building-select-bar {
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 8px;
+    width: 100%;
+    gap: 10px;
     font-size: 12px;
-    text-align: center;
+  }
+
+  .building-select-notice {
+    flex: 1;
+    width: auto;
+    min-width: 0;
   }
 
   .settings-panel {
@@ -2655,8 +2766,8 @@ body {
   inset: 0;
   overflow: hidden;
   font-family: sans-serif;
-  color: #f2ede4;
-  background: #0b0716 url('/video/inicio-poster.jpg') center / cover no-repeat;
+  color: #efe3dc;
+  background: #050306;
 }
 
 .start-video {
@@ -2668,8 +2779,13 @@ body {
   transform-origin: 60% 45%;
 }
 
-/* En el menu el cuadro queda quieto con un zoom lento de ida y vuelta. */
+.start-screen--intro .start-video {
+  filter: brightness(0.78) contrast(1.08);
+}
+
+/* En el menu el cuadro queda quieto, oscuro y rojizo, con un zoom lento. */
 .start-screen--menu .start-video {
+  filter: brightness(0.42) saturate(0.75) contrast(1.2) sepia(0.25) hue-rotate(-18deg);
   animation: start-kenburns 26s ease-in-out infinite alternate;
 }
 
@@ -2684,13 +2800,53 @@ body {
   pointer-events: none;
   transition: opacity 0.8s ease;
   background:
-    linear-gradient(90deg, rgba(8, 4, 18, 0.92) 0%, rgba(8, 4, 18, 0.7) 34%, rgba(8, 4, 18, 0.1) 70%),
-    linear-gradient(0deg, rgba(8, 4, 18, 0.85) 0%, rgba(8, 4, 18, 0) 40%),
-    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.55) 100%);
+    linear-gradient(90deg, rgba(4, 1, 3, 0.96) 0%, rgba(8, 1, 4, 0.8) 34%, rgba(20, 0, 4, 0.3) 70%),
+    linear-gradient(0deg, rgba(4, 1, 3, 0.95) 0%, rgba(4, 1, 3, 0) 45%),
+    linear-gradient(180deg, rgba(4, 1, 3, 0.8) 0%, rgba(4, 1, 3, 0) 25%),
+    radial-gradient(ellipse at 65% 45%, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.85) 100%);
 }
 
 .start-screen--intro .start-shade {
-  opacity: 0.25;
+  opacity: 0.3;
+}
+
+/* Neblina baja que se arrastra por el suelo. */
+.start-fog {
+  position: absolute;
+  inset: 45% -50% -10% -50%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 20% 35% at 15% 80%, rgba(150, 140, 170, 0.14), transparent 70%),
+    radial-gradient(ellipse 26% 30% at 50% 90%, rgba(130, 120, 150, 0.16), transparent 70%),
+    radial-gradient(ellipse 22% 32% at 85% 75%, rgba(150, 140, 170, 0.12), transparent 70%);
+  animation: start-fog 34s linear infinite alternate;
+}
+
+@keyframes start-fog {
+  from { transform: translateX(-14%); }
+  to { transform: translateX(14%); }
+}
+
+/* Relampago cada tanto: ilumina un instante la escena oscura. */
+.start-flash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 70% 10%, rgba(220, 225, 255, 0.55), rgba(160, 170, 220, 0.12) 60%);
+  opacity: 0;
+}
+
+.start-screen--menu .start-flash {
+  animation: start-lightning 11s linear infinite;
+  animation-delay: 3s;
+}
+
+@keyframes start-lightning {
+  0%, 90%, 100% { opacity: 0; }
+  91% { opacity: 0.85; }
+  92% { opacity: 0.05; }
+  93.5% { opacity: 0.6; }
+  96% { opacity: 0; }
 }
 
 .start-embers span {
@@ -2700,8 +2856,8 @@ body {
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: #ffb347;
-  box-shadow: 0 0 10px 3px rgba(255, 120, 40, 0.7);
+  background: #ff4a2a;
+  box-shadow: 0 0 10px 3px rgba(200, 20, 10, 0.7);
   opacity: 0;
   animation: start-ember var(--d) linear infinite;
   animation-delay: calc(var(--i) * -0.9s);
@@ -2736,15 +2892,16 @@ body {
 
 .start-chip--skip {
   font-weight: bold;
-  border-color: #ffb347;
+  border-color: #d4241a;
 }
 
 .start-chip:hover {
-  background: rgba(255, 179, 71, 0.25);
+  background: rgba(212, 36, 26, 0.3);
 }
 
 .start-menu {
   position: absolute;
+  z-index: 3;
   top: 50%;
   left: clamp(20px, 7vw, 110px);
   display: flex;
@@ -2766,7 +2923,7 @@ body {
   font-size: 12px;
   letter-spacing: 3px;
   text-transform: uppercase;
-  color: #ffb347;
+  color: #d4362a;
 }
 
 .start-title {
@@ -2783,17 +2940,27 @@ body {
 
 .start-title span:first-child {
   font-size: clamp(22px, 3.2vw, 34px);
-  color: #c9b8ff;
-  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.6);
+  color: #b9a9a4;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.8);
 }
 
+/* Rojo sangre con un parpadeo de letrero que falla. */
 .start-title-big {
   font-size: clamp(48px, 8.5vw, 104px);
-  background: linear-gradient(180deg, #ffe08a 0%, #ff9a3c 45%, #d6431f 100%);
+  background: linear-gradient(180deg, #ff6a50 0%, #c8140c 50%, #5c0404 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
-  filter: drop-shadow(0 5px 0 #3a0d06) drop-shadow(0 0 22px rgba(255, 120, 40, 0.55));
+  filter: drop-shadow(0 5px 0 #1a0202) drop-shadow(0 0 24px rgba(220, 20, 10, 0.6));
+  animation: start-title-flicker 7s steps(1) infinite;
+}
+
+@keyframes start-title-flicker {
+  0%, 100% { opacity: 1; }
+  71% { opacity: 0.35; }
+  72% { opacity: 1; }
+  74% { opacity: 0.55; }
+  75% { opacity: 1; }
 }
 
 .start-tagline {
@@ -2801,7 +2968,7 @@ body {
   max-width: 400px;
   font-size: 15px;
   line-height: 1.45;
-  color: rgba(242, 237, 228, 0.85);
+  color: rgba(225, 210, 205, 0.78);
 }
 
 .start-actions {
@@ -2823,9 +2990,9 @@ body {
   font-weight: bold;
   letter-spacing: 0.5px;
   text-align: left;
-  color: #f2ede4;
-  background: rgba(20, 12, 36, 0.72);
-  border: 1px solid rgba(201, 184, 255, 0.35);
+  color: #efe3dc;
+  background: rgba(14, 4, 6, 0.78);
+  border: 1px solid rgba(180, 30, 25, 0.45);
   border-radius: 10px;
   cursor: pointer;
   backdrop-filter: blur(6px);
@@ -2840,28 +3007,30 @@ body {
 .start-btn:hover,
 .start-btn:focus-visible {
   transform: translateX(6px);
-  background: rgba(60, 30, 90, 0.8);
-  border-color: #c9b8ff;
+  background: rgba(70, 6, 8, 0.85);
+  border-color: #e0301f;
+  box-shadow: 0 0 18px rgba(200, 20, 10, 0.4);
   outline: none;
 }
 
 .start-btn--primary {
   font-size: 21px;
   padding: 16px 22px;
-  color: #1a0904;
-  background: linear-gradient(180deg, #ffc46b, #ff8a2a);
+  color: #fff1ec;
+  background: linear-gradient(180deg, #c41c12, #6e0606);
   border: none;
-  box-shadow: 0 6px 0 #9a3c12, 0 0 28px rgba(255, 138, 42, 0.45);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5);
+  box-shadow: 0 6px 0 #2e0202, 0 0 30px rgba(200, 20, 10, 0.5);
 }
 
 .start-btn--primary:hover,
 .start-btn--primary:focus-visible {
-  background: linear-gradient(180deg, #ffd48a, #ff9a3c);
+  background: linear-gradient(180deg, #e0281a, #860808);
 }
 
 .start-btn--primary:active {
   transform: translateY(4px);
-  box-shadow: 0 2px 0 #9a3c12;
+  box-shadow: 0 2px 0 #2e0202;
 }
 
 .start-link {
@@ -2892,7 +3061,8 @@ body {
 
   .start-shade {
     background:
-      linear-gradient(0deg, rgba(8, 4, 18, 0.95) 0%, rgba(8, 4, 18, 0.75) 45%, rgba(8, 4, 18, 0.05) 75%);
+      linear-gradient(0deg, rgba(4, 1, 3, 0.97) 0%, rgba(4, 1, 3, 0.82) 45%, rgba(4, 1, 3, 0.25) 75%),
+      radial-gradient(ellipse at 55% 30%, rgba(0, 0, 0, 0) 30%, rgba(0, 0, 0, 0.8) 100%);
   }
 
   .start-menu {
@@ -2955,8 +3125,14 @@ body {
 @media (prefers-reduced-motion: reduce) {
   .start-screen--menu .start-video,
   .start-embers span,
-  .start-menu {
+  .start-menu,
+  .start-fog,
+  .start-title-big {
     animation: none;
+  }
+
+  .start-screen--menu .start-flash {
+    display: none;
   }
 }
 
@@ -3261,4 +3437,156 @@ kbd {
   font-size: 16px;
   color: #e7f2e7;
   background: #0b120b;
+}
+
+/* ---------- Halloween: murcielagos y aranas (HalloweenCreatures) ---------- */
+
+.hw-creatures {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hw-bat {
+  position: absolute;
+  top: var(--top);
+  left: 0;
+  animation: hw-bat-fly var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+
+.hw-bat--reverse {
+  animation-name: hw-bat-fly-reverse;
+}
+
+/* Cruzan de lado a lado ondulando, cada uno a su altura. */
+@keyframes hw-bat-fly {
+  0% { transform: translate(-12vw, 0); }
+  25% { transform: translate(22vw, -6vh); }
+  50% { transform: translate(52vw, 4vh); }
+  75% { transform: translate(80vw, -3vh); }
+  100% { transform: translate(112vw, 2vh); }
+}
+
+@keyframes hw-bat-fly-reverse {
+  0% { transform: translate(112vw, 0) scaleX(-1); }
+  25% { transform: translate(78vw, 5vh) scaleX(-1); }
+  50% { transform: translate(48vw, -5vh) scaleX(-1); }
+  75% { transform: translate(18vw, 3vh) scaleX(-1); }
+  100% { transform: translate(-12vw, -2vh) scaleX(-1); }
+}
+
+.hw-bat-bob {
+  display: block;
+  animation: hw-bat-bob var(--bob) ease-in-out infinite alternate;
+}
+
+@keyframes hw-bat-bob {
+  from { transform: translateY(-3px) rotate(-4deg); }
+  to { transform: translateY(3px) rotate(4deg); }
+}
+
+.hw-bat-svg {
+  display: block;
+  fill: #0a0508;
+  filter: drop-shadow(0 0 4px rgba(255, 60, 30, 0.35));
+}
+
+.hw-bat-wing {
+  transform-box: view-box;
+  animation: hw-bat-flap 0.22s ease-in-out infinite alternate;
+}
+
+.hw-bat-wing--left {
+  transform-origin: 30px 15px;
+}
+
+.hw-bat-wing--right {
+  transform-origin: 34px 15px;
+}
+
+@keyframes hw-bat-flap {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(-0.35); }
+}
+
+.hw-bat-eye,
+.hw-spider-eye {
+  fill: #ff3b1f;
+}
+
+/* Las aranas bajan por su hilo, se quedan meciendose y vuelven a subir. */
+.hw-spider {
+  position: absolute;
+  top: 0;
+  left: var(--x);
+  animation: hw-spider-drop var(--dur) ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes hw-spider-drop {
+  0%, 100% { transform: translateY(-120%); }
+  30%, 70% { transform: translateY(var(--drop)); }
+  45% { transform: translateY(calc(var(--drop) - 2vh)); }
+  55% { transform: translateY(calc(var(--drop) + 1vh)); }
+}
+
+.hw-spider-thread {
+  position: absolute;
+  bottom: calc(100% - 14px);
+  left: 50%;
+  width: 1px;
+  height: 120vh;
+  background: linear-gradient(180deg, rgba(220, 220, 230, 0.1), rgba(220, 220, 230, 0.55));
+}
+
+.hw-spider-svg {
+  position: relative;
+  display: block;
+  fill: #0b070a;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
+  animation: hw-spider-sway 2.4s ease-in-out infinite alternate;
+  transform-origin: 50% -40%;
+}
+
+@keyframes hw-spider-sway {
+  from { transform: rotate(-7deg); }
+  to { transform: rotate(7deg); }
+}
+
+.hw-spider-legs {
+  stroke: #0b070a;
+  transform-box: view-box;
+  transform-origin: 20px 22px;
+  animation: hw-spider-legs 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes hw-spider-legs {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.88); }
+}
+
+.hw-spider-mark {
+  fill: #b3120a;
+}
+
+@media (max-width: 640px) {
+  .hw-bat-svg {
+    transform: scale(0.75);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hw-creatures,
+  .building-select-flash {
+    display: none;
+  }
+
+  .building-select-map,
+  .building-select-fog,
+  .building-hotspot--enabled {
+    animation: none;
+  }
 }
