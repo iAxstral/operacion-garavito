@@ -3250,3 +3250,15 @@ kbd {
     font-size: 11px;
   }
 }
+
+.game-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: sans-serif;
+  font-size: 16px;
+  color: #e7f2e7;
+  background: #0b120b;
+}

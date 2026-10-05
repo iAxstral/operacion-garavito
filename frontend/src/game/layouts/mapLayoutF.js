@@ -71,7 +71,7 @@ function buildStairsBlock(grid, decorations, labels, { hub, direction, kind }) {
   let stepsX0;
   let landingX0;
   let railingX;
-  let glassX = null;
+  let glassX;
 
   if (direction === 'right') {
 

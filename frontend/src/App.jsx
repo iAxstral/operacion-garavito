@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import GameCanvas from './game/GameCanvas';
+import { lazy, Suspense, useEffect, useState } from 'react';
+// Phaser (la mayor parte del peso) solo se descarga al entrar a la partida: el menu y
+// la sala abren rapido aun en el celular.
+const GameCanvas = lazy(() => import('./game/GameCanvas'));
 import Hud from './components/Hud';
 import SecurityMission from './components/SecurityMission';
 import WiresMission from './components/WiresMission';
@@ -97,7 +99,9 @@ function App() {
   return (
     <div id="game-root">
       <div className="game-stage">
-        <GameCanvas />
+        <Suspense fallback={<div className="game-loading">Cargando el edificio…</div>}>
+          <GameCanvas />
+        </Suspense>
         <Hud />
         <SecurityMission />
         <WiresMission />

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  getLatestState,
+  onGameEvent,
   getMyBuilding,
   getMyRole,
   onStateChange,
@@ -115,6 +117,71 @@ function healthColor(health) {
   if (health > 60) return '#4caf50';
   if (health > 30) return '#e0a13a';
   return '#c0392b';
+}
+
+// Texto del aviso para un evento del servidor (o null si a este jugador no le toca).
+function toastFor(event) {
+  const broadcastTypes = ['REVIVED', 'TRANSFER', 'EVENT_STARTED', 'EVENT_RESOLVED', 'EVENT_FAILED'];
+  if (!event || (event.playerId !== getMyRole() && !broadcastTypes.includes(event.type))) return null;
+
+  let message = null;
+  // Reanimaciones: se avisa a todos, no solo al que hizo la accion.
+  const KINDER_EVENT_MESSAGES = {
+    EVENT_STARTED: { BLACKOUT: '⚡ ¡Apagón! Infraestructura tiene que llegar al tablero eléctrico', SUPPLY: '📦 ¡Suministros urgentes! Recójanlos antes de que se acabe el tiempo' },
+    EVENT_RESOLVED: { BLACKOUT: '💡 ¡Volvió la luz!', SUPPLY: `📦 ¡Suministros recogidos! +20 Garavitos y +25 de vida para todos` },
+    EVENT_FAILED: { SUPPLY: '📦 Se perdieron los suministros… ¡viene una horda!' },
+  };
+  if (KINDER_EVENT_MESSAGES[event.type]) {
+    message = KINDER_EVENT_MESSAGES[event.type][event.reason] ?? null;
+    return message ? { message, ms: 3500 } : null;
+  }
+  if (event.type === 'TRANSFER' && (event.playerId === getMyRole() || event.itemId === getMyRole())) {
+    message = event.playerId === getMyRole()
+      ? `Enviaste ${event.reason} Garavitos a ${roleInfo(event.itemId).name}`
+      : `¡Economía te envió +${event.reason} Garavitos!`;
+    return { message, ms: 2500 };
+  }
+  if (event.type === 'REVIVED') {
+    const revived = roleInfo(event.playerId).name;
+    const reviver = roleInfo(event.itemId).name;
+    message = event.playerId === getMyRole() ? `¡${reviver} te levantó! Vuelves con 50 de vida`
+      : event.itemId === getMyRole() ? `¡Levantaste a ${revived}!`
+        : `${revived} volvió a la pelea`;
+    return { message, ms: 2500 };
+  }
+  if (
+    event.type === 'PICKUP_REJECTED'
+    || event.type === 'PURCHASE_REJECTED'
+    || event.type === 'MISSION_REJECTED'
+    || event.type === 'DOOR_REJECTED'
+    || event.type === 'EQUIP_REJECTED'
+    || (event.type === 'RELOAD_REJECTED' && event.reason === 'no_ammo')
+    || (event.type === 'ATTACK_REJECTED' && event.reason === 'no_ammo')
+  ) {
+    message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo completar la acción';
+  } else if (event.type === 'PURCHASE_SUCCESS' && event.itemId === 'shop-municion') {
+    message = `+${AMMO_PER_PACK} balas de reserva`;
+  } else if (event.type === 'PURCHASE_SUCCESS' && weaponForItem(event.itemId)) {
+    message = `¡${weaponForItem(event.itemId).name} comprada! Equípala con ${isTouchDevice() ? 'el botón de armas' : 'las teclas 1-4'}`;
+  } else if (event.type === 'PURCHASE_SUCCESS') {
+    message = '¡Compra exitosa! Está en tu inventario (E)';
+  } else if (event.type === 'PICKUP_SUCCESS') {
+    const name = FOOD_ITEMS.find((item) => item.itemId === event.itemId)?.itemName ?? 'Objeto';
+    message = `${name} guardado en el inventario (E para abrirlo)`;
+  } else if (event.type === 'USE_SUCCESS') {
+    message = `¡Recuperaste vida! +${healFor(event.itemId)}`;
+  } else if (event.type === 'USE_REJECTED') {
+    message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo usar ese objeto';
+  } else if (event.type === 'ABILITY_REJECTED') {
+    message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo usar la habilidad';
+  } else if (event.type === 'REVIVE_REJECTED') {
+    message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo revivir';
+  } else if (event.type === 'MISSION_SUCCESS') {
+    const reward = getLatestState().players.find((p) => p.playerId === getMyRole())
+      ?.missions?.find((m) => m.missionId === event.itemId)?.reward;
+    message = `¡Misión completada! +${reward ?? ''} Garavitos`;
+  }
+  return message ? { message, ms: 2500 } : null;
 }
 
 export default function Hud() {
@@ -293,82 +360,15 @@ export default function Hud() {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [nearVendor, nearDoor, shopOpen, inventoryOpen, mapOpen]);
 
-  useEffect(() => {
-    const event = state.lastEvent;
-    const broadcastTypes = ['REVIVED', 'TRANSFER', 'EVENT_STARTED', 'EVENT_RESOLVED', 'EVENT_FAILED'];
-    if (!event || (event.playerId !== getMyRole() && !broadcastTypes.includes(event.type))) return undefined;
-
-    let message = null;
-    // Reanimaciones: se avisa a todos, no solo al que hizo la accion.
-    const KINDER_EVENT_MESSAGES = {
-      EVENT_STARTED: { BLACKOUT: '⚡ ¡Apagón! Infraestructura tiene que llegar al tablero eléctrico', SUPPLY: '📦 ¡Suministros urgentes! Recójanlos antes de que se acabe el tiempo' },
-      EVENT_RESOLVED: { BLACKOUT: '💡 ¡Volvió la luz!', SUPPLY: `📦 ¡Suministros recogidos! +20 Garavitos y +25 de vida para todos` },
-      EVENT_FAILED: { SUPPLY: '📦 Se perdieron los suministros… ¡viene una horda!' },
-    };
-    if (KINDER_EVENT_MESSAGES[event.type]) {
-      message = KINDER_EVENT_MESSAGES[event.type][event.reason] ?? null;
-      if (!message) return undefined;
-      setToast(message);
-      const timeout = setTimeout(() => setToast(null), 3500);
-      return () => clearTimeout(timeout);
-    }
-    if (event.type === 'TRANSFER' && (event.playerId === getMyRole() || event.itemId === getMyRole())) {
-      message = event.playerId === getMyRole()
-        ? `Enviaste ${event.reason} Garavitos a ${roleInfo(event.itemId).name}`
-        : `¡Economía te envió +${event.reason} Garavitos!`;
-      setToast(message);
-      const timeout = setTimeout(() => setToast(null), 2500);
-      return () => clearTimeout(timeout);
-    }
-    if (event.type === 'REVIVED') {
-      const revived = roleInfo(event.playerId).name;
-      const reviver = roleInfo(event.itemId).name;
-      message = event.playerId === getMyRole() ? `¡${reviver} te levantó! Vuelves con 50 de vida`
-        : event.itemId === getMyRole() ? `¡Levantaste a ${revived}!`
-          : `${revived} volvió a la pelea`;
-      setToast(message);
-      const timeout = setTimeout(() => setToast(null), 2500);
-      return () => clearTimeout(timeout);
-    }
-    if (
-      event.type === 'PICKUP_REJECTED'
-      || event.type === 'PURCHASE_REJECTED'
-      || event.type === 'MISSION_REJECTED'
-      || event.type === 'DOOR_REJECTED'
-      || event.type === 'EQUIP_REJECTED'
-      || (event.type === 'RELOAD_REJECTED' && event.reason === 'no_ammo')
-      || (event.type === 'ATTACK_REJECTED' && event.reason === 'no_ammo')
-    ) {
-      message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo completar la acción';
-    } else if (event.type === 'PURCHASE_SUCCESS' && event.itemId === 'shop-municion') {
-      message = `+${AMMO_PER_PACK} balas de reserva`;
-    } else if (event.type === 'PURCHASE_SUCCESS' && weaponForItem(event.itemId)) {
-      message = `¡${weaponForItem(event.itemId).name} comprada! Equípala con ${isTouchDevice() ? 'el botón de armas' : 'las teclas 1-4'}`;
-    } else if (event.type === 'PURCHASE_SUCCESS') {
-      message = '¡Compra exitosa! Está en tu inventario (E)';
-    } else if (event.type === 'PICKUP_SUCCESS') {
-      const name = FOOD_ITEMS.find((item) => item.itemId === event.itemId)?.itemName ?? 'Objeto';
-      message = `${name} guardado en el inventario (E para abrirlo)`;
-    } else if (event.type === 'USE_SUCCESS') {
-      message = `¡Recuperaste vida! +${healFor(event.itemId)}`;
-    } else if (event.type === 'USE_REJECTED') {
-      message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo usar ese objeto';
-    } else if (event.type === 'ABILITY_REJECTED') {
-      message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo usar la habilidad';
-    } else if (event.type === 'REVIVE_REJECTED') {
-      message = REJECTION_MESSAGES[event.reason] ?? 'No se pudo revivir';
-    } else if (event.type === 'MISSION_SUCCESS') {
-      const reward = stateRef.current.players.find((p) => p.playerId === getMyRole())
-        ?.missions?.find((m) => m.missionId === event.itemId)?.reward;
-      message = `¡Misión completada! +${reward ?? ''} Garavitos`;
-    }
-    if (!message) return undefined;
-
-    setToast(message);
-    const timeout = setTimeout(() => setToast(null), 2500);
-    return () => clearTimeout(timeout);
-
-  }, [state.lastEvent]);
+  // Avisos: se escucha cada evento en orden (con lastEvent, dos casi simultaneos se pisaban).
+  const toastTimeoutRef = useRef(null);
+  useEffect(() => onGameEvent((event) => {
+    const toastInfo = toastFor(event);
+    if (!toastInfo) return;
+    setToast(toastInfo.message);
+    clearTimeout(toastTimeoutRef.current);
+    toastTimeoutRef.current = setTimeout(() => setToast(null), toastInfo.ms);
+  }), []);
 
   // Aviso de Kinder: una sola vez cuando el Kinder N arranca. Depende solo de numeros
   // que cambian al cambiar de Kinder: con el objeto `state.wave` (nuevo en cada tick del
