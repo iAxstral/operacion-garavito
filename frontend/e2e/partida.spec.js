@@ -61,7 +61,7 @@ test('dos jugadores en la misma sala se ven y comparten el avance de misiones', 
   await host.locator('.role-card', { hasText: 'Biomédica' }).click();
 
   await openLobbyScreen(guest, 'F');
-  await guest.locator('.lobby-code-input').fill(code);
+  await guest.getByLabel('Código de la sala').fill(code);
   await guest.getByRole('button', { name: 'Entrar' }).click();
   await guest.locator('.role-card', { hasText: 'Infraestructura' }).click();
 

@@ -1108,49 +1108,6 @@
   opacity: 0.8;
 }
 
-.lobby-panels {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 18px;
-}
-
-.lobby-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  width: 260px;
-  padding: 18px;
-  background: rgba(20, 30, 22, 0.9);
-  border: 2px solid rgba(134, 168, 106, 0.35);
-  border-radius: 10px;
-}
-
-.lobby-panel h3,
-.lobby-panel p {
-  margin: 0;
-}
-
-.lobby-panel p {
-  font-size: 13px;
-  opacity: 0.75;
-}
-
-.lobby-code-input {
-  width: 8ch;
-  padding: 8px 10px;
-  font-family: monospace;
-  font-size: 30px;
-  letter-spacing: 6px;
-  text-align: center;
-  text-transform: uppercase;
-  color: #f2fbe2;
-  background: rgba(0, 0, 0, 0.5);
-  border: 2px solid rgba(134, 168, 106, 0.5);
-  border-radius: 8px;
-}
-
 .lobby-error {
   margin: 0;
   color: #ff9c9c;
@@ -2014,16 +1971,6 @@ body {
 
   .role-card-mission {
     font-size: 11px;
-  }
-
-  .lobby-panels {
-    gap: 12px;
-  }
-
-  .lobby-panel {
-    width: min(260px, calc(100vw - 48px));
-    padding: 14px;
-    gap: 10px;
   }
 
   .lobby-help {
@@ -3587,6 +3534,186 @@ kbd {
   .building-select-map,
   .building-select-fog,
   .building-hotspot--enabled {
+    animation: none;
+  }
+}
+
+/* ---------- Sala de juego (crear / unirse) sobre crear-sala-halloween.jpg ---------- */
+
+.lobby-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+  font-family: sans-serif;
+  color: #e9e4d6;
+  background: radial-gradient(ellipse at 50% 35%, #142019 0%, #050806 75%);
+}
+
+.lobby-stage {
+  position: relative;
+  width: min(100vw, calc((100dvh - 56px) * var(--stage-ratio)));
+  margin: 0;
+  overflow: hidden;
+  container-type: inline-size;
+  box-shadow: 0 0 70px rgba(60, 200, 90, 0.12);
+}
+
+.lobby-stage-art {
+  position: absolute;
+  max-width: none;
+  height: auto;
+  user-select: none;
+  animation: lobby-flicker 8s steps(1) infinite;
+}
+
+/* Tubo fluorescente que falla de vez en cuando. */
+@keyframes lobby-flicker {
+  0%, 100% { filter: brightness(1); }
+  47% { filter: brightness(0.75); }
+  48% { filter: brightness(1.05); }
+  49.5% { filter: brightness(0.6); }
+  50.5% { filter: brightness(1); }
+}
+
+/* Los ojos verdes de la profesora laten. */
+.lobby-eye {
+  position: absolute;
+  width: 2.2%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  background: radial-gradient(circle, rgba(200, 255, 170, 0.95) 0%, rgba(90, 255, 110, 0.55) 40%, transparent 72%);
+  mix-blend-mode: screen;
+  animation: lobby-eyes 3.2s ease-in-out infinite;
+}
+
+@keyframes lobby-eyes {
+  0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.9); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.35); }
+}
+
+.lobby-building-tag {
+  position: absolute;
+  top: 3%;
+  left: 3%;
+  padding: 4px 12px;
+  font-size: clamp(11px, 1.3vw, 15px);
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #9dff8a;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(120, 255, 110, 0.35);
+  border-radius: 4px;
+  text-shadow: 0 0 8px rgba(90, 255, 90, 0.6);
+}
+
+/* Botones invisibles encima de los pintados: el dibujo es el boton. */
+.lobby-hotspot {
+  position: absolute;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease, background 0.15s ease, transform 0.1s ease;
+}
+
+.lobby-hotspot:hover:not(:disabled),
+.lobby-hotspot:focus-visible {
+  outline: none;
+  background: rgba(170, 255, 120, 0.14);
+  box-shadow: 0 0 0 2px rgba(160, 255, 110, 0.85), 0 0 26px rgba(110, 255, 80, 0.75);
+}
+
+.lobby-hotspot--back:hover:not(:disabled),
+.lobby-hotspot--back:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  box-shadow: 0 0 0 2px rgba(220, 220, 220, 0.7), 0 0 18px rgba(255, 255, 255, 0.35);
+}
+
+.lobby-hotspot:active:not(:disabled) {
+  transform: translateY(2px) scale(0.98);
+}
+
+.lobby-hotspot:disabled {
+  cursor: not-allowed;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.lobby-stage--busy .lobby-hotspot {
+  cursor: progress;
+}
+
+.lobby-code-field {
+  position: absolute;
+  box-sizing: border-box;
+  padding: 0;
+  font-family: 'Courier New', monospace;
+  /* Relativo al ancho de la imagen: 4 letras siempre caben en el recuadro pintado. */
+  font-size: 2.3cqw;
+  font-weight: bold;
+  letter-spacing: 0.35em;
+  text-indent: 0.35em;
+  text-align: center;
+  text-transform: uppercase;
+  color: #b8ff9c;
+  text-shadow: 0 0 10px rgba(110, 255, 80, 0.85);
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  caret-color: #b8ff9c;
+}
+
+.lobby-code-field::placeholder {
+  color: rgba(200, 220, 190, 0.28);
+  text-shadow: none;
+}
+
+.lobby-code-field:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(160, 255, 110, 0.7), 0 0 20px rgba(110, 255, 80, 0.45);
+}
+
+.lobby-status {
+  position: relative;
+  z-index: 3;
+  max-width: min(640px, calc(100vw - 32px));
+  min-height: 2.8em;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4em;
+  text-align: center;
+  color: rgba(225, 235, 215, 0.8);
+}
+
+.lobby-status--error {
+  color: #ff8a7a;
+  animation: building-notice-shake 0.4s ease;
+}
+
+@media (max-aspect-ratio: 1/1) {
+  .lobby-stage {
+    width: min(100vw, calc((100dvh - 90px) * var(--stage-ratio)));
+  }
+
+  .lobby-eye {
+    width: 4.4%;
+  }
+
+  .lobby-code-field {
+    font-size: 4.6cqw;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lobby-stage-art,
+  .lobby-eye {
     animation: none;
   }
 }
