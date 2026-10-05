@@ -5,6 +5,7 @@ const STORAGE_KEY = 'garavito.settings.v1';
 
 export const VOLUME_CHANNELS = [
   { id: 'master', label: 'Volumen general', hint: 'Afecta a todos los sonidos del juego', icon: '🔊' },
+  { id: 'music', label: 'Música', hint: 'Música del menú y de la partida', icon: '🎵' },
   { id: 'ambient', label: 'Ambiente', hint: 'Lluvia y atmósfera del campus', icon: '🌧️' },
   { id: 'zombies', label: 'Zombis', hint: 'Gruñidos, rugidos y mordidas', icon: '🧟' },
   { id: 'combat', label: 'Combate', hint: 'Tus golpes, impactos y el daño que recibes', icon: '⚔️' },
@@ -12,7 +13,7 @@ export const VOLUME_CHANNELS = [
 ];
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  volumes: Object.freeze({ master: 0.8, ambient: 0.6, zombies: 0.9, combat: 0.8, ui: 0.6 }),
+  volumes: Object.freeze({ master: 0.8, music: 0.5, ambient: 0.6, zombies: 0.9, combat: 0.8, ui: 0.6 }),
   muted: false,
   vibration: true,
   screenShake: true,
