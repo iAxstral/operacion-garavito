@@ -43,6 +43,14 @@ public class Player {
     private volatile double shotFacing = 0;
 
     private volatile long lastDamagedAt = 0;
+    // Estadisticas de la corrida actual (pantalla de resultados y ranking).
+    private int statKills;
+    private int statMissions;
+    private int statEarned;
+    private int statDamage;
+    private int statRevives;
+    private int statDowns;
+
     /** Ultima posicion aceptada (para validar la siguiente) y ultima correccion enviada. */
     private volatile long lastMoveAt = 0;
     private volatile long lastCorrectionAt = 0;
@@ -121,10 +129,13 @@ public class Player {
         if (lifeState == PlayerLifeState.DOWNED || invulnerable) {
             return false;
         }
+        int before = health;
         health = Math.max(0, health - amount);
+        statDamage += before - health;
         lastDamagedAt = System.currentTimeMillis();
         if (health == 0) {
             lifeState = PlayerLifeState.DOWNED;
+            statDowns++;
         }
         return true;
     }
@@ -409,6 +420,37 @@ public class Player {
         garavitos += amount;
     }
 
+    /** Garavitos ganados (kills, misiones, jefe): suman al saldo y a las estadisticas. */
+    public synchronized void addEarnings(int amount) {
+        garavitos += amount;
+        statEarned += amount;
+    }
+
+    public synchronized void recordKills(int kills) {
+        statKills += kills;
+    }
+
+    public synchronized void recordMission() {
+        statMissions++;
+    }
+
+    public synchronized void recordRevive() {
+        statRevives++;
+    }
+
+    public synchronized MatchSummary.PlayerSummary statsSnapshot() {
+        return new MatchSummary.PlayerSummary(role, statKills, statMissions, statEarned, statDamage, statRevives, statDowns);
+    }
+
+    public synchronized void resetStats() {
+        statKills = 0;
+        statMissions = 0;
+        statEarned = 0;
+        statDamage = 0;
+        statRevives = 0;
+        statDowns = 0;
+    }
+
     public synchronized PurchaseResult purchase(int price, InventorySlot slot) {
         if (garavitos < price) {
             return PurchaseResult.rejected("insufficient_garavitos");
@@ -440,6 +482,12 @@ public class Player {
         y = 800;
         lastMoveAt = 0;
         rejectedMoves = 0;
+        statKills = 0;
+        statMissions = 0;
+        statEarned = 0;
+        statDamage = 0;
+        statRevives = 0;
+        statDowns = 0;
         lifeState = PlayerLifeState.ALIVE;
         attackReadyAt = 0;
         chargedReadyAt = 0;

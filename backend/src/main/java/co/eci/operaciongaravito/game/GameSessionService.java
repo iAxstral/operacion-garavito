@@ -30,9 +30,11 @@ public class GameSessionService {
     });
 
     private final BossConfig bossConfig;
+    private final co.eci.operaciongaravito.history.MatchHistoryService history;
 
     public GameSessionService(
             SimpMessagingTemplate messagingTemplate,
+            co.eci.operaciongaravito.history.MatchHistoryService history,
             @Value("${game.boss.detection-radius-tiles:8}") double detectionRadiusTiles,
             @Value("${game.boss.attack-radius-tiles:1}") double attackRadiusTiles,
             @Value("${game.boss.repath-ms:500}") long repathMs,
@@ -44,6 +46,7 @@ public class GameSessionService {
             @Value("${game.boss.bite-damage:12}") int biteDamage,
             @Value("${game.boss.attack-cooldown-ms:900}") long attackCooldownMs) {
         this.messagingTemplate = messagingTemplate;
+        this.history = history;
         this.bossConfig = new BossConfig(detectionRadiusTiles, attackRadiusTiles, repathMs, alertMs, stunMs,
                 loseTargetMs, speedPxPerSecond, maxHealth, biteDamage, attackCooldownMs);
     }
@@ -152,7 +155,8 @@ public class GameSessionService {
                 session.lobbyState(),
                 session.bossView(),
                 session.projectileStates(),
-                session.barricadeStates()
+                session.barricadeStates(),
+                session.lastSummary()
         );
     }
 
@@ -182,6 +186,9 @@ public class GameSessionService {
                 lastTickAt[0] = now;
 
                 session.tick(now, deltaSeconds);
+                for (MatchSummary summary = session.pollSummaryToSave(); summary != null; summary = session.pollSummaryToSave()) {
+                    history.saveAsync(summary);
+                }
 
                 if (now - lastBroadcastAt[0] >= BROADCAST_PERIOD_MS) {
                     lastBroadcastAt[0] = now;

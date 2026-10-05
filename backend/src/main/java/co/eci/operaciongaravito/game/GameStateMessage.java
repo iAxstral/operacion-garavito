@@ -13,9 +13,10 @@ public record GameStateMessage(
         LobbyState lobby,
         BossView boss,
         List<ProjectileState> projectiles,
-        List<BarricadeState> barricades) {
+        List<BarricadeState> barricades,
+        MatchSummary summary) {
 
     public static GameStateMessage eventOnly(LastEvent event) {
-        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of(), List.of());
+        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of(), List.of(), null);
     }
 }

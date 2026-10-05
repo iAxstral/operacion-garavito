@@ -4,6 +4,9 @@ import SockJS from 'sockjs-client';
 const SOCKET_URL = import.meta.env.VITE_WS_URL
   ?? `${window.location.protocol}//${window.location.hostname}:8080/ws`;
 
+/** Base de la API REST del mismo servidor (p. ej. /api/ranking). */
+export const API_BASE = SOCKET_URL.replace(/\/ws\/?$/, '');
+
 class SocketService {
   constructor() {
     this.client = null;

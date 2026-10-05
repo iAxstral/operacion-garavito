@@ -3073,3 +3073,82 @@ kbd {
   font-size: 12px;
   opacity: 0.7;
 }
+
+/* ---------- Resultados y ranking ---------- */
+
+.results-panel {
+  max-width: min(680px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.results-panel--victory {
+  border-color: rgba(232, 195, 74, 0.6);
+}
+
+.results-panel--victory h2 {
+  color: #e8c34a;
+  text-shadow: 0 0 16px rgba(232, 195, 74, 0.5);
+}
+
+.results-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 18px;
+  font-size: 13px;
+}
+
+.results-meta strong {
+  font-size: 18px;
+  color: #fff;
+}
+
+.results-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.results-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.results-table th,
+.results-table td {
+  padding: 6px 8px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  white-space: nowrap;
+}
+
+.results-table tbody th {
+  text-align: left;
+  font-weight: bold;
+}
+
+.results-me {
+  background: rgba(79, 195, 247, 0.12);
+}
+
+.results-awards {
+  display: block;
+  font-size: 11px;
+  font-weight: normal;
+  color: #e8c34a;
+}
+
+.ranking-panel {
+  width: min(640px, 100%);
+}
+
+.ranking-table td {
+  color: #e7f2e7;
+}
+
+.game-over-actions {
+  flex-wrap: wrap;
+  justify-content: center;
+}

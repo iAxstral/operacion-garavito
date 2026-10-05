@@ -79,6 +79,10 @@ public class GameSession {
 
     private volatile boolean wipedRun = false;
     private volatile boolean victoryPending = false;
+    private volatile long runStartedAt = System.currentTimeMillis();
+    private volatile MatchSummary lastSummary;
+    private final java.util.Queue<MatchSummary> summariesToSave = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    private long summarySequence;
     private final java.util.Queue<LastEvent> pendingEvents = new java.util.concurrent.ConcurrentLinkedQueue<>();
     private volatile boolean started = false;
     private volatile String host;
@@ -392,12 +396,14 @@ public class GameSession {
             boss = null;
             if (waveDirector.isVictory()) {
                 victoryPending = true;
+                closeRun(true, WaveCurve.KINDER_COUNT, now);
             }
         }
 
         List<Player> targets = players.values().stream().filter(Player::isAlive).toList();
 
         if (targets.isEmpty() && !players.isEmpty()) {
+            closeRun(false, waveDirector.getKinder(), now);
             zombies.clear();
             acids.clear();
             boss = null;
@@ -442,6 +448,33 @@ public class GameSession {
                 }
             });
         }
+    }
+
+    /**
+     * Termina la corrida: arma el resumen (pantalla de resultados y ranking) y pone en
+     * cero las estadisticas para la siguiente.
+     */
+    private void closeRun(boolean victory, int kinderReached, long now) {
+        List<MatchSummary.PlayerSummary> stats = players.values().stream()
+                .map(Player::statsSnapshot)
+                .sorted(java.util.Comparator.comparing(MatchSummary.PlayerSummary::role))
+                .toList();
+        MatchSummary summary = new MatchSummary(++summarySequence, building, victory, kinderReached,
+                Math.max(0, (now - runStartedAt) / 1000), stats);
+        lastSummary = summary;
+        summariesToSave.add(summary);
+        players.values().forEach(Player::resetStats);
+        runStartedAt = now;
+    }
+
+    /** El resumen de la ultima corrida terminada, o null si todavia no termino ninguna. */
+    public MatchSummary lastSummary() {
+        return lastSummary;
+    }
+
+    /** Siguiente resumen que todavia no se guardo en el historial, o null. */
+    public MatchSummary pollSummaryToSave() {
+        return summariesToSave.poll();
     }
 
     /** Los zombis pegados a una barricada la van rompiendo. */
@@ -572,6 +605,7 @@ public class GameSession {
             } else if (now >= reviver.getReviveUntil()) {
                 target.revive(FIELD_REVIVE_HEALTH);
                 reviver.stopRevive();
+                reviver.recordRevive();
                 pendingEvents.add(LastEvent.revived(target.getPlayerId(), reviver.getPlayerId()));
             }
         }
@@ -878,7 +912,7 @@ public class GameSession {
         if (!target.hit(damage, charged, now)) {
             return 0;
         }
-        player.addGaravitos(BOSS_REWARD_GARAVITOS);
+        player.addEarnings(BOSS_REWARD_GARAVITOS);
         waveDirector.onBossDefeated(now);
         return 1;
     }
@@ -886,9 +920,10 @@ public class GameSession {
     /** Paga los zombis comunes muertos (el jefe ya se pago en {@link #hitBoss}). */
     private AttackResult payKills(Player player, int hits, int zombieKills, int bossKills) {
         if (zombieKills > 0) {
-            player.addGaravitos(zombieKills * GARAVITOS_PER_ZOMBIE);
+            player.addEarnings(zombieKills * GARAVITOS_PER_ZOMBIE);
             waveDirector.onZombiesKilled(zombieKills);
         }
+        player.recordKills(zombieKills + bossKills);
         return AttackResult.ok(hits, zombieKills + bossKills);
     }
 
@@ -1006,7 +1041,8 @@ public class GameSession {
         if (!missionBoard.complete(playerId, missionId)) {
             return MissionResult.rejected("unknown_mission");
         }
-        player.addGaravitos(mission.reward());
+        player.addEarnings(mission.reward());
+        player.recordMission();
         return MissionResult.ok(mission.reward());
     }
 
@@ -1061,6 +1097,8 @@ public class GameSession {
         claimedItems.clear();
         missionBoard.reset();
         barricades.clear();
+        runStartedAt = System.currentTimeMillis();
+        lastSummary = null;
         floors.forEach(FloorGrid::resetDoors);
         players.values().forEach(Player::reset);
         wipedRun = false;

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import SettingsPanel from './SettingsPanel';
 import HowToPlay from './HowToPlay';
+import RankingPanel from './RankingPanel';
 import { playSfx } from '../game/sfx';
 import { channelVolume, onSettingsChange } from '../game/settings';
 
@@ -161,6 +162,9 @@ export default function MainMenu({ onPlay }) {
             <button type="button" className="start-btn" onClick={() => open('howto')}>
               <span aria-hidden="true">📖</span> Cómo jugar
             </button>
+            <button type="button" className="start-btn" onClick={() => open('ranking')}>
+              <span aria-hidden="true">🏆</span> Ranking
+            </button>
           </nav>
 
           <button type="button" className="start-link" onClick={replayIntro}>
@@ -173,6 +177,7 @@ export default function MainMenu({ onPlay }) {
 
       {panel === 'settings' && <SettingsPanel onClose={() => setPanel(null)} />}
       {panel === 'howto' && <HowToPlay onClose={() => setPanel(null)} />}
+      {panel === 'ranking' && <RankingPanel onClose={() => setPanel(null)} />}
     </div>
   );
 }
