@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   onNearMissionChange,
-  onStateChange,
+  onGameEvent,
   getMyRole,
   requestMissionStart,
   requestMissionCancel,
@@ -83,7 +83,6 @@ export default function SecurityMission() {
   const [nearMission, setNearMissionState] = useState(null);
   const [phase, setPhase] = useState('closed');
   const [kills, setKills] = useState(0);
-  const [lastEvent, setLastEvent] = useState(null);
 
   const canvasRef = useRef(null);
   const zombiesRef = useRef([]);
@@ -93,20 +92,20 @@ export default function SecurityMission() {
   const nextSpawnAtRef = useRef(0);
   const activeMissionRef = useRef(null);
 
-  // 'SEGURIDAD' es el rol dueno de este minijuego: ahora hay 3 salas/instancias posibles
-  // (mission-seguridad, mission-seguridad-f1, mission-seguridad-f3), asi que se filtra
-  // por rol en vez de por un missionId fijo.
+  // Se abre junto a una mision de tipo CAMARAS (Seguridad tambien tiene CODIGO).
   useEffect(
-    () => onNearMissionChange((mission) => setNearMissionState(mission?.role === 'SEGURIDAD' ? mission : null)),
+    () => onNearMissionChange((mission) => setNearMissionState(mission?.type === 'CAMARAS' ? mission : null)),
     [],
   );
 
-  useEffect(() => onStateChange((state) => setLastEvent(state.lastEvent)), []);
-
+  const phaseRef = useRef(phase);
   useEffect(() => {
-    const event = lastEvent;
+    phaseRef.current = phase;
+  });
+
+  useEffect(() => onGameEvent((event) => {
     const activeId = activeMissionRef.current?.missionId;
-    if (!event || event.playerId !== getMyRole() || !activeId || event.itemId !== activeId) return;
+    if (event.playerId !== getMyRole() || !activeId || event.itemId !== activeId) return;
 
     if (event.type === 'MISSION_STARTED') {
       finishedRef.current = false;
@@ -114,12 +113,11 @@ export default function SecurityMission() {
       setKills(0);
       setPhase('active');
       setInputLocked(true);
-    } else if (event.type === 'MISSION_REJECTED' && phase !== 'closed') {
+    } else if (event.type === 'MISSION_REJECTED' && phaseRef.current !== 'closed') {
       setPhase('closed');
       setInputLocked(false);
     }
-
-  }, [lastEvent]);
+  }), []);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -129,7 +127,7 @@ export default function SecurityMission() {
         requestMissionStart(nearMission.missionId);
       } else if (event.key === 'Escape' && phase === 'active') {
         event.preventDefault();
-        requestMissionCancel(activeMissionRef.current?.missionId ?? 'mission-seguridad');
+        requestMissionCancel(activeMissionRef.current?.missionId ?? nearMission?.missionId);
         setInputLocked(false);
         setPhase('closed');
       }
@@ -214,7 +212,7 @@ export default function SecurityMission() {
   };
 
   const handleCancelClick = () => {
-    requestMissionCancel(activeMissionRef.current?.missionId ?? 'mission-seguridad');
+    requestMissionCancel(activeMissionRef.current?.missionId ?? nearMission?.missionId);
     setInputLocked(false);
     setPhase('closed');
   };
@@ -223,7 +221,7 @@ export default function SecurityMission() {
     <>
       {phase === 'closed' && nearMission && (
         <div className="mission-hint">
-          Presiona <strong>E</strong> — Tarea de Seguridad
+          Presiona <strong>E</strong> — Revisar las cámaras
         </div>
       )}
 

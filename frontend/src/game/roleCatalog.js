@@ -1,4 +1,4 @@
-import { missionZonesFor } from './missionCatalog';
+import { missionTypesForRole } from './missionCatalog';
 
 export const ROLE_CATALOG = [
   {
@@ -16,7 +16,7 @@ export const ROLE_CATALOG = [
     spritePrefix: 'biomedica',
     portrait: '/personajes/biomedica.png',
     missionIcon: '💉',
-    blurb: 'Repara el cableado conectando los cables por color.',
+    blurb: 'La única que puede revivir a los compañeros caídos.',
   },
   {
     role: 'ECONOMIA',
@@ -36,11 +36,9 @@ export const ROLE_CATALOG = [
   },
 ];
 
-// Salas de mision del rol en ese edificio, derivadas del catalogo de misiones para que
-// el texto nunca diga salas que el edificio no tiene.
-export function missionSummary(role, building) {
-  const zones = missionZonesFor(building).filter((zone) => zone.role === role);
-  return zones.map((zone) => `${zone.room} (piso ${zone.floor})`).join(' o ');
+// Minijuegos del rol: cada Kinder le tocan 3 misiones mezclando estos, en salas al azar.
+export function missionSummary(role) {
+  return missionTypesForRole(role).map((type) => `${type.icon} ${type.name}`).join(' · ');
 }
 
 export function roleInfo(role) {

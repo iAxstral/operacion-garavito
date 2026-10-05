@@ -7,7 +7,11 @@ package co.eci.operaciongaravito.game;
  */
 public enum Building {
     F(3),
-    C(2);
+    C(2),
+    /** Ingenieria: laboratorios y talleres. */
+    G(2),
+    /** Administrativo: oficinas, rectoria y centro de datos. */
+    A(3);
 
     private final int floorCount;
 

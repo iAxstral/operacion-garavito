@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Playwright y scripts temporales de capturas
+/test-results/
+/playwright-report/
+*.tmp.mjs

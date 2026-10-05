@@ -32,8 +32,13 @@ public class WaveDirector {
     private Phase phase = Phase.RESTING;
     private long nextEventAt;
     private long zombieSequence;
+    /** Turno de piso para la proxima aparicion: se reparten por turnos, no al azar. */
+    private int floorTurn;
     private boolean justCleared;
     private boolean bossDue;
+    private boolean bossDefeated;
+    /** Se cumplio la cuota (o cayo el jefe) pero faltan misiones: la horda sigue llegando. */
+    private boolean waitingForMissions;
 
     public WaveDirector(long now, long startDelayMs, List<FloorGrid> floors) {
         this.nextEventAt = now + startDelayMs;
@@ -45,11 +50,29 @@ public class WaveDirector {
         boolean bossStage = phase == Phase.ACTIVE && blueprint.boss();
         int remaining = phase == Phase.ACTIVE && !bossStage ? Math.max(0, quota - kills) : 0;
         return new WaveState(kinder, WaveCurve.KINDER_COUNT, kills, quota, remaining,
-                restingSeconds(now), bossStage, phase == Phase.VICTORY);
+                restingSeconds(now), bossStage, phase == Phase.VICTORY,
+                phase == Phase.ACTIVE && waitingForMissions, 0, 0);
+    }
+
+    /** True si hay un Kinder en curso (no respiro ni victoria). */
+    public synchronized boolean isActive() {
+        return phase == Phase.ACTIVE;
     }
 
     public synchronized int getKinder() {
         return kinder;
+    }
+
+    /**
+     * Kinder para el que se juegan las misiones ahora: el que viene durante el respiro,
+     * el activo durante el Kinder, 0 tras ganar.
+     */
+    public synchronized int upcomingKinder() {
+        return switch (phase) {
+            case RESTING -> Math.min(kinder + 1, WaveCurve.KINDER_COUNT);
+            case ACTIVE -> kinder;
+            case VICTORY -> 0;
+        };
     }
 
     public synchronized boolean isVictory() {
@@ -68,6 +91,14 @@ public class WaveDirector {
      * ninguno). {@code alive} son los zombis vivos que ya hay en el mapa.
      */
     public synchronized List<Zombie> update(long now, int alive, Collection<Player> players) {
+        return update(now, alive, players, true);
+    }
+
+    /**
+     * Igual que {@link #update(long, int, Collection)}, pero el Kinder solo se pasa si
+     * ademas {@code missionsDone} (la barrera del MissionBoard esta abierta).
+     */
+    public synchronized List<Zombie> update(long now, int alive, Collection<Player> players, boolean missionsDone) {
         switch (phase) {
             case RESTING -> {
                 if (now >= nextEventAt) {
@@ -75,7 +106,9 @@ public class WaveDirector {
                 }
             }
             case ACTIVE -> {
-                if (!blueprint.boss() && kills >= blueprint.killQuota()) {
+                boolean goalMet = blueprint.boss() ? bossDefeated : kills >= blueprint.killQuota();
+                waitingForMissions = goalMet && !missionsDone;
+                if (goalMet && missionsDone) {
                     finishKinder(now);
                     return List.of();
                 }
@@ -101,7 +134,8 @@ public class WaveDirector {
     /** El jefe del ultimo Kinder cayo: se gana la corrida. */
     public synchronized void onBossDefeated(long now) {
         if (phase == Phase.ACTIVE && blueprint.boss()) {
-            finishKinder(now);
+            // Se cierra en el proximo update, cuando tambien esten las misiones.
+            bossDefeated = true;
         }
     }
 
@@ -128,6 +162,8 @@ public class WaveDirector {
         blueprint = null;
         justCleared = false;
         bossDue = false;
+        bossDefeated = false;
+        waitingForMissions = false;
     }
 
     private void startKinder(long now, int number) {
@@ -137,6 +173,8 @@ public class WaveDirector {
         phase = Phase.ACTIVE;
         nextEventAt = now;
         bossDue = blueprint.boss();
+        bossDefeated = false;
+        waitingForMissions = false;
     }
 
     private void finishKinder(long now) {
@@ -150,28 +188,46 @@ public class WaveDirector {
     }
 
     private List<Zombie> spawnBurst(int alive, Collection<Player> players) {
+        int room = WaveCurve.maxAlive(blueprint, players.size()) - alive;
+        return spawn(Math.min(blueprint.spawnBurst(), room), players);
+    }
+
+    /**
+     * Horda extra (p. ej. si nadie recogio los suministros): {@code count} zombis del
+     * Kinder activo aunque se pase el tope de vivos. Vacia si no hay Kinder activo.
+     */
+    public synchronized List<Zombie> surge(Collection<Player> players, int count) {
+        if (phase != Phase.ACTIVE) {
+            return List.of();
+        }
+        return spawn(count, players);
+    }
+
+    private List<Zombie> spawn(int count, Collection<Player> players) {
         List<Player> living = players.stream().filter(Player::isAlive).toList();
         if (living.isEmpty()) {
             return List.of();
         }
-        int room = WaveCurve.maxAlive(blueprint, players.size()) - alive;
-        int count = Math.min(blueprint.spawnBurst(), room);
 
         ThreadLocalRandom random = ThreadLocalRandom.current();
         List<Zombie> burst = new ArrayList<>(Math.max(0, count));
+        // Pisos con gente viva, por turnos: asi la horda aparece en todos ellos (antes se
+        // sorteaba y a veces un piso ocupado se quedaba sin zombis) y nunca en uno vacio.
+        List<Integer> occupied = living.stream().map(Player::getFloor).distinct().sorted().toList();
         for (int i = 0; i < count; i++) {
-            // Se sortea un jugador vivo y se spawnea en SU piso: asi la horda aparece
-            // en todos los pisos donde hay gente, y nunca en uno que nadie pisa.
-            int floor = living.get(random.nextInt(living.size())).getFloor();
+            int floor = occupied.get(Math.floorMod(floorTurn++, occupied.size()));
             List<Player> onFloor = living.stream().filter(p -> p.getFloor() == floor).toList();
             FloorGrid.SpawnPoint point = pickSpawnPoint(floors.get(floor - 1).spawnPoints(), onFloor, random);
+            ZombieKind kind = WaveCurve.rollKind(blueprint, random.nextDouble());
+            int health = kind.health() > 0 ? kind.health() : WaveCurve.rollHealth(blueprint, random.nextDouble());
             burst.add(new Zombie(
                     "z" + (++zombieSequence),
                     floor,
                     point.x(),
                     point.y(),
-                    WaveCurve.rollHealth(blueprint, random.nextDouble()),
-                    WaveCurve.rollSpeed(blueprint, random.nextDouble())));
+                    health,
+                    WaveCurve.rollSpeed(blueprint, random.nextDouble()) * kind.speedFactor(),
+                    kind));
         }
         return burst;
     }

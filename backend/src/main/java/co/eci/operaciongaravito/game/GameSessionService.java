@@ -23,16 +23,18 @@ public class GameSessionService {
     private final Map<String, GameSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, Seat> seatsByConnection = new ConcurrentHashMap<>();
     private final SimpMessagingTemplate messagingTemplate;
-    private final ScheduledExecutorService roundTimeoutScheduler = Executors.newScheduledThreadPool(4, runnable -> {
+    private final ScheduledExecutorService gameLoop = Executors.newScheduledThreadPool(4, runnable -> {
         Thread thread = new Thread(runnable, "game-loop");
         thread.setDaemon(true);
         return thread;
     });
 
     private final BossConfig bossConfig;
+    private final co.eci.operaciongaravito.history.MatchHistoryService history;
 
     public GameSessionService(
             SimpMessagingTemplate messagingTemplate,
+            co.eci.operaciongaravito.history.MatchHistoryService history,
             @Value("${game.boss.detection-radius-tiles:8}") double detectionRadiusTiles,
             @Value("${game.boss.attack-radius-tiles:1}") double attackRadiusTiles,
             @Value("${game.boss.repath-ms:500}") long repathMs,
@@ -44,6 +46,7 @@ public class GameSessionService {
             @Value("${game.boss.bite-damage:12}") int biteDamage,
             @Value("${game.boss.attack-cooldown-ms:900}") long attackCooldownMs) {
         this.messagingTemplate = messagingTemplate;
+        this.history = history;
         this.bossConfig = new BossConfig(detectionRadiusTiles, attackRadiusTiles, repathMs, alertMs, stunMs,
                 loseTargetMs, speedPxPerSecond, maxHealth, biteDamage, attackCooldownMs);
     }
@@ -66,8 +69,7 @@ public class GameSessionService {
         boolean[] created = { false };
         GameSession session = sessions.computeIfAbsent(gameId, id -> {
             created[0] = true;
-            GameSession fresh = new GameSession(id, building, bossConfig, roundTimeoutScheduler,
-                    round -> broadcastRoundResolved(id, round));
+            GameSession fresh = new GameSession(id, building, bossConfig);
             startTicking(id);
             return fresh;
         });
@@ -94,33 +96,68 @@ public class GameSessionService {
         }
     }
 
+    /**
+     * Se cayo una conexion: el jugador NO sale de la sala enseguida. Se le guarda el
+     * puesto {@link GameSession#RECONNECT_GRACE_MS} para que pueda volver (/rejoin)
+     * con su rol, inventario y misiones; si no vuelve, el tick lo saca.
+     */
     @EventListener
     public void onDisconnect(SessionDisconnectEvent event) {
         Seat seat = seatsByConnection.remove(event.getSessionId());
-        if (seat != null) {
-            leave(seat.gameId(), seat.role());
+        if (seat == null) {
+            return;
+        }
+        GameSession session = sessions.get(seat.gameId());
+        if (session == null) {
+            return;
+        }
+        session.markDisconnected(seat.role(), System.currentTimeMillis());
+        broadcast(seat.gameId(), session, null);
+    }
+
+    /** Vuelve a su puesto quien se desconecto, desde una conexion nueva. */
+    public String rejoin(String gameId, String role, String token, String connectionId) {
+        GameSession session = sessions.get(gameId);
+        if (session == null) {
+            return "lobby_not_found";
+        }
+        String rejection = session.rejoin(role, token);
+        if (rejection == null) {
+            seatsByConnection.values().removeIf(seat -> seat.gameId().equals(gameId) && seat.role().equals(role));
+            registerSeat(connectionId, gameId, role);
+        }
+        return rejection;
+    }
+
+    private void expireSeats(String gameId, GameSession session, long now) {
+        for (String role : session.expiredSeats(now)) {
+            LOGGER.log(System.Logger.Level.INFO, "se libera el puesto de " + role + " en " + gameId);
+            leave(gameId, role);
         }
     }
 
     public void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
-        messagingTemplate.convertAndSend("/topic/game/" + gameId, message(session, lastEvent, session.currentRoundView()));
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message(session, lastEvent));
     }
 
     public void broadcastRejected(String gameId, LastEvent event) {
         messagingTemplate.convertAndSend("/topic/game/" + gameId, GameStateMessage.eventOnly(event));
     }
 
-    private GameStateMessage message(GameSession session, LastEvent lastEvent, RoundState round) {
+    private GameStateMessage message(GameSession session, LastEvent lastEvent) {
         return new GameStateMessage(
                 session.playerStates(),
                 session.claimedItemIdsSnapshot(),
                 lastEvent,
-                round,
                 session.zombieStates(),
                 session.waveState(),
                 session.doorStates(),
                 session.lobbyState(),
-                session.bossView()
+                session.bossView(),
+                session.projectileStates(),
+                session.barricadeStates(),
+                session.lastSummary(),
+                session.kinderEvent()
         );
     }
 
@@ -128,12 +165,16 @@ public class GameSessionService {
         long[] lastTickAt = { System.currentTimeMillis() };
         long[] lastBroadcastAt = { 0 };
 
-        roundTimeoutScheduler.scheduleAtFixedRate(() -> {
+        gameLoop.scheduleAtFixedRate(() -> {
             GameSession session = sessions.get(gameId);
             if (session == null) {
                 throw new IllegalStateException("partida cerrada");
             }
 
+            expireSeats(gameId, session, System.currentTimeMillis());
+            if (!sessions.containsKey(gameId)) {
+                throw new IllegalStateException("partida cerrada");
+            }
             if (!session.hasPlayers() || !session.isStarted()) {
                 lastTickAt[0] = System.currentTimeMillis();
                 return;
@@ -146,11 +187,14 @@ public class GameSessionService {
                 lastTickAt[0] = now;
 
                 session.tick(now, deltaSeconds);
+                for (MatchSummary summary = session.pollSummaryToSave(); summary != null; summary = session.pollSummaryToSave()) {
+                    history.saveAsync(summary);
+                }
 
                 if (now - lastBroadcastAt[0] >= BROADCAST_PERIOD_MS) {
                     lastBroadcastAt[0] = now;
                     LastEvent event = session.consumeWipedRun() ? LastEvent.teamWiped()
-                            : session.consumeVictory() ? LastEvent.victory() : null;
+                            : session.consumeVictory() ? LastEvent.victory() : session.pollEvent();
                     broadcast(gameId, session, event);
                 }
             } catch (RuntimeException ex) {
@@ -158,13 +202,5 @@ public class GameSessionService {
                 LOGGER.log(System.Logger.Level.WARNING, "fallo el tick de la partida " + gameId, ex);
             }
         }, TICK_PERIOD_MS, TICK_PERIOD_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
-    }
-
-    private void broadcastRoundResolved(String gameId, RoundState round) {
-        GameSession session = sessions.get(gameId);
-        if (session == null) {
-            return;
-        }
-        messagingTemplate.convertAndSend("/topic/game/" + gameId, message(session, null, round));
     }
 }

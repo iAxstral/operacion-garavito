@@ -50,7 +50,7 @@ export default function RoleSelect({ onJoined, onBack }) {
                 <span className="role-card-name">{entry.name}</span>
                 <span className="role-card-blurb">{entry.blurb}</span>
                 <span className="role-card-mission">
-                  {taken ? 'Ya elegido' : `Misión: ${missionSummary(entry.role, getMyBuilding())}`}
+                  {taken ? 'Ya elegido' : `Misiones: ${missionSummary(entry.role)}`}
                 </span>
               </button>
             );

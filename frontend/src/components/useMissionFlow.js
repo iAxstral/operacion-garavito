@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   onNearMissionChange,
-  onStateChange,
+  onGameEvent,
   getMyRole,
   requestMissionStart,
   requestMissionCancel,
@@ -11,13 +11,12 @@ import {
 
 const SUCCESS_CLOSE_DELAY_MS = 1100;
 
-// `role` es el rol dueño de este minijuego (p.ej. 'SALUD'), no un missionId fijo: cada
-// rol ahora tiene 3 salas/instancias posibles (mission-salud, mission-salud-f1,
-// mission-salud-f2), y el jugador puede acercarse a cualquiera de las 3.
-export default function useMissionFlow(role, onStarted) {
+// `type` es el minijuego (p.ej. 'CABLES'): cada Kinder el servidor reparte 3 misiones por
+// jugador en salas al azar, y cada componente de minijuego se abre solo cuando el
+// jugador esta junto a una mision de su tipo.
+export default function useMissionFlow(type, onStarted) {
   const [nearMission, setNearMission] = useState(null);
   const [phase, setPhase] = useState('closed');
-  const [lastEvent, setLastEvent] = useState(null);
 
   const activeMissionRef = useRef(null);
   const finishedRef = useRef(false);
@@ -27,21 +26,19 @@ export default function useMissionFlow(role, onStarted) {
   });
 
   useEffect(
-    () => onNearMissionChange((mission) => setNearMission(mission?.role === role ? mission : null)),
-    [role],
+    () => onNearMissionChange((mission) => setNearMission(mission?.type === type ? mission : null)),
+    [type],
   );
 
-  useEffect(() => onStateChange((state) => setLastEvent(state.lastEvent)), []);
 
   const close = useCallback(() => {
     setInputLocked(false);
     setPhase('closed');
   }, []);
 
-  useEffect(() => {
-    const event = lastEvent;
+  useEffect(() => onGameEvent((event) => {
     const activeId = activeMissionRef.current?.missionId;
-    if (!event || event.playerId !== getMyRole() || !activeId || event.itemId !== activeId) return;
+    if (event.playerId !== getMyRole() || !activeId || event.itemId !== activeId) return;
 
     if (event.type === 'MISSION_STARTED') {
       finishedRef.current = false;
@@ -51,7 +48,7 @@ export default function useMissionFlow(role, onStarted) {
     } else if (event.type === 'MISSION_REJECTED') {
       close();
     }
-  }, [lastEvent, close]);
+  }), [close]);
 
   const cancel = useCallback(() => {
     requestMissionCancel(activeMissionRef.current?.missionId ?? nearMission?.missionId);
