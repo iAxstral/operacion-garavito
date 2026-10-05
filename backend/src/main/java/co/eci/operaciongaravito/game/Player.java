@@ -81,13 +81,13 @@ public class Player {
         return name;
     }
 
-    /** Guarda el apodo sin caracteres de control, con espacios simples y de largo maximo 16. */
+    /** Guarda el apodo con los caracteres de control vueltos espacio, espacios simples y largo maximo 16. */
     public void setName(String raw) {
         if (raw == null) {
             name = null;
             return;
         }
-        String clean = raw.replaceAll("\\p{Cntrl}", "").replaceAll("\\s+", " ").strip();
+        String clean = raw.replaceAll("\\p{Cntrl}", " ").replaceAll("\\s+", " ").strip();
         if (clean.length() > MAX_NAME_LENGTH) {
             clean = clean.substring(0, MAX_NAME_LENGTH).strip();
         }

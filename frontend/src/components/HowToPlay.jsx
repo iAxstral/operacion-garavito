@@ -24,6 +24,7 @@ const KEYBOARD = [
   ['F', 'Habilidad de tu rol'],
   ['E', 'Interactuar: misiones, tienda, puertas, escaleras, inventario'],
   ['M / Tab', 'Mapa y equipo'],
+  ['Z / X / V / G / B', 'Avisar al equipo: zombis, ayuda, revívanme, vamos, munición'],
   ['Esc', 'Configuración'],
 ];
 
@@ -36,6 +37,7 @@ const TOUCH = [
   ['E', 'Interactuar (mantén para revivir)'],
   ['🔫 / ⟳', 'Cambiar de arma / recargar'],
   ['🗺 / ⚙', 'Mapa / configuración'],
+  ['📣', 'Avisar al equipo (se escucha con la voz de tu rol)'],
 ];
 
 export default function HowToPlay({ onClose }) {

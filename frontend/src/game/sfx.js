@@ -162,6 +162,14 @@ const SOUNDS = {
     play: (ctx, v) => noise(ctx, { gain: 0.22 * v, attack: 0.12, decay: 0.1, filter: 'highpass', freq: 900, freqTo: 3200, q: 0.7 }),
   },
   stagger: { channel: 'combat', play: (ctx, v) => tone(ctx, { type: 'triangle', from: 1400, to: 1900, gain: 0.12 * v, decay: 0.12 }) },
+  // Radio del equipo: chasquido y estatica corta antes de un aviso hablado.
+  radio: {
+    channel: 'voices',
+    play: (ctx, v) => {
+      noise(ctx, { gain: 0.3 * v, attack: 0.002, decay: 0.12, filter: 'bandpass', freq: 2200, q: 1.5 });
+      tone(ctx, { type: 'square', from: 1700, to: 1700, gain: 0.08 * v, attack: 0.002, decay: 0.05 });
+    },
+  },
   // Letrero de Kinder: campanada grave con un golpe de tambor.
   kinderStinger: {
     channel: 'music',

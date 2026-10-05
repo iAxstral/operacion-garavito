@@ -31,6 +31,7 @@ import { CAFETERIA_MENU, WEAPON_MACHINE_MENU } from '../game/shopCatalog';
 import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog';
 import { abilityFor, BARRICADE_COOLDOWN_MS, MAX_BARRICADES, priceFor } from '../game/abilityCatalog';
 import { roleInfo } from '../game/roleCatalog';
+import { displayName, nameWithRole } from '../game/profile';
 import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
 
 const MAP_CELL_PX = 12;
@@ -133,6 +134,11 @@ function AmmoPips({ loaded, size }) {
   );
 }
 
+// Apodo (o rol) de un jugador por su id, con el ultimo estado del servidor.
+function nameOf(playerId) {
+  return displayName(getLatestState().players.find((p) => p.playerId === playerId) ?? { role: playerId });
+}
+
 // Texto del aviso para un evento del servidor (o null si a este jugador no le toca).
 function toastFor(event) {
   const broadcastTypes = ['REVIVED', 'TRANSFER', 'EVENT_STARTED', 'EVENT_RESOLVED', 'EVENT_FAILED'];
@@ -151,13 +157,13 @@ function toastFor(event) {
   }
   if (event.type === 'TRANSFER' && (event.playerId === getMyRole() || event.itemId === getMyRole())) {
     message = event.playerId === getMyRole()
-      ? `Enviaste ${event.reason} Garavitos a ${roleInfo(event.itemId).name}`
+      ? `Enviaste ${event.reason} Garavitos a ${nameOf(event.itemId)}`
       : `¡Economía te envió +${event.reason} Garavitos!`;
     return { message, ms: 2500 };
   }
   if (event.type === 'REVIVED') {
-    const revived = roleInfo(event.playerId).name;
-    const reviver = roleInfo(event.itemId).name;
+    const revived = nameOf(event.playerId);
+    const reviver = nameOf(event.itemId);
     message = event.playerId === getMyRole() ? `¡${reviver} te levantó! Vuelves con 50 de vida`
       : event.itemId === getMyRole() ? `¡Levantaste a ${revived}!`
         : `${revived} volvió a la pelea`;
@@ -678,7 +684,7 @@ export default function Hud() {
               {others.length === 0 && <p className="team-panel-empty">Nadie más conectado todavía.</p>}
               {others.map((p) => (
                 <div key={p.playerId} className="team-panel-row">
-                  <strong>{roleInfo(p.role).name}</strong> — {p.health} / 100
+                  <strong>{nameWithRole(p)}</strong> — {p.health} / 100
                   <div className="hud-health-bar hud-health-bar--small">
                     <div className="hud-health-fill" style={{ width: `${p.health}%`, background: healthColor(p.health) }} />
                   </div>

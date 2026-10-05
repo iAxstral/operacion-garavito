@@ -319,7 +319,7 @@ const EMOJI_ICONS = {
   '🔫': 'gun', '★': 'star', '❤': 'heart', '❤️': 'heart', '✊': 'fist', '🪓': 'axe', '🎯': 'rifle',
   '💥': 'burst', '🗺': 'map', '🗺️': 'map', '⚙': 'gear', '⚙️': 'gear', '🏆': 'trophy', '📖': 'book',
   '☠': 'skull', '👥': 'people', '📦': 'box', '✓': 'check', '⟳': 'reload', '»': 'dash', '✕': 'close',
-  '👁': 'eye', '📡': 'radar', '💓': 'pulse', '💊': 'pill', '📊': 'chart', '🧾': 'receipt', '🔧': 'wrench', '📐': 'ruler',
+  '📣': 'megaphone', '👁': 'eye', '📡': 'radar', '💓': 'pulse', '💊': 'pill', '📊': 'chart', '🧾': 'receipt', '🔧': 'wrench', '📐': 'ruler',
 };
 
 function iconForEmoji(value) {

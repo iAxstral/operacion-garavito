@@ -28,10 +28,12 @@ export default function WaitingRoom({ onStarted, onLeave }) {
         <div className="waiting-players">
           {ROLE_CATALOG.map((entry) => {
             const present = joinedRoles.includes(entry.role);
+            const player = state.players.find((p) => p.role === entry.role);
             return (
               <div key={entry.role} className={`waiting-slot${present ? ' waiting-slot--present' : ''}`}>
                 <img src={entry.portrait} alt="" className="waiting-slot-portrait" />
                 <span className="waiting-slot-name">{entry.name}</span>
+                {player?.name && <span className="waiting-slot-nick">{player.name}</span>}
                 <span className="waiting-slot-tag">
                   {present
                     ? `${entry.role === state.lobby?.host ? 'Anfitrión' : 'Listo'}${entry.role === getMyRole() ? ' (tú)' : ''}`

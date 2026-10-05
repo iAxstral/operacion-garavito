@@ -10,10 +10,11 @@ export const VOLUME_CHANNELS = [
   { id: 'zombies', label: 'Zombis', hint: 'Gruñidos, rugidos y mordidas', icon: '🧟' },
   { id: 'combat', label: 'Combate', hint: 'Tus golpes, impactos y el daño que recibes', icon: '⚔️' },
   { id: 'ui', label: 'Interfaz', hint: 'Botones y menús', icon: '🖱️' },
+  { id: 'voices', label: 'Voces del equipo', hint: 'Los avisos hablados de tus compañeros', icon: '📣' },
 ];
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  volumes: Object.freeze({ master: 0.8, music: 0.5, ambient: 0.6, zombies: 0.9, combat: 0.8, ui: 0.6 }),
+  volumes: Object.freeze({ master: 0.8, music: 0.5, ambient: 0.6, zombies: 0.9, combat: 0.8, ui: 0.6, voices: 0.9 }),
   muted: false,
   vibration: true,
   screenShake: true,

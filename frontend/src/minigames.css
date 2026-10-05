@@ -519,3 +519,189 @@
     font-size: 11px;
   }
 }
+
+/* ---------- Avisos al equipo (PingControls) ---------- */
+
+.ping-controls {
+  position: absolute;
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 18;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* En celular el joystick ocupa abajo a la izquierda: el boton va a media altura. */
+.ping-controls--touch {
+  top: 42%;
+  bottom: auto;
+  flex-direction: column;
+}
+
+.ping-toggle {
+  width: 44px;
+  height: 44px;
+}
+
+.ping-toggle .hw-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.ping-toggle--open {
+  border-color: var(--hw-gold);
+  box-shadow: 0 0 14px rgba(232, 182, 74, 0.6);
+}
+
+.ping-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: linear-gradient(180deg, rgba(30, 12, 14, 0.95), rgba(10, 5, 7, 0.95));
+  border: 1px solid var(--hw-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+.ping-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 190px;
+  padding: 8px 10px;
+  font: bold 14px sans-serif;
+  text-align: left;
+  color: var(--hw-bone);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-left: 4px solid var(--ping);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ping-option:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--ping);
+}
+
+.ping-option:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.ping-option .hw-icon {
+  color: var(--ping);
+}
+
+.ping-option span {
+  flex: 1;
+}
+
+.ping-option kbd {
+  font-size: 11px;
+}
+
+.ping-option--zombies,
+.ping-feed-item--zombies { --ping: #ff3a2a; }
+.ping-option--help,
+.ping-feed-item--help { --ping: #ff9a2a; }
+.ping-option--revive,
+.ping-feed-item--revive { --ping: #6dff7a; }
+.ping-option--go,
+.ping-feed-item--go { --ping: #3fd8ff; }
+.ping-option--ammo,
+.ping-feed-item--ammo { --ping: #ffd23a; }
+
+.ping-feed {
+  position: absolute;
+  top: calc(100px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 17;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.ping-feed-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+  padding: 5px 12px;
+  font: 14px sans-serif;
+  color: var(--hw-bone);
+  background: rgba(14, 5, 7, 0.88);
+  border: 1px solid var(--ping);
+  border-radius: 999px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ping) 45%, transparent);
+  animation: ping-in 0.25s ease-out;
+}
+
+.ping-feed-item .hw-icon {
+  color: var(--ping);
+}
+
+.ping-feed-item small {
+  opacity: 0.75;
+}
+
+@keyframes ping-in {
+  from { transform: translateY(-8px) scale(0.92); opacity: 0; }
+}
+
+/* ---------- Apodo ---------- */
+
+.nickname-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--hw-title-font);
+  font-size: 20px;
+  color: var(--hw-bone);
+}
+
+.nickname-field input {
+  width: min(300px, 60vw);
+  padding: 8px 12px;
+  font: 16px sans-serif;
+  color: var(--hw-bone);
+  background: rgba(20, 8, 10, 0.85);
+  border: 1px solid var(--hw-border);
+  border-radius: 8px;
+}
+
+.nickname-field input:focus {
+  outline: none;
+  border-color: var(--hw-gold);
+  box-shadow: 0 0 10px rgba(232, 182, 74, 0.4);
+}
+
+.waiting-slot-nick {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: bold;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hw-gold);
+}
+
+@media (max-width: 640px) {
+  .nickname-field {
+    flex-direction: column;
+    gap: 4px;
+    font-size: 17px;
+  }
+
+  .ping-option {
+    min-width: 170px;
+    padding: 10px;
+  }
+}

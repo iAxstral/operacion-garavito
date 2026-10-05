@@ -6,7 +6,7 @@ import {
   requestTransfer,
   setAbilityPanel,
 } from '../game/gameSync';
-import { roleInfo } from '../game/roleCatalog';
+import { nameWithRole } from '../game/profile';
 import { playSfx } from '../game/sfx';
 
 const AMOUNTS = [5, 10, 25];
@@ -48,7 +48,7 @@ export default function TreasuryPanel() {
       {mates.map((mate) => (
         <div key={mate.playerId} className="treasury-row">
           <span className="treasury-name">
-            <strong>{roleInfo(mate.role).name}</strong>
+            <strong>{nameWithRole(mate)}</strong>
             <small>{mate.garavitos} G · {mate.health} vida{mate.lifeState === 'DOWNED' ? ' · caído' : ''}</small>
           </span>
           {AMOUNTS.map((amount) => (

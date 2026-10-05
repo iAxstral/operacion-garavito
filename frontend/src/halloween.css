@@ -32,6 +32,12 @@
   --hw-scary-font: 'Creepster', 'Pirata One', 'Georgia', serif;
 }
 
+/* Fondo de la pagina: negro, para que el fundido entre pantallas salga de la oscuridad. */
+html,
+body {
+  background: var(--hw-ink);
+}
+
 /* ---------- Fondo comun: piedra oscura, neblina roja y vineta ---------- */
 
 .role-select {

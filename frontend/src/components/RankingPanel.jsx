@@ -99,7 +99,7 @@ export default function RankingPanel({ onClose, initialBuilding = 'F' }) {
                         <td>{formatTime(match.durationSeconds)}</td>
                         <td>{match.players}</td>
                         <td>{match.totalKills}</td>
-                        <td>{match.mvpRole ? roleInfo(match.mvpRole).name : '—'}</td>
+                        <td>{match.mvpRole ? (match.mvpName ? `${match.mvpName} (${roleInfo(match.mvpRole).name})` : roleInfo(match.mvpRole).name) : '—'}</td>
                         <td>{formatDate(match.playedAt)}</td>
                       </tr>
                     ))}

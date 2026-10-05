@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getLatestState, getMyRole, onGameEvent, setInputLocked } from '../game/gameSync';
-import { roleInfo } from '../game/roleCatalog';
+import { nameWithRole } from '../game/profile';
 import { playSfx } from '../game/sfx';
 import RankingPanel from './RankingPanel';
 import Icon from './Icon';
@@ -102,7 +102,7 @@ export default function GameOverScreen({ onExitToMenu }) {
                 {players.map((p) => (
                   <tr key={p.role} className={p.role === getMyRole() ? 'results-me' : undefined}>
                     <th scope="row">
-                      {roleInfo(p.role).name}{p.role === getMyRole() ? ' (tú)' : ''}
+                      {nameWithRole(p)}{p.role === getMyRole() ? ' (tú)' : ''}
                       {awards.get(p.role) && (
                         <span className="results-awards">
                           {awards.get(p.role).map((award) => (

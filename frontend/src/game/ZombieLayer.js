@@ -25,6 +25,8 @@ const LUNGE_PX = 16;
 const OUTLINE_COLORS = { RUNNER: 0x3fd8ff, SPITTER: 0x9dff3a, TOUGH: 0xff3a2a };
 const OUTLINE_SCALE = 1.14;
 const RISE_MS = 520;
+// Lo que el cuerpo de un zombi que cayo entero se queda en el piso.
+const CORPSE_MS = 6000;
 
 function bakeTexture(scene, key, { body, rot, w, h }) {
   if (scene.textures.exists(key)) return;
@@ -306,21 +308,49 @@ export default class ZombieLayer {
     this.scene.time.delayedCall(70, () => this.applyPhaseTint(entry));
   }
 
+  // Muertes variadas: el escupidor siempre revienta (y deja su charco, que pone el
+  // servidor); los demas a veces revientan y a veces caen enteros y el cuerpo queda un
+  // rato en el piso.
   kill(entry) {
     this.clearWarning(entry);
+    entry.deathStyle = entry.kind === 'SPITTER' || Math.random() < 0.45 ? 'burst' : 'corpse';
     this.hooks.onDeath?.(entry);
     this.scene.tweens.killTweensOf(entry.offset);
     entry.outline?.destroy();
     entry.outline = null;
+    this.scene.tweens.add({ targets: entry.shadow, alpha: 0, duration: 260, onComplete: () => entry.shadow.destroy() });
+
+    if (entry.deathStyle === 'corpse') {
+      const side = entry.sprite.flipX ? -1 : 1;
+      entry.sprite.setTintMode(Phaser.TintModes.MULTIPLY).setTint(0x8a7a7a);
+      this.scene.tweens.add({
+        targets: entry.sprite,
+        angle: 90 * side,
+        y: entry.sprite.y + 10,
+        duration: 320,
+        ease: 'Bounce.easeOut',
+        onComplete: () => {
+          entry.sprite.setDepth(1.58);
+          this.scene.tweens.add({
+            targets: entry.sprite,
+            alpha: 0,
+            delay: CORPSE_MS,
+            duration: 900,
+            onComplete: () => entry.sprite.destroy(),
+          });
+        },
+      });
+      return;
+    }
+
     this.scene.tweens.add({
       targets: entry.sprite,
       alpha: 0,
       scaleY: 0.4,
       angle: entry.sprite.flipX ? -80 : 80,
-      duration: 260,
+      duration: 200,
       onComplete: () => entry.sprite.destroy(),
     });
-    this.scene.tweens.add({ targets: entry.shadow, alpha: 0, duration: 260, onComplete: () => entry.shadow.destroy() });
   }
 
   update(delta) {

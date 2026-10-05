@@ -1,6 +1,9 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLayout';
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
+import { displayName } from './profile';
+import PingLayer from './PingLayer';
+import { PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
@@ -12,6 +15,7 @@ import {
   getMyRole,
   getBoss,
   getProjectiles,
+  getPuddles,
   getZombies,
   isInputLocked,
   onStateChange,
@@ -295,7 +299,10 @@ export default class MainScene extends Phaser.Scene {
         this.gore.blood(entry.x, entry.y);
         if (amount > 0) this.gore.damageNumber(entry.x, entry.y - 34, amount, { crit: amount >= 3 });
       },
-      onDeath: (entry) => this.gore.burst(entry.x, entry.y + 6, entry.kind === 'SPITTER' ? 0x6f8526 : 0x6e0b0b),
+      onDeath: (entry) => {
+        if (entry.deathStyle === 'corpse') this.gore.blood(entry.x, entry.y + 4, { big: true });
+        else this.gore.burst(entry.x, entry.y + 6, entry.kind === 'SPITTER' ? 0x7fdc2a : 0x6e0b0b);
+      },
     };
   }
 
@@ -445,9 +452,12 @@ export default class MainScene extends Phaser.Scene {
     this.reviveGfx = this.add.graphics().setDepth(5500);
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
+    this.pingLayer = new PingLayer(this);
     // El servidor rechazo una posicion (movimiento imposible): se vuelve a la suya.
+    // Los avisos del equipo de este piso se marcan en el mapa.
     const offCorrection = onGameEvent((event) => {
       if (event.type === 'POSITION_CORRECTED' && event.playerId === getMyRole()) this.applyServerPosition();
+      if (event.type === 'PING') this.showPing(event);
     });
     this.events.once('shutdown', () => {
       offCorrection();
@@ -582,7 +592,7 @@ export default class MainScene extends Phaser.Scene {
       if (!entry) {
         const sprite = this.add.sprite(state.x, state.y, `${prefix}_down`).setDepth(9);
         const label = this.add
-          .text(state.x, state.y, roleInfo(state.role).name, {
+          .text(state.x, state.y, displayName(state), {
             fontFamily: 'sans-serif',
             fontSize: '11px',
             color: '#ffffff',
@@ -622,7 +632,7 @@ export default class MainScene extends Phaser.Scene {
       entry.downed = downed;
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
       entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.sprite.displayHeight / 2 - 5);
-      const labelText = state.connected === false ? `${roleInfo(state.role).name} (desconectado)` : roleInfo(state.role).name;
+      const labelText = state.connected === false ? `${displayName(state)} (desconectado)` : displayName(state);
       if (entry.label.text !== labelText) entry.label.setText(labelText);
       entry.sprite.setAlpha(state.connected === false ? 0.45 : entry.sprite.alpha);
       this.weaponLayer.update(state.playerId, {
@@ -813,6 +823,45 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
+  showPing(event) {
+    const [floor, x, y] = String(event.reason ?? '').split(',').map(Number);
+    if (floor !== this.floor || !Number.isFinite(x)) return;
+    const who = displayName(getLatestState().players.find((p) => p.playerId === event.playerId) ?? { role: event.playerId });
+    this.pingLayer.add({ kind: event.itemId, x, y, label: `${who}: ${PING_KINDS[event.itemId]?.label ?? '¡Aquí!'}` });
+  }
+
+  // Charcos de acido de los escupidores muertos: verdes, burbujean y se secan.
+  syncPuddles() {
+    if (!this.puddleSprites) this.puddleSprites = new Map();
+    const seen = new Set();
+    getPuddles().filter((p) => p.floor === this.floor).forEach((p) => {
+      seen.add(p.id);
+      let entry = this.puddleSprites.get(p.id);
+      if (!entry) {
+        const pool = this.add.ellipse(p.x, p.y + 10, 20, 9, 0x7fdc2a, 0.7).setDepth(1.55);
+        const glow = this.add.ellipse(p.x, p.y + 10, 90, 40, 0x9dff3a, 0.18).setDepth(1.56).setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({ targets: pool, width: 76, height: 32, duration: 260, ease: 'Quad.easeOut' });
+        entry = { pool, glow, x: p.x, y: p.y + 10 };
+        this.puddleSprites.set(p.id, entry);
+      }
+      const life = Math.min(1, p.remainingMs / 1500);
+      entry.pool.setAlpha(0.7 * life);
+      entry.glow.setAlpha((0.14 + Math.sin(this.time.now / 180) * 0.05) * life);
+      if (Math.random() < 0.12) {
+        const bubble = this.add.circle(entry.x + (Math.random() - 0.5) * 50, entry.y + (Math.random() - 0.5) * 18, 2 + Math.random() * 2, 0xc8ff7a, 0.8).setDepth(1.57);
+        this.tweens.add({ targets: bubble, scale: 1.8, alpha: 0, duration: 380, onComplete: () => bubble.destroy() });
+      }
+    });
+    this.puddleSprites.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      this.tweens.add({ targets: [entry.pool, entry.glow], alpha: 0, duration: 400, onComplete: () => {
+        entry.pool.destroy();
+        entry.glow.destroy();
+      } });
+      this.puddleSprites.delete(id);
+    });
+  }
+
   // El jefe solo se dibuja si esta en el piso de este jugador.
   syncBoss(delta) {
     this.syncProjectiles(delta);
@@ -830,6 +879,8 @@ export default class MainScene extends Phaser.Scene {
       .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)
       .setVisible(this.player.visible);
     this.lighting.update(time, this.focusSprite(), this.remotePlayers);
+    this.syncPuddles();
+    this.pingLayer?.update(time);
     this.checkDamageTaken();
     this.drawReviveProgress();
     if (this.updateSpectate(delta)) return;
@@ -1042,7 +1093,7 @@ export default class MainScene extends Phaser.Scene {
       const distance = Math.hypot(p.x - this.player.x, p.y - this.player.y);
       if (distance <= best) {
         best = distance;
-        near = { playerId: p.playerId, role: p.role, name: roleInfo(p.role).name };
+        near = { playerId: p.playerId, role: p.role, name: displayName(p) };
       }
     });
     setNearDowned(near);
