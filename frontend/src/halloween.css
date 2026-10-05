@@ -444,6 +444,298 @@ kbd {
   from { opacity: 0; }
 }
 
+/* ---------- HUD gotico ---------- */
+
+.hud {
+  color: var(--hw-bone);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+}
+
+/* Paneles del HUD: piedra negra con borde de sangre seca. */
+.hud-weapon,
+.hud-ability-chip,
+.hud-missions,
+.hud-wave,
+.hud-floor,
+.hud-garavitos,
+.hud-toast,
+.hud-interact-hint,
+.hud-icon-btn,
+.hud-ability,
+.tutorial-tip,
+.team-panel,
+.shop-modal,
+.inventory-modal,
+.map-modal,
+.mission-modal {
+  color: var(--hw-bone);
+  background: linear-gradient(180deg, rgba(30, 12, 14, 0.9), rgba(10, 5, 7, 0.92));
+  border: 1px solid rgba(150, 30, 24, 0.65);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.7), 0 2px 8px rgba(0, 0, 0, 0.5);
+}
+
+.shop-modal h3,
+.inventory-modal h3,
+.map-modal h3,
+.mission-modal h3,
+.team-panel h3,
+.hud-missions-title {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  letter-spacing: 1px;
+  color: var(--hw-bone);
+}
+
+.shop-modal h3,
+.inventory-modal h3,
+.map-modal h3,
+.mission-modal h3,
+.team-panel h3 {
+  font-size: 24px;
+  text-shadow: 0 0 10px rgba(232, 50, 31, 0.5);
+}
+
+.hud-missions-title {
+  font-size: 16px;
+}
+
+.modal-close {
+  color: var(--hw-bone);
+  background: rgba(40, 10, 12, 0.8);
+  border-color: var(--hw-border);
+}
+
+.modal-close:hover {
+  background: rgba(110, 14, 10, 0.8);
+}
+
+.hud-icon-btn {
+  color: var(--hw-bone);
+}
+
+.hud-icon-btn .hw-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.hud-icon-btn:hover,
+.hud-icon-btn:active {
+  background: rgba(110, 14, 10, 0.85);
+  border-color: var(--hw-blood-bright);
+}
+
+/* Vida: corazon que late y barra con marco de hierro. */
+.hud-health {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud-health-heart {
+  width: 26px;
+  height: 26px;
+  color: var(--hw-blood-bright);
+  filter: drop-shadow(0 0 5px rgba(232, 50, 31, 0.7));
+  animation: hw-heartbeat 1.4s ease-in-out infinite;
+}
+
+.hud-health--low .hud-health-heart {
+  animation-duration: 0.55s;
+}
+
+@keyframes hw-heartbeat {
+  0%, 40%, 100% { transform: scale(1); }
+  15% { transform: scale(1.2); }
+  28% { transform: scale(1.08); }
+}
+
+.hud-health-bar {
+  height: 22px;
+  background: linear-gradient(180deg, #120607, #050203);
+  border: 2px solid #3a1210;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgba(190, 36, 26, 0.55), inset 0 2px 6px rgba(0, 0, 0, 0.9);
+}
+
+.hud-health-fill {
+  box-shadow: inset 0 1px 0 rgba(255, 200, 180, 0.35);
+}
+
+.hud-health-label {
+  font-weight: bold;
+  letter-spacing: 0.5px;
+  color: #fff4ee;
+}
+
+.hud-health-bar--small {
+  height: 10px;
+  border-width: 1px;
+}
+
+/* Poca vida: los bordes de la pantalla laten en rojo hasta curarse. */
+.hud-low-health {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 50%, rgba(170, 0, 0, 0.55) 100%);
+  animation: hw-low-health 1.1s ease-in-out infinite;
+}
+
+@keyframes hw-low-health {
+  0%, 100% { opacity: 0.45; }
+  20% { opacity: 1; }
+}
+
+.hud-garavitos {
+  gap: 5px;
+  color: var(--hw-gold);
+  border-color: rgba(232, 182, 74, 0.55);
+}
+
+.hud-garavitos .hw-icon {
+  color: var(--hw-gold);
+}
+
+.hud-slot {
+  background: rgba(20, 8, 10, 0.75);
+  border-color: rgba(150, 30, 24, 0.6);
+}
+
+/* Arma y municion: balas dibujadas en el cargador. */
+.hud-weapon-name {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 16px;
+  letter-spacing: 0.5px;
+}
+
+.hud-weapon-glyph .hw-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.hud-weapon-ammo {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--hw-gold);
+}
+
+.hud-weapon-ammo small {
+  color: var(--hw-bone-dim);
+}
+
+.hud-ammo-pips {
+  display: flex;
+  gap: 2px;
+}
+
+.hud-ammo-pip {
+  width: 4px;
+  height: 12px;
+  border-radius: 2px 2px 1px 1px;
+  background: rgba(232, 182, 74, 0.15);
+  border: 1px solid rgba(232, 182, 74, 0.45);
+}
+
+.hud-ammo-pip--full {
+  background: linear-gradient(180deg, #ffe39a 0 30%, #c88a2a 30%);
+  border-color: #6b4712;
+}
+
+.hud-weapon--empty {
+  border-color: var(--hw-blood-bright);
+}
+
+.hud-weapon-reload,
+.hud-ability-fill {
+  background: var(--hw-blood-bright);
+}
+
+.hud-ability-chip {
+  border-color: rgba(232, 182, 74, 0.55);
+}
+
+.hud-ability-chip .hw-icon {
+  color: var(--hw-gold);
+}
+
+.hud-ability-key {
+  color: #120708;
+  background: var(--hw-gold);
+}
+
+.hud-mission .hw-icon {
+  color: var(--hw-blood-bright);
+}
+
+.hud-mission--done .hw-icon {
+  color: var(--hw-ghost);
+}
+
+.hud-wave {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  letter-spacing: 0.5px;
+}
+
+.hud-wave--resting {
+  color: var(--hw-bone);
+  border-color: rgba(120, 140, 120, 0.5);
+}
+
+.hud-wave--active {
+  color: #ffb3a6;
+  border-color: var(--hw-blood-bright);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.7), 0 0 14px rgba(232, 50, 31, 0.35);
+}
+
+.hud-interact-hint strong {
+  color: var(--hw-gold);
+}
+
+.hud-kinder-event .hw-icon {
+  margin-right: 2px;
+}
+
+.tutorial-tip {
+  border-color: rgba(232, 182, 74, 0.55);
+}
+
+.tutorial-tip-close {
+  color: #fff1ec;
+  background: linear-gradient(180deg, #c41c12, #6e0606);
+  border-color: #c41c12;
+}
+
+.tutorial-tip-icon .hw-icon {
+  width: 26px;
+  height: 26px;
+  color: var(--hw-gold);
+}
+
+.inventory-use {
+  color: #fff1ec;
+  background: linear-gradient(180deg, #c41c12, #6e0606);
+}
+
+.inventory-use:hover {
+  background: linear-gradient(180deg, #e0281a, #860808);
+}
+
+/* Botones tactiles: hierro oscuro con iconos claros. */
+.touch-btn .hw-icon {
+  width: 46%;
+  height: 46%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hud-health-heart,
+  .hud-low-health {
+    animation: none;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .waiting-code,
   .waiting-slot--present,

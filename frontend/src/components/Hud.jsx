@@ -114,10 +114,23 @@ function nextMission(me) {
   return here[0] ?? pending[0] ?? null;
 }
 
+// Siempre sangre: mas oscura y apagada a medida que se acaba la vida.
 function healthColor(health) {
-  if (health > 60) return '#4caf50';
-  if (health > 30) return '#e0a13a';
-  return '#c0392b';
+  if (health > 60) return 'linear-gradient(180deg, #e8412c 0%, #a3140c 55%, #6a0606 100%)';
+  if (health > 30) return 'linear-gradient(180deg, #d0581f 0%, #8f2a0a 55%, #561405 100%)';
+  return 'linear-gradient(180deg, #a01010 0%, #5c0505 60%, #300202 100%)';
+}
+
+/** Balas del cargador dibujadas: llenas las que quedan, huecas las gastadas. */
+function AmmoPips({ loaded, size }) {
+  if (!size) return null;
+  return (
+    <span className="hud-ammo-pips" aria-hidden="true">
+      {Array.from({ length: size }, (_, i) => (
+        <span key={i} className={`hud-ammo-pip${i < loaded ? ' hud-ammo-pip--full' : ''}`} />
+      ))}
+    </span>
+  );
 }
 
 // Texto del aviso para un evento del servidor (o null si a este jugador no le toca).
@@ -452,15 +465,19 @@ export default function Hud() {
   return (
     <div className={`hud${touch ? ' hud--touch' : ''}`}>
       {hurtKey > 0 && <div key={hurtKey} className={`hud-hurt-vignette${health <= 30 ? ' hud-hurt-vignette--critical' : ''}`} />}
+      {health > 0 && health <= 30 && me?.lifeState !== 'DOWNED' && <div className="hud-low-health" aria-hidden="true" />}
 
       <div className="hud-top-left">
-        <div className="hud-health-bar">
-          <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
-          <span className="hud-health-label">{health} / 100</span>
+        <div className={`hud-health${health <= 30 ? ' hud-health--low' : ''}`}>
+          <Icon name="heart" className="hud-health-heart" />
+          <div className="hud-health-bar">
+            <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
+            <span className="hud-health-label">{health} / 100</span>
+          </div>
         </div>
 
         <div className="hud-stats-row">
-          <div className="hud-garavitos">{garavitos} Garavitos</div>
+          <div className="hud-garavitos"><Icon name="coin" /> {garavitos} Garavitos</div>
           <div className="hud-floor">{role.name} — Piso {floor}</div>
         </div>
 
@@ -484,8 +501,8 @@ export default function Hud() {
           <span className="hud-weapon-name">{weapon.name}</span>
           {weapon.ranged && (
             <span className="hud-weapon-ammo">
-              {reloadingMs > 0 ? 'Recargando…' : `${me?.magazine ?? 0}/${weapon.magazineSize}`}
-              <small> · {me?.reserveAmmo ?? 0}</small>
+              {reloadingMs > 0 ? 'Recargando…' : <AmmoPips loaded={me?.magazine ?? 0} size={weapon.magazineSize} />}
+              <small>{me?.magazine ?? 0}/{weapon.magazineSize} · {me?.reserveAmmo ?? 0}</small>
             </span>
           )}
           {!touch && <span className="hud-weapon-keys">1-4{weapon.ranged ? ' · R' : ''}</span>}
