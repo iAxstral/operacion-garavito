@@ -83,6 +83,23 @@ public class GameSession {
     private volatile boolean started = false;
     private volatile String host;
 
+    /*
+     * Validacion de movimiento: el cliente manda su posicion, pero el servidor ya no le
+     * cree a ciegas. Velocidad maxima (caminar 160 px/s, con dash un poco mas, mas un
+     * margen por la red), que el destino no sea pared y que no atraviese paredes; el
+     * cambio de piso solo vale saliendo de la escalera y llegando a la del otro piso.
+     */
+    static final double MOVE_MAX_SPEED_PX_S = 240;
+    static final double MOVE_SLACK_PX = 72;
+    static final double MOVE_MAX_GAP_S = 0.5;
+    /** El sprite se reporta por su centro; los pies estan mas abajo. */
+    static final double FOOT_OFFSET_PX = 51;
+    static final double STAIRS_MARGIN_PX = 96;
+    static final double STAIRS_ARRIVAL_RADIUS_PX = 220;
+    static final long CORRECTION_EVERY_MS = 400;
+    /** Una accion (ataque) puede venir con la posicion un poco mas fresca que la del servidor. */
+    static final double ACTION_POSITION_TOLERANCE_PX = 48;
+
     /** Cuanto se le guarda el puesto a un jugador que se desconecto. */
     public static final long RECONNECT_GRACE_MS = 30_000;
     private final Map<String, String> seatTokens = new ConcurrentHashMap<>();
@@ -223,8 +240,8 @@ public class GameSession {
             return PickupResult.rejected("already_claimed");
         }
 
-        double dx = x - item.x();
-        double dy = y - item.y();
+        double dx = player.getX() - item.x();
+        double dy = player.getY() - item.y();
         if (Math.sqrt(dx * dx + dy * dy) > PICKUP_RANGE_PX) {
             claimedItems.remove(itemId, playerId);
             return PickupResult.rejected("too_far");
@@ -256,12 +273,60 @@ public class GameSession {
                 .toList();
     }
 
-    public void reportPosition(String playerId, int floor, double x, double y) {
+    /**
+     * Posicion que reporta el cliente. Devuelve false si se rechazo (movimiento
+     * imposible): el jugador queda donde el servidor lo tenia.
+     */
+    public boolean reportPosition(String playerId, int floor, double x, double y) {
         Player player = players.get(playerId);
         // Un caido se queda donde cayo: su cliente pasa a modo espectador.
-        if (player != null && player.isAlive() && building.hasFloor(floor)) {
-            player.reportPosition(floor, x, y);
+        if (player == null || !player.isAlive() || !building.hasFloor(floor)) {
+            return true;
         }
+        long now = System.currentTimeMillis();
+        if (!isValidMove(player, floor, x, y, now)) {
+            player.countRejectedMove();
+            return false;
+        }
+        player.reportPosition(floor, x, y);
+        player.setLastMoveAt(now);
+        return true;
+    }
+
+    /** True (como mucho cada CORRECTION_EVERY_MS) si hay que mandarle a este jugador su posicion real. */
+    public boolean shouldCorrect(String playerId) {
+        Player player = players.get(playerId);
+        return player != null && player.shouldSendCorrection(System.currentTimeMillis(), CORRECTION_EVERY_MS);
+    }
+
+    boolean isValidMove(Player player, int floor, double x, double y, long now) {
+        if (floor == player.getFloor()) {
+            // El cliente reporta cada ~100 ms mientras se mueve: entre dos reportes nunca
+            // deberia haber mas de medio segundo de camino, aunque haya estado quieto antes.
+            double elapsed = player.getLastMoveAt() == 0 ? MOVE_MAX_GAP_S
+                    : Math.min(MOVE_MAX_GAP_S, Math.max(0, (now - player.getLastMoveAt()) / 1000.0));
+            double distance = Math.hypot(x - player.getX(), y - player.getY());
+            if (distance > MOVE_SLACK_PX + MOVE_MAX_SPEED_PX_S * elapsed) {
+                return false;
+            }
+            FloorGrid grid = floorGrid(floor);
+            if (!grid.isWalkable(x, y + FOOT_OFFSET_PX) && !grid.isWalkable(x, y)) {
+                return false;
+            }
+            return distance < FloorGrid.TILE * 0.75
+                    || grid.hasLineOfSight(player.getX(), player.getY() + FOOT_OFFSET_PX, x, y + FOOT_OFFSET_PX)
+                    || grid.hasLineOfSight(player.getX(), player.getY(), x, y);
+        }
+        if (Math.abs(floor - player.getFloor()) != 1) {
+            return false;
+        }
+        boolean goingUp = floor > player.getFloor();
+        FloorGrid.StairsSpec from = floorGrid(player.getFloor()).stairs(goingUp ? "up" : "down");
+        FloorGrid.StairsSpec to = floorGrid(floor).stairs(goingUp ? "down" : "up");
+        return from != null && to != null
+                && (from.contains(player.getX(), player.getY(), STAIRS_MARGIN_PX)
+                        || from.contains(player.getX(), player.getY() + FOOT_OFFSET_PX, STAIRS_MARGIN_PX))
+                && Math.hypot(x - to.arrivalX(), y - to.arrivalY()) <= STAIRS_ARRIVAL_RADIUS_PX;
     }
 
     private void collectAcid(Zombie zombie) {
@@ -657,7 +722,12 @@ public class GameSession {
         }
 
         long now = System.currentTimeMillis();
-        player.reportPosition(x, y);
+        // El origen del golpe es la posicion del servidor, salvo una diferencia chica
+        // (el ataque puede llegar antes que el ultimo reporte de movimiento).
+        if (Math.hypot(x - player.getX(), y - player.getY()) > ACTION_POSITION_TOLERANCE_PX) {
+            x = player.getX();
+            y = player.getY();
+        }
 
         if (type == AttackType.CHARGED) {
             if (!player.tryConsumeChargedCooldown(now, CHARGED_COOLDOWN_MS)) {
@@ -880,8 +950,8 @@ public class GameSession {
             return PurchaseResult.rejected("unknown_item");
         }
 
-        double dx = x - vendor.x();
-        double dy = y - vendor.y();
+        double dx = player.getX() - vendor.x();
+        double dy = player.getY() - vendor.y();
         if (vendor.floor() != player.getFloor() || Math.sqrt(dx * dx + dy * dy) > SHOP_RANGE_PX) {
             return PurchaseResult.rejected("too_far");
         }
@@ -927,8 +997,8 @@ public class GameSession {
             return MissionResult.rejected("unknown_mission");
         }
 
-        double dx = x - mission.x();
-        double dy = y - mission.y();
+        double dx = player.getX() - mission.x();
+        double dy = player.getY() - mission.y();
         if (mission.floor() != player.getFloor() || Math.sqrt(dx * dx + dy * dy) > MISSION_RANGE_PX) {
             return MissionResult.rejected("too_far");
         }
@@ -964,8 +1034,8 @@ public class GameSession {
         }
         FloorGrid.DoorSpec spec = grid.doors().stream().filter(d -> d.doorId().equals(doorId)).findFirst().orElseThrow();
 
-        double dx = x - spec.centerX();
-        double dy = y - spec.centerY();
+        double dx = player.getX() - spec.centerX();
+        double dy = player.getY() - spec.centerY();
         if (floors.indexOf(grid) + 1 != player.getFloor() || Math.sqrt(dx * dx + dy * dy) > DOOR_INTERACT_RANGE_PX) {
             return DoorToggleResult.rejected("too_far");
         }

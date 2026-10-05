@@ -35,3 +35,5 @@ door f2-biblioteca 9 7
 door f2-reuniones 27 7
 door f2-estudio 9 16
 door f2-armero 27 16
+stairs up 2176 640 192 256 2464 736
+stairs down 64 640 192 256 352 736

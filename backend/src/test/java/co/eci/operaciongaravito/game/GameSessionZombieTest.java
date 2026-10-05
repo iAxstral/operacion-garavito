@@ -80,6 +80,7 @@ class GameSessionZombieTest {
     @DisplayName("desarmado golpea pero no mata de un solo golpe")
     void unarmedTakesMoreThanOneHit() {
         ZombieState target = isolatedZombie();
+        player.reportPosition(target.x() - 20, target.y());
 
         AttackResult unarmed = session.attemptAttack("SEGURIDAD", AttackType.BASIC, target.x() - 20, target.y(), 0);
 

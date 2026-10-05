@@ -32,7 +32,24 @@ public final class FloorGrid {
 
     /** {@code baseWalkable} se construye una sola vez al cargar el mapa (sin puertas). */
     private record Template(char[][] cells, List<DoorSpec> doors, List<SpawnPoint> spawnPoints,
-                            boolean[][] baseWalkable) {
+                            boolean[][] baseWalkable, List<StairsSpec> stairs) {
+    }
+
+    /**
+     * Escalera del piso (px): {@code kind} es "up" o "down"; la zona es donde se toma y
+     * (arrivalX, arrivalY) donde aparece quien llega por ella desde el otro piso.
+     */
+    public record StairsSpec(String kind, double x, double y, double w, double h, double arrivalX, double arrivalY) {
+        public boolean contains(double px, double py, double margin) {
+            return px >= x - margin && px <= x + w + margin && py >= y - margin && py <= y + h + margin;
+        }
+    }
+
+    private List<StairsSpec> stairs = List.of();
+
+    /** La escalera de ese tipo en este piso, o null si no hay. */
+    public StairsSpec stairs(String kind) {
+        return stairs.stream().filter(s -> s.kind().equals(kind)).findFirst().orElse(null);
     }
 
     private static final Map<Building, Template[]> TEMPLATES = loadTemplates();
@@ -67,6 +84,7 @@ public final class FloorGrid {
             copy[i] = template.cells()[i].clone();
         }
         FloorGrid grid = new FloorGrid(copy, template.doors(), template.spawnPoints(), template.baseWalkable());
+        grid.stairs = template.stairs();
         template.doors().forEach(spec -> grid.registerDoor(spec.doorId(), spec.col(), spec.row()));
         return grid;
     }
@@ -262,9 +280,17 @@ public final class FloorGrid {
             BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8));
             List<char[]> rows = new ArrayList<>();
             List<DoorSpec> doors = new ArrayList<>();
+            List<StairsSpec> stairs = new ArrayList<>();
             String line;
             while ((line = reader.readLine()) != null) {
                 if (line.isBlank() || line.startsWith("#GENERADO") || line.startsWith("# ")) {
+                    continue;
+                }
+                if (line.startsWith("stairs ")) {
+                    String[] p = line.split(" ");
+                    stairs.add(new StairsSpec(p[1], Double.parseDouble(p[2]), Double.parseDouble(p[3]),
+                            Double.parseDouble(p[4]), Double.parseDouble(p[5]),
+                            Double.parseDouble(p[6]), Double.parseDouble(p[7])));
                     continue;
                 }
                 if (line.startsWith("door ")) {
@@ -275,7 +301,8 @@ public final class FloorGrid {
                 rows.add(line.toCharArray());
             }
             char[][] cells = rows.toArray(char[][]::new);
-            return new Template(cells, List.copyOf(doors), computeSpawnPoints(cells), computeBaseWalkable(cells));
+            return new Template(cells, List.copyOf(doors), computeSpawnPoints(cells), computeBaseWalkable(cells),
+                    List.copyOf(stairs));
         } catch (IOException ex) {
             throw new UncheckedIOException(ex);
         }

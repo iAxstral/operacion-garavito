@@ -166,8 +166,10 @@ public class GameController {
     @MessageMapping("/game/{gameId}/move")
     public void move(@DestinationVariable String gameId, MoveRequest request) {
         GameSession session = sessionService.find(gameId);
-        if (session != null) {
-            session.reportPosition(request.playerId(), request.floor(), request.x(), request.y());
+        if (session != null
+                && !session.reportPosition(request.playerId(), request.floor(), request.x(), request.y())
+                && session.shouldCorrect(request.playerId())) {
+            broadcast(gameId, session, LastEvent.positionCorrected(request.playerId()));
         }
     }
 

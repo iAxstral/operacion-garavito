@@ -43,6 +43,11 @@ public class Player {
     private volatile double shotFacing = 0;
 
     private volatile long lastDamagedAt = 0;
+    /** Ultima posicion aceptada (para validar la siguiente) y ultima correccion enviada. */
+    private volatile long lastMoveAt = 0;
+    private volatile long lastCorrectionAt = 0;
+    private volatile int rejectedMoves = 0;
+
     /** Momento en que se cayo su conexion, o 0 si esta conectado. */
     private volatile long disconnectedAt = 0;
     /** Enfriamiento de la habilidad del rol (p. ej. la barricada de Infraestructura). */
@@ -142,6 +147,31 @@ public class Player {
             return false;
         }
         garavitos -= amount;
+        return true;
+    }
+
+    public long getLastMoveAt() {
+        return lastMoveAt;
+    }
+
+    public void setLastMoveAt(long now) {
+        lastMoveAt = now;
+    }
+
+    public synchronized void countRejectedMove() {
+        rejectedMoves++;
+    }
+
+    public int getRejectedMoves() {
+        return rejectedMoves;
+    }
+
+    /** True si toca avisarle al cliente que corrija su posicion (como mucho cada {@code everyMs}). */
+    public synchronized boolean shouldSendCorrection(long now, long everyMs) {
+        if (now - lastCorrectionAt < everyMs) {
+            return false;
+        }
+        lastCorrectionAt = now;
         return true;
     }
 
@@ -408,6 +438,8 @@ public class Player {
         floor = 1;
         x = 608;
         y = 800;
+        lastMoveAt = 0;
+        rejectedMoves = 0;
         lifeState = PlayerLifeState.ALIVE;
         attackReadyAt = 0;
         chargedReadyAt = 0;

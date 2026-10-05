@@ -32,6 +32,7 @@ import {
   setNearBarricade,
   getAbilityPanel,
   setAbilityPanel,
+  onGameEvent,
   setNearVendor,
   setNearMission,
   setNearDoor,
@@ -428,7 +429,12 @@ export default class MainScene extends Phaser.Scene {
     this.reviveGfx = this.add.graphics().setDepth(5500);
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
+    // El servidor rechazo una posicion (movimiento imposible): se vuelve a la suya.
+    const offCorrection = onGameEvent((event) => {
+      if (event.type === 'POSITION_CORRECTED' && event.playerId === getMyRole()) this.applyServerPosition();
+    });
     this.events.once('shutdown', () => {
+      offCorrection();
       this.scale.off('resize', this.applyCameraZoom, this);
       this.weaponLayer?.destroy();
       setNearBarricade(null);
@@ -853,6 +859,20 @@ export default class MainScene extends Phaser.Scene {
     this.updateMissionProximity();
     this.updateZombieAudio(time);
     this.updateRain(time);
+  }
+
+  applyServerPosition() {
+    const me = getMyPlayerState();
+    if (!me || this.spectating || this.changingFloor) return;
+    this.corrections = (this.corrections ?? 0) + 1;
+    if (me.floor !== this.floor) {
+      this.changingFloor = true;
+      this.scene.restart({ floor: me.floor, spawn: { x: me.x, y: me.y } });
+      return;
+    }
+    this.player.setPosition(me.x, me.y);
+    this.player.setVelocity(0, 0);
+    changeFloor(this.floor, Math.round(me.x), Math.round(me.y));
   }
 
   // Lo que ilumina la luz "del jugador": el compañero que se mira si esta caido.

@@ -27,6 +27,11 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("JOIN_REJECTED", clientId, null, reason);
     }
 
+    /** El servidor rechazo una posicion de este jugador: debe volver a la que tiene el servidor. */
+    public static LastEvent positionCorrected(String playerId) {
+        return new LastEvent("POSITION_CORRECTED", playerId, null, null);
+    }
+
     public static LastEvent rejoinOk(String playerId, String clientId) {
         return new LastEvent("REJOIN_OK", playerId, clientId, null);
     }
