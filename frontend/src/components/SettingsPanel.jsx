@@ -11,6 +11,7 @@ import {
   vibrate,
 } from '../game/settings';
 import { playSfx } from '../game/sfx';
+import { resetTutorial } from '../game/tutorial';
 
 // Muestra que se escucha al soltar cada barra, con el volumen recien elegido.
 const PREVIEW_FILES = { ambient: '/sounds/rain.wav', zombies: '/sounds/zombie_groan.wav' };
@@ -171,6 +172,29 @@ export default function SettingsPanel({ onClose, inGame = false }) {
               }}
             />
           )}
+        </section>
+
+        <section className="settings-section">
+          <div className="settings-section-head">
+            <h3>Ayudas</h3>
+          </div>
+          <Toggle
+            label="Mostrar ayudas de primera vez"
+            hint="Consejos cortos la primera vez que usas cada mecánica"
+            checked={settings.tips}
+            onChange={(tips) => updateSettings({ tips })}
+          />
+          <button
+            type="button"
+            className="settings-mute"
+            onClick={() => {
+              resetTutorial();
+              updateSettings({ tips: true });
+              playSfx('click');
+            }}
+          >
+            ↺ Volver a ver todas las ayudas
+          </button>
         </section>
 
         <footer className="settings-footer">

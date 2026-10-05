@@ -17,6 +17,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   muted: false,
   vibration: true,
   screenShake: true,
+  tips: true,
 });
 
 function sanitize(raw) {
@@ -30,6 +31,7 @@ function sanitize(raw) {
     muted: typeof raw?.muted === 'boolean' ? raw.muted : DEFAULT_SETTINGS.muted,
     vibration: typeof raw?.vibration === 'boolean' ? raw.vibration : DEFAULT_SETTINGS.vibration,
     screenShake: typeof raw?.screenShake === 'boolean' ? raw.screenShake : DEFAULT_SETTINGS.screenShake,
+    tips: typeof raw?.tips === 'boolean' ? raw.tips : DEFAULT_SETTINGS.tips,
   };
 }
 

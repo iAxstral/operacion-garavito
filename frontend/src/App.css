@@ -3152,3 +3152,65 @@ kbd {
   flex-wrap: wrap;
   justify-content: center;
 }
+
+/* ---------- Ayudas de primera vez ---------- */
+
+.tutorial-tip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(150px + env(safe-area-inset-bottom));
+  z-index: 17;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(520px, calc(100vw - 32px));
+  box-sizing: border-box;
+  padding: 10px 12px 10px 14px;
+  transform: translateX(-50%);
+  font-family: sans-serif;
+  color: #f2fbe2;
+  background: rgba(12, 18, 30, 0.92);
+  border: 1px solid #4fc3f7;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  pointer-events: auto;
+  animation: tutorial-in 0.25s ease-out;
+}
+
+@keyframes tutorial-in {
+  from { opacity: 0; transform: translate(-50%, 12px); }
+}
+
+.tutorial-tip p {
+  flex: 1;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.tutorial-tip-icon {
+  font-size: 24px;
+}
+
+.tutorial-tip-close {
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: bold;
+  color: #0b1a24;
+  background: #4fc3f7;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+@media (max-width: 640px), (max-height: 500px) {
+  .tutorial-tip {
+    top: calc(100px + env(safe-area-inset-top));
+    bottom: auto;
+  }
+
+  .tutorial-tip p {
+    font-size: 12px;
+  }
+}

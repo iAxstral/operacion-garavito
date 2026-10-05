@@ -11,6 +11,7 @@ import CashMission from './components/CashMission';
 import FuseMission from './components/FuseMission';
 import TouchControls from './components/TouchControls';
 import SpectatorPanel from './components/SpectatorPanel';
+import TutorialHints from './components/TutorialHints';
 import PhonePanel from './components/PhonePanel';
 import TreasuryPanel from './components/TreasuryPanel';
 import GameOverScreen from './components/GameOverScreen';
@@ -108,6 +109,7 @@ function App() {
         <FuseMission />
         <TouchControls />
         <SpectatorPanel />
+        <TutorialHints />
         <PhonePanel />
         <TreasuryPanel />
         <GameOverScreen onExitToMenu={handleExitToMenu} />
