@@ -51,6 +51,7 @@ import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
 import Lighting from './Lighting';
+import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY } from './HauntedDecor';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
 const DASH_SPEED = 420;
@@ -287,7 +288,14 @@ export default class MainScene extends Phaser.Scene {
         if (volume > 0.01) this.sound.play('zombie_attack', { volume });
       },
       onStagger: (entry) => playSfx('stagger', this.hearing(entry.x, entry.y)),
-      onHit: (entry) => playSfx('hit', this.hearing(entry.x, entry.y)),
+      onHit: (entry, amount) => {
+        playSfx('hit', this.hearing(entry.x, entry.y));
+        const from = this.nearestPlayerTo(entry.x, entry.y) ?? { x: entry.x, y: entry.y - 1 };
+        this.gore.splatter(entry.x, entry.y, from.x, from.y);
+        this.gore.blood(entry.x, entry.y);
+        if (amount > 0) this.gore.damageNumber(entry.x, entry.y - 34, amount, { crit: amount >= 3 });
+      },
+      onDeath: (entry) => this.gore.burst(entry.x, entry.y + 6, entry.kind === 'SPITTER' ? 0x6f8526 : 0x6e0b0b),
     };
   }
 
@@ -372,6 +380,8 @@ export default class MainScene extends Phaser.Scene {
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
+    this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
+    startDust(this, this.player);
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
@@ -581,7 +591,8 @@ export default class MainScene extends Phaser.Scene {
           })
           .setOrigin(0.5, 1)
           .setDepth(11);
-        entry = { sprite, label, prefix, aim: Math.PI / 2, shotSeq: state.shotSeq ?? 0, weaponSeen: false };
+        const shadow = this.add.image(state.x, state.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
+        entry = { sprite, shadow, label, prefix, aim: Math.PI / 2, shotSeq: state.shotSeq ?? 0, weaponSeen: false };
         this.remotePlayers.set(state.playerId, entry);
       }
 
@@ -610,6 +621,7 @@ export default class MainScene extends Phaser.Scene {
       else entry.sprite.clearTint();
       entry.downed = downed;
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
+      entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.sprite.displayHeight / 2 - 5);
       const labelText = state.connected === false ? `${roleInfo(state.role).name} (desconectado)` : roleInfo(state.role).name;
       if (entry.label.text !== labelText) entry.label.setText(labelText);
       entry.sprite.setAlpha(state.connected === false ? 0.45 : entry.sprite.alpha);
@@ -627,6 +639,7 @@ export default class MainScene extends Phaser.Scene {
     this.remotePlayers.forEach((entry, id) => {
       if (seen.has(id)) return;
       entry.sprite.destroy();
+      entry.shadow.destroy();
       entry.label.destroy();
       this.weaponLayer.remove(id);
       this.remotePlayers.delete(id);
@@ -813,6 +826,9 @@ export default class MainScene extends Phaser.Scene {
   update(time, delta) {
     if (!this.player) return;
     this.syncRemotePlayers(delta);
+    this.playerShadow
+      .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)
+      .setVisible(this.player.visible);
     this.lighting.update(time, this.focusSprite(), this.remotePlayers);
     this.checkDamageTaken();
     this.drawReviveProgress();
@@ -1352,12 +1368,15 @@ export default class MainScene extends Phaser.Scene {
 
     this.layoutGrid = layout.grid;
     this.lighting = new Lighting(this);
+    bakeHauntedTextures(this);
+    this.gore = new GoreFx(this);
     renderOutside(this, layout.grid, this.lighting, getMyBuilding());
     this.renderGridTiles(layout.grid);
     this.renderDecorations(layout.decorations);
     this.renderFurniture(layout.furniture);
     this.renderLabels(layout.labels);
     this.addInteriorLights(layout);
+    decorateFloor(this, layout.grid, this.lighting, { building: getMyBuilding(), floor: this.floor });
 
     [
       { kind: 'up', stairs: layout.upStairs },
@@ -1405,8 +1424,12 @@ export default class MainScene extends Phaser.Scene {
     VENDORS.filter((vendor) => vendor.floor === this.floor).forEach((vendor) => {
       this.lighting.addLight({ x: vendor.x, y: vendor.y, radius: 150, mode: 'steady', bulb: false });
     });
-    missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor).forEach((site) => {
-      this.lighting.addLight({ x: site.x, y: site.y, radius: 130, mode: 'steady', bulb: false });
+    // Salones: en algunos el bombillo esta fallando (parpadea o se va por ratos).
+    const roomModes = ['broken', null, 'flicker', null, 'broken', 'flicker'];
+    missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor).forEach((site, i) => {
+      const mode = roomModes[i % roomModes.length];
+      if (mode) this.lighting.addLight({ x: site.x, y: site.y - TILE, radius: 230, mode });
+      else this.lighting.addLight({ x: site.x, y: site.y, radius: 130, mode: 'steady', bulb: false });
     });
 
     // Luces fluorescentes del techo del corredor porticado: parejas, sin foco visible.

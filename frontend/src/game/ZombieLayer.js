@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { SHADOW_KEY } from './HauntedDecor';
 
 const TEXTURE = 'zombie';
 const TOUGH_TEXTURE = 'zombie-teso';
@@ -19,6 +20,11 @@ const WINDUP_TINT = 0xff5a5a;
 const SPIT_TINT = 0xb6ff5a;
 const STAGGER_TINT = 0xb9c4ff;
 const LUNGE_PX = 16;
+
+// Contorno de color para reconocer el tipo de un vistazo (el caminante normal no lleva).
+const OUTLINE_COLORS = { RUNNER: 0x3fd8ff, SPITTER: 0x9dff3a, TOUGH: 0xff3a2a };
+const OUTLINE_SCALE = 1.14;
+const RISE_MS = 520;
 
 function bakeTexture(scene, key, { body, rot, w, h }) {
   if (scene.textures.exists(key)) return;
@@ -103,7 +109,7 @@ export default class ZombieLayer {
 
       if (state.health < entry.health) {
         this.flash(entry);
-        this.hooks.onHit?.(entry);
+        this.hooks.onHit?.(entry, entry.health - state.health);
       }
       entry.health = state.health;
 
@@ -126,8 +132,17 @@ export default class ZombieLayer {
     const sprite = this.scene.add.sprite(state.x, state.y, textureFor(state, tough));
     sprite.setDepth(state.y);
 
-    const shadow = this.scene.add.ellipse(state.x, state.y + 16, tough ? 28 : 22, 9, 0x000000, 0.28);
-    shadow.setDepth(1);
+    const shadow = this.scene.add.image(state.x, state.y + 16, SHADOW_KEY)
+      .setDisplaySize(tough ? 40 : 32, tough ? 15 : 12)
+      .setDepth(1.6);
+
+    const outlineColor = OUTLINE_COLORS[tough ? 'TOUGH' : kind];
+    const outline = outlineColor
+      ? this.scene.add.sprite(state.x, state.y, sprite.texture.key)
+        .setTint(outlineColor)
+        .setTintMode(Phaser.TintModes.FILL)
+        .setAlpha(0.85)
+      : null;
 
     const sway = this.scene.tweens.add({
       targets: sprite,
@@ -137,12 +152,10 @@ export default class ZombieLayer {
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
-    sprite.setScale(0.5);
-    this.scene.tweens.add({ targets: sprite, scale: 1, duration: 220, ease: 'Back.easeOut' });
-
-    return {
+    const entry = {
       sprite,
       shadow,
+      outline,
       sway,
       x: state.x,
       y: state.y,
@@ -156,7 +169,41 @@ export default class ZombieLayer {
       phase: 'CHASE',
       warning: null,
       ring: null,
+      rise: 1,
     };
+    this.riseFromFloor(entry);
+    return entry;
+  }
+
+  // Sale del piso: un hoyo oscuro se abre, el zombi sube estirandose y salta tierra.
+  riseFromFloor(entry) {
+    const { x, y } = entry;
+    const footY = y + (entry.tough ? 20 : 16);
+    const hole = this.scene.add.ellipse(x, footY, 6, 3, 0x0d0705, 0.9).setDepth(1.7);
+    this.scene.tweens.add({
+      targets: hole,
+      width: 40,
+      height: 14,
+      duration: 180,
+      ease: 'Quad.easeOut',
+      onComplete: () => this.scene.tweens.add({ targets: hole, alpha: 0, delay: RISE_MS, duration: 400, onComplete: () => hole.destroy() }),
+    });
+    entry.rise = 0;
+    this.scene.tweens.add({ targets: entry, rise: 1, duration: RISE_MS, delay: 120, ease: 'Back.easeOut' });
+    for (let i = 0; i < 8; i += 1) {
+      const a = Math.PI + Math.random() * Math.PI;
+      const d = 12 + Math.random() * 22;
+      const clod = this.scene.add.rectangle(x, footY, 3 + Math.random() * 3, 3, i % 2 ? 0x4a3020 : 0x2c1d12).setDepth(footY + 1);
+      this.scene.tweens.add({
+        targets: clod,
+        x: x + Math.cos(a) * d,
+        y: { value: footY + Math.sin(a) * d * 0.4 + 6, ease: 'Bounce.easeOut' },
+        alpha: 0,
+        delay: 120,
+        duration: 520,
+        onComplete: () => clod.destroy(),
+      });
+    }
   }
 
   changePhase(entry, phase) {
@@ -263,17 +310,17 @@ export default class ZombieLayer {
     this.clearWarning(entry);
     this.hooks.onDeath?.(entry);
     this.scene.tweens.killTweensOf(entry.offset);
-    this.scene.add.ellipse(entry.sprite.x, entry.sprite.y + 12, 26, 12, 0x5a1f1f, 0.5).setDepth(1);
+    entry.outline?.destroy();
+    entry.outline = null;
     this.scene.tweens.add({
-      targets: [entry.sprite, entry.shadow],
+      targets: entry.sprite,
       alpha: 0,
       scaleY: 0.4,
-      duration: 220,
-      onComplete: () => {
-        entry.sprite.destroy();
-        entry.shadow.destroy();
-      },
+      angle: entry.sprite.flipX ? -80 : 80,
+      duration: 260,
+      onComplete: () => entry.sprite.destroy(),
     });
+    this.scene.tweens.add({ targets: entry.shadow, alpha: 0, duration: 260, onComplete: () => entry.shadow.destroy() });
   }
 
   update(delta) {
@@ -284,9 +331,21 @@ export default class ZombieLayer {
       const previousX = entry.x;
       entry.x += (entry.targetX - entry.x) * t;
       entry.y += (entry.targetY - entry.y) * t;
-      sprite.setPosition(entry.x + entry.offset.x, entry.y + entry.offset.y);
+      // Mientras sale del piso: hundido, aplastado y transparente.
+      const sink = (1 - entry.rise) * 22;
+      sprite.setPosition(entry.x + entry.offset.x, entry.y + entry.offset.y + sink);
+      if (entry.rise < 1) sprite.setAlpha(Math.min(1, 0.2 + entry.rise)).setScale(1, Math.max(0.05, entry.rise));
 
       sprite.setDepth(sprite.y);
+      if (entry.outline) {
+        entry.outline
+          .setPosition(sprite.x, sprite.y)
+          .setAngle(sprite.angle)
+          .setFlipX(sprite.flipX)
+          .setScale(sprite.scaleX * OUTLINE_SCALE, sprite.scaleY * OUTLINE_SCALE)
+          .setAlpha(0.85 * sprite.alpha)
+          .setDepth(sprite.depth - 0.5);
+      }
       if (Math.abs(entry.targetX - previousX) > 0.5) sprite.setFlipX(entry.targetX < previousX);
       entry.shadow.setPosition(entry.x, entry.y + (entry.tough ? 20 : 16));
 
@@ -311,6 +370,7 @@ export default class ZombieLayer {
       entry.ring?.destroy();
       entry.sprite.destroy();
       entry.shadow.destroy();
+      entry.outline?.destroy();
     });
     this.sprites.clear();
   }
