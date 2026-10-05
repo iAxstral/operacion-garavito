@@ -1,4 +1,5 @@
 package co.eci.operaciongaravito.game;
 
-public record ZombieState(String id, int floor, long x, long y, int health, boolean tough) {
+public record ZombieState(String id, int floor, long x, long y, int health, boolean tough,
+                          ZombieAttackPhase phase, ZombieKind kind, boolean spitting) {
 }

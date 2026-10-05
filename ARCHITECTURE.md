@@ -38,13 +38,12 @@ del ciclo de render de Phaser, para hablar con el backend (Game Service).
 │   WebSocketConfig ── registra ──▶ /ws (STOMP)    │
 │                       habilita ──▶ /topic/** │    │
 │   GameController ── @MessageMapping           │   │
-│     /game/{id}/join, /pickup, /decide         │   │
+│     /game/{id}/join, /pickup, /mission/*      │   │
 │     ── difunde ──▶ /topic/game/{id}           │   │
 │   GameSessionService / GameSession / Player   │   │
 │     (vida + inventario, ver mas abajo)        │   │
-│   RoundCoordinator (uno por GameSession)      │   │
+│   MissionBoard (uno por GameSession)          │   │
 │     (barrera de sincronizacion, ver mas abajo)│   │
-│   TestSocketController (echo de prueba, /game/test) │
 └────────────────────────────────────────────────┘
 ```
 
@@ -112,7 +111,7 @@ animación propia: reutiliza los frames de `right` con `setFlipX`.
 ## Vida e inventario
 
 Sistema nuevo, sincronizado con el backend por el **mismo topic**
-`/topic/game/{gameId}` que a futuro usará el `RoundCoordinator` — un campo
+`/topic/game/{gameId}` que usa toda la partida — un campo
 más en el payload (`players`), no un canal aparte.
 
 ### Modelo de datos (backend, en memoria — no es una entidad JPA)
@@ -169,100 +168,68 @@ a mano. Si el catálogo crece o cambia seguido, vale la pena moverlo a un
 JSON compartido — por ahora, para 4 items placeholder, no se justificó la
 inversión.
 
-## RoundCoordinator (barrera de sincronización)
+## MissionBoard (barrera de sincronización)
 
-Implementado en `backend/.../game/RoundCoordinator.java` — este es el
-mecanismo de concurrencia central del proyecto (documentado antes en la
-Wiki como pseudo-código aislado; esto es la implementación real,
-integrada con `GameSession`/`Player`, y reemplaza esa versión).
+Implementado en `backend/.../game/MissionBoard.java`. Reemplaza al antiguo
+`RoundCoordinator` (Sprint 1), que resolvía "rondas" con una acción
+placeholder (`/decide`) sin efecto en el juego. El concepto de barrera se
+conserva, pero ahora sincroniza algo real: **un Kinder solo se pasa cuando
+cada jugador vivo completó sus 3 misiones** (además de la cuota de zombis, o
+de matar al jefe en el Kinder 5).
 
-**Patrón**: mismo concepto que un `CyclicBarrier` — todas las partes
-"llegan" antes de que se dispare la acción, y esta se dispara una sola vez
-— pero adaptado a mensajería asíncrona por WebSocket en vez de hilos
-bloqueados en `await()`: "llegar a la barrera" es publicar `/decide`, y la
-ronda se resuelve desde el hilo que entrega la 4ª decisión, o desde un
-hilo del scheduler si se agota el timeout. Nunca hay un hilo esperando
-bloqueado.
+**Patrón**: el mismo de un `CyclicBarrier` — todas las partes "llegan" antes
+de que se dispare la acción, y esta se dispara una sola vez — adaptado a
+mensajería asíncrona: "llegar a la barrera" es completar la última misión
+propia (`/mission/complete`, en un hilo de STOMP), y la barrera se evalúa en
+el hilo del tick de la sala (`MissionBoard.allDone`, que `WaveDirector.update`
+recibe como condición). Nunca hay un hilo bloqueado esperando.
 
 **Estructura**:
 ```
-RoundCoordinator (uno por GameSession)
-  ├── decisions: ConcurrentHashMap<role, action>   (put es atomico, sin lock)
-  ├── schoolState: SchoolState                     (mutable, solo se toca dentro del lock de resolucion)
-  └── resolveLock: Object                          (synchronized SOLO en tryResolve)
-
-SchoolState: budget, population, infrastructureHealth, security, happiness
-  (los mismos 5 campos documentados en la Wiki de arquitectura)
+MissionBoard (uno por GameSession)
+  ├── byPlayer: rol -> 3 asignaciones {missionId, tipo, sala, recompensa, done}
+  ├── previousSites: rol -> salas del Kinder anterior (para no repetirlas)
+  └── monitor de la instancia (synchronized en todas las operaciones)
 ```
 
-**Por qué el mapa concurrente no alcanza solo**: `decisions.put(role, action)`
-es atómico por entrada, pero "¿ya llegaron las 4?" es una condición sobre
-el mapa completo — comprobarla y actuar sobre ella (resolver + limpiar)
-no es atómico por sí solo. Dos hilos podrían ver `size()==4` a la vez y
-ambos intentar resolver. Por eso el único `synchronized` está en
-`tryResolve`, con un doble chequeo *dentro* del lock (`currentRoundResolved`
-y `decisions.size()`) — el mismo patrón de "chequear, entrar al lock,
-re-chequear" que evita la doble resolución sin bloquear nada mientras
-las decisiones van llegando una por una.
+**Por qué todo bajo el mismo monitor**: completar una misión es
+"chequear que esté pendiente → marcarla → pagar". Si dos mensajes de la misma
+misión llegan a la vez (doble clic, reintento de red), sin exclusión ambos
+verían `done=false` y se pagaría dos veces. `complete()` hace el chequeo y la
+marca dentro del mismo `synchronized` y devuelve `true` solo una vez; el tick
+nunca ve un reparto a medio hacer porque `deal()` usa el mismo monitor.
+Los caídos no traban la barrera (`allDone` solo mira a los vivos): si no, sin
+Biomédica para revivir, la partida quedaría bloqueada.
 
-**Timeout (30s, `RoundCoordinator.TIMEOUT_SECONDS`)**: cada ronda programa
-su propio timeout al crearse y al resolverse (`scheduleTimeout`). Si se
-agota antes de tener las 4 decisiones, `tryResolve(forcedByTimeout=true)`
-completa los roles faltantes con `DEFAULT_ACTION` ("no_action") y resuelve
-igual — este es el manejo de desconexión ya documentado en la Wiki, ahora
-real. El mismo `tryResolve` atiende ambos disparadores (4ª decisión o
-timeout) bajo el mismo lock, así que no importa cuál llegue primero: el
-otro es un no-op.
-
-**Efecto sobre `SchoolState`** (`SchoolState.applyDecisions`, placeholder
-de balance — el diseño real de efectos por acción queda fuera de alcance):
-una decisión real cuesta presupuesto pero sube seguridad/felicidad; una
-decisión por defecto no cuesta presupuesto pero deteriora la
-infraestructura. Alcanza para demostrar que el efecto se aplica al estado
-compartido; los valores/reglas exactas son ajustables después.
+**Reparto**: al empezar el respiro de cada Kinder se reparten 3 misiones por
+jugador — los dos minijuegos de su rol más uno al azar, en salas distintas
+(`MissionCatalog`, 12 en el Edificio F y 8 en el C), evitando las del Kinder
+anterior. La recompensa sube con el Kinder (25, 30, 35…).
 
 ### Mensajes
 
-- `/app/game/{gameId}/decide` ⟵ `{ playerId, action }` (`playerId` == rol;
-  `action` hoy es un string libre — el catálogo de acciones por rol es un
-  cambio aparte).
-- `/topic/game/{gameId}` ⟶ el mismo `GameStateMessage` de vida/inventario,
-  con un campo `round: { number, schoolState, resolved }` agregado —
-  **no** un canal nuevo. `resolved` es una bandera "esto se resolvió justo
-  en este mensaje": en broadcasts de join/pickup siempre va en `false`
-  (solo informan el número/estado actual); en el broadcast que dispara el
-  propio `RoundCoordinator` al resolver (por decisiones completas o por
-  timeout) va en `true`. `/decide` no difunde nada por sí mismo — ver el
-  javadoc de clase de `GameController` para el porqué (un solo camino de
-  broadcast para "se resolvió la ronda", cubre ambos disparadores).
+- `/app/game/{gameId}/mission/start|complete|cancel` ⟵ `{ playerId, missionId, x, y }`
+  (`missionId` es el de la asignación, p. ej. `m7`).
+- `/topic/game/{gameId}` ⟶ `players[].missions` (las asignaciones de cada
+  jugador) y `wave.teamMissionsDone/teamMissionsRequired/waitingForMissions`.
 
-### Verificado con evidencia real
+### Verificado
 
-- **Concurrencia** (`frontend/scripts`-style test con 4 clientes STOMP
-  reales, no mocks): 4 conexiones distintas enviando `/decide` casi
-  simultáneamente para la misma ronda → exactamente 1 mensaje
-  `round.resolved=true` visto por los 4 suscriptores, con el **mismo**
-  `schoolState` en los 4 (no hay resoluciones duplicadas ni estados
-  divergentes). Repetido 3 veces, consistente las 3.
-- **Timeout**: solo 2 de 4 roles deciden; a los ~30s se resuelve solo, con
-  `DEFAULT_ACTION` aplicado a los 2 faltantes — el `schoolState` resultante
-  coincidió exactamente con el cálculo esperado (2 decisiones reales + 2
-  default).
-- **Frontend real**: HUD muestra "Ronda N" en vivo; al llegar
-  `round.resolved=true`, aparece un banner "¡Ronda N resuelta!" —
-  confirmado leyendo el DOM en el mismo instante del broadcast (con un
-  round-trip de verificación separado, el banner ya se había autoocultado
-  a los 3s — el mecanismo en sí funciona, solo hay que revisarlo rápido).
+- `MissionBoardTest`: 32 hilos completando la misma misión → se paga
+  exactamente una vez; la barrera espera a todos los vivos y no la traban
+  los caídos; las salas rotan entre Kinders.
+- En el navegador: 3 clientes reales abriendo su misión en el mismo instante
+  (esto destapó que `lastEvent` pisaba eventos simultáneos; ahora el cliente
+  recibe cada evento en orden con `onGameEvent`).
 
 ### HU del Backlog cubiertas
 
-- **HU-01 (ver evento simultáneo)**: demostrable — cualquier jugador
-  conectado a `/topic/game/{gameId}` ve la ronda resolverse (HUD: "Ronda N"
-  + banner), sin importar quién disparó la resolución.
-- **HU-02 (resolución consistente de decisiones concurrentes)**:
-  demostrable — verificado arriba con 4 clientes reales, una sola
-  resolución, mismo estado para todos.
-- **HU-03 (votación)**: fuera de alcance de este cambio, como se acordó.
+- **HU-01 (ver evento simultáneo)**: todos los jugadores ven en vivo el
+  avance del equipo (`misiones X/Y`) y el paso de Kinder cuando la barrera se
+  abre, sin importar quién completó la última misión.
+- **HU-02 (resolución consistente de acciones concurrentes)**: una misión
+  completada en paralelo se resuelve una sola vez, con el mismo estado para
+  todos (test de concurrencia arriba).
 
 ## Sistema de pisos (pendiente)
 
@@ -288,11 +255,9 @@ similar). Para desarrollo local sin Postgres instalado, hay un perfil `dev`
 - Múltiples roles/personajes jugables simultáneos (solo Seguridad tiene
   atlas real; el resto de los 4 roles existen en el modelo del backend pero
   no en el cliente Phaser).
-- Sistema de misiones.
 - Sincronización multijugador de posición/movimiento (cada cliente solo ve
   su propio personaje moviéndose; vida/inventario/ronda sí se sincronizan).
-- Catálogo real de acciones por rol para `/decide` (hoy es un placeholder
-  de una sola acción fija) y HU-03 (votación).
+- HU-03 (votación).
 - Cambio de piso real (ver "Sistema de pisos" arriba).
 - Lobby/matchmaking (`gameId` fijo en `"default"`).
 

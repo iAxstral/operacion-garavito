@@ -45,13 +45,24 @@ public class GameController {
             return;
         }
 
-        String rejection = session.joinPlayer(request.role());
+        String rejection = session.joinPlayer(request.role(), request.token());
         if (rejection != null) {
             sessionService.broadcast(gameId, session, LastEvent.joinRejected(request.clientId(), rejection));
             return;
         }
         sessionService.registerSeat(headers.getSessionId(), gameId, request.role());
         sessionService.broadcast(gameId, session, LastEvent.joinOk(request.role(), request.clientId()));
+    }
+
+    @MessageMapping("/game/{gameId}/rejoin")
+    public void rejoin(@DestinationVariable String gameId, JoinRequest request, SimpMessageHeaderAccessor headers) {
+        GameSession session = sessionService.find(gameId);
+        String rejection = sessionService.rejoin(gameId, request.role(), request.token(), headers.getSessionId());
+        if (rejection != null) {
+            sessionService.broadcastRejected(gameId, LastEvent.rejoinRejected(request.clientId(), rejection));
+            return;
+        }
+        sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
     }
 
     @MessageMapping("/game/{gameId}/start")
@@ -155,8 +166,10 @@ public class GameController {
     @MessageMapping("/game/{gameId}/move")
     public void move(@DestinationVariable String gameId, MoveRequest request) {
         GameSession session = sessionService.find(gameId);
-        if (session != null) {
-            session.reportPosition(request.playerId(), request.floor(), request.x(), request.y());
+        if (session != null
+                && !session.reportPosition(request.playerId(), request.floor(), request.x(), request.y())
+                && session.shouldCorrect(request.playerId())) {
+            broadcast(gameId, session, LastEvent.positionCorrected(request.playerId()));
         }
     }
 
@@ -192,18 +205,90 @@ public class GameController {
         broadcast(gameId, session, event);
     }
 
-    @MessageMapping("/game/{gameId}/decide")
-    public void decide(@DestinationVariable String gameId, DecideRequest request) {
+    @MessageMapping("/game/{gameId}/equip")
+    public void equip(@DestinationVariable String gameId, EquipRequest request) {
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        try {
-            session.submitDecision(request.playerId(), request.action());
-        } catch (IllegalArgumentException ex) {
+        PlayerActionResult result = session.attemptEquip(request.playerId(), request.itemId());
+        broadcast(gameId, session, result.success()
+                ? null
+                : LastEvent.equipRejected(request.playerId(), request.itemId(), result.reason()));
+    }
 
+    @MessageMapping("/game/{gameId}/reload")
+    public void reload(@DestinationVariable String gameId, PlayerRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
         }
+        PlayerActionResult result = session.attemptReload(request.playerId());
+        broadcast(gameId, session, result.success() ? null : LastEvent.reloadRejected(request.playerId(), result.reason()));
+    }
 
+    @MessageMapping("/game/{gameId}/revive/start")
+    public void startRevive(@DestinationVariable String gameId, ReviveRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptReviveStart(request.playerId(), request.targetId());
+        broadcast(gameId, session, result.success()
+                ? null
+                : LastEvent.reviveRejected(request.playerId(), request.targetId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/revive/cancel")
+    public void cancelRevive(@DestinationVariable String gameId, PlayerRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session != null) {
+            session.attemptReviveCancel(request.playerId());
+            broadcast(gameId, session, null);
+        }
+    }
+
+    @MessageMapping("/game/{gameId}/event/interact")
+    public void interactEvent(@DestinationVariable String gameId, PlayerRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptEventInteract(request.playerId());
+        // El exito lo anuncia el tick (EVENT_RESOLVED); aqui solo el rechazo.
+        broadcast(gameId, session, result.success() ? session.pollEvent() : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/barricade/place")
+    public void placeBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptPlaceBarricade(request.playerId(), request.x(), request.y(), request.facing());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/barricade/repair")
+    public void repairBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptRepairBarricade(request.playerId(), request.barricadeId());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/transfer")
+    public void transfer(@DestinationVariable String gameId, TransferRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptTransfer(request.playerId(), request.targetId(), request.amount());
+        broadcast(gameId, session, result.success()
+                ? LastEvent.transfer(request.playerId(), request.targetId(), request.amount())
+                : LastEvent.abilityRejected(request.playerId(), result.reason()));
     }
 
     private void broadcast(String gameId, GameSession session, LastEvent lastEvent) {

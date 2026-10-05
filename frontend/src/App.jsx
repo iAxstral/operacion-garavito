@@ -1,11 +1,21 @@
-import { useState } from 'react';
-import GameCanvas from './game/GameCanvas';
+import { lazy, Suspense, useEffect, useState } from 'react';
+// Phaser (la mayor parte del peso) solo se descarga al entrar a la partida: el menu y
+// la sala abren rapido aun en el celular.
+const GameCanvas = lazy(() => import('./game/GameCanvas'));
 import Hud from './components/Hud';
 import SecurityMission from './components/SecurityMission';
 import WiresMission from './components/WiresMission';
 import MathMission from './components/MathMission';
 import StackMission from './components/StackMission';
+import CodeMission from './components/CodeMission';
+import VaccineMission from './components/VaccineMission';
+import CashMission from './components/CashMission';
+import FuseMission from './components/FuseMission';
 import TouchControls from './components/TouchControls';
+import SpectatorPanel from './components/SpectatorPanel';
+import TutorialHints from './components/TutorialHints';
+import PhonePanel from './components/PhonePanel';
+import TreasuryPanel from './components/TreasuryPanel';
 import GameOverScreen from './components/GameOverScreen';
 import ConnectionStatus from './components/ConnectionStatus';
 import MainMenu from './components/MainMenu';
@@ -13,12 +23,23 @@ import BuildingSelect from './components/BuildingSelect';
 import RoleSelect from './components/RoleSelect';
 import LobbyEntry from './components/LobbyEntry';
 import WaitingRoom from './components/WaitingRoom';
-import { leaveGame } from './game/gameSync';
+import { leaveGame, resumeSession } from './game/gameSync';
 import './App.css';
 
 function App() {
   const [view, setView] = useState('menu');
   const [building, setBuilding] = useState(null);
+
+  // Si se recargo la pagina en medio de una partida, se vuelve al mismo puesto.
+  useEffect(() => {
+    let cancelled = false;
+    resumeSession().then((resumed) => {
+      if (!cancelled && resumed) setView(resumed.started ? 'playing' : 'waiting');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const handleExitToMenu = () => {
     leaveGame();
@@ -78,13 +99,23 @@ function App() {
   return (
     <div id="game-root">
       <div className="game-stage">
-        <GameCanvas />
+        <Suspense fallback={<div className="game-loading">Cargando el edificio…</div>}>
+          <GameCanvas />
+        </Suspense>
         <Hud />
         <SecurityMission />
         <WiresMission />
         <MathMission />
         <StackMission />
+        <CodeMission />
+        <VaccineMission />
+        <CashMission />
+        <FuseMission />
         <TouchControls />
+        <SpectatorPanel />
+        <TutorialHints />
+        <PhonePanel />
+        <TreasuryPanel />
         <GameOverScreen onExitToMenu={handleExitToMenu} />
       </div>
       <ConnectionStatus />

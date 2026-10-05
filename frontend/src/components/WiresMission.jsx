@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import useMissionFlow from './useMissionFlow';
 
-const MISSION_ROLE = 'SALUD';
+const MISSION_TYPE = 'CABLES';
 const WIDTH = 420;
 const HEIGHT = 300;
 const LEFT_X = 46;
@@ -30,7 +30,7 @@ export default function WiresMission() {
   const [drag, setDrag] = useState(null);
   const svgRef = useRef(null);
 
-  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_ROLE, () => {
+  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_TYPE, () => {
     setLayout(newLayout());
     setConnected([]);
     setDrag(null);

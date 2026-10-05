@@ -22,7 +22,7 @@ class GameSessionZombieTest {
     @BeforeEach
     void setUp() {
         scheduler = Executors.newScheduledThreadPool(1);
-        session = new GameSession("test", Building.F, BossConfig.defaults(), scheduler, round -> { });
+        session = new GameSession("test", Building.F, BossConfig.defaults());
         assertNull(session.joinPlayer("SEGURIDAD"));
         assertTrue(session.start("SEGURIDAD"));
         player = session.getOrCreatePlayer("SEGURIDAD");
@@ -36,6 +36,7 @@ class GameSessionZombieTest {
 
     private void armPlayer() {
         player.tryAddItem(new InventorySlot(ItemType.WEAPON, "shop-hacha", "Hacha"));
+        assertTrue(session.attemptEquip("SEGURIDAD", "shop-hacha").success());
     }
 
     private void tickUntilZombies() {
@@ -79,6 +80,7 @@ class GameSessionZombieTest {
     @DisplayName("desarmado golpea pero no mata de un solo golpe")
     void unarmedTakesMoreThanOneHit() {
         ZombieState target = isolatedZombie();
+        player.reportPosition(target.x() - 20, target.y());
 
         AttackResult unarmed = session.attemptAttack("SEGURIDAD", AttackType.BASIC, target.x() - 20, target.y(), 0);
 
@@ -142,11 +144,11 @@ class GameSessionZombieTest {
     }
 
     @Test
-    @DisplayName("el hacha cuesta lo que paga una mision de rol")
-    void axeCostsExactlyOneMissionReward() {
-        ShopItem axe = ShopCatalog.itemById("shop-hacha");
-        assertEquals(MissionCatalog.REWARD_GARAVITOS, axe.price());
-        assertEquals(ItemType.WEAPON, axe.type());
+    @DisplayName("una mision alcanza para el hacha, pero el rifle exige ahorrar")
+    void weaponPricesForceChoices() {
+        assertTrue(ShopCatalog.itemById("shop-hacha").price() <= MissionCatalog.REWARD_GARAVITOS);
+        assertTrue(ShopCatalog.itemById("shop-rifle").price() > 2 * MissionCatalog.REWARD_GARAVITOS);
+        assertEquals(ItemType.AMMO, ShopCatalog.itemById("shop-municion").type());
     }
 
     @Test
@@ -167,12 +169,19 @@ class GameSessionZombieTest {
         assertTrue(session.waveState().restingSeconds() > 0, "deberia haber entrado al respiro");
     }
 
-    /** Registra kills en el director como si hubieran llegado por /attack. */
+    /**
+     * Registra kills en el director como si hubieran llegado por /attack, y completa las
+     * misiones del jugador: un Kinder pide las dos cosas.
+     */
     private void registerKills(int count) {
         try {
             java.lang.reflect.Field field = GameSession.class.getDeclaredField("waveDirector");
             field.setAccessible(true);
             ((WaveDirector) field.get(session)).onZombiesKilled(count);
+            java.lang.reflect.Field boardField = GameSession.class.getDeclaredField("missionBoard");
+            boardField.setAccessible(true);
+            MissionBoard board = (MissionBoard) boardField.get(session);
+            board.viewFor("SEGURIDAD").forEach(mission -> board.complete("SEGURIDAD", mission.missionId()));
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError(ex);
         }
@@ -278,6 +287,12 @@ class GameSessionZombieTest {
         now += 66;
         session.tick(now, 0.066);
         assertNull(session.bossView());
+        assertFalse(session.waveState().victory(), "sin las misiones del Kinder 5 todavia no se gana");
+        assertTrue(session.waveState().waitingForMissions());
+
+        registerKills(0);
+        now += 66;
+        session.tick(now, 0.066);
         assertTrue(session.waveState().victory());
         assertTrue(session.consumeVictory());
         assertFalse(session.consumeVictory());
@@ -376,7 +391,7 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("mientras la sala no inicia no hay zombis")
     void nothingSpawnsBeforeStart() {
-        GameSession waiting = new GameSession("wait", Building.F, BossConfig.defaults(), scheduler, round -> { });
+        GameSession waiting = new GameSession("wait", Building.F, BossConfig.defaults());
         waiting.joinPlayer("SEGURIDAD");
         long now = System.currentTimeMillis();
         for (int i = 0; i < 400; i++) {
@@ -399,7 +414,7 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("en el Edificio C (2 pisos) nunca aparece un zombi en un piso inexistente")
     void buildingCNeverSpawnsOnAMissingFloor() {
-        GameSession c = new GameSession("edc", Building.C, BossConfig.defaults(), scheduler, round -> { });
+        GameSession c = new GameSession("edc", Building.C, BossConfig.defaults());
         c.joinPlayer("SEGURIDAD");
         c.start("SEGURIDAD");
         // Antes el director sorteaba el piso 3 aunque el C no lo tiene: un zombi

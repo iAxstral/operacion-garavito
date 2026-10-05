@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import useMissionFlow from './useMissionFlow';
 
-const MISSION_ROLE = 'INFRAESTRUCTURA';
+const MISSION_TYPE = 'TORRE';
 const WIDTH = 320;
 const HEIGHT = 380;
 const BLOCK_H = 26;
@@ -68,7 +68,7 @@ export default function StackMission() {
   const gameRef = useRef(freshState());
   const doneRef = useRef(false);
 
-  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_ROLE, () => {
+  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_TYPE, () => {
     gameRef.current = freshState();
     doneRef.current = false;
     setPlaced(0);

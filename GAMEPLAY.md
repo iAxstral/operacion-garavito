@@ -8,7 +8,8 @@
 
 El backend ya es dueño de la lógica de juego: `GameSession` administra
 jugadores, vida, Garavitos, inventario, items del mundo, misiones por zona y
-tienda; `RoundCoordinator` sincroniza las rondas. Los zombis entran **ahí**, no
+tienda; `MissionBoard` reparte 3 misiones por jugador en cada Kinder y hace de
+barrera para pasarlo. Los zombis entran **ahí**, no
 en el cliente.
 
 Eso obliga a resolver antes un hueco: **hoy el servidor no sabe dónde está
@@ -33,9 +34,8 @@ por el número de jugadores. Las posiciones viajan en el broadcast del tick.
 
 ## 2. El tick
 
-`GameSession` gana un bucle propio sobre el `ScheduledExecutorService` que ya
-recibe en el constructor (el mismo que usa `RoundCoordinator` para sus
-timeouts).
+El tick de cada sala corre sobre el `ScheduledExecutorService` de
+`GameSessionService` (antes lo compartia con el `RoundCoordinator`, ya retirado).
 
 | | Frecuencia | Por qué |
 |---|---|---|

@@ -1,11 +1,15 @@
 package co.eci.operaciongaravito.game;
 
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 public class Player {
 
     public static final int MAX_INVENTORY_SLOTS = 5;
+    /** Balas que trae cada paquete de municion. No ocupa espacio en el inventario. */
+    public static final int AMMO_PER_PACK = 15;
 
     private final String playerId;
     private final String role;
@@ -21,6 +25,45 @@ public class Player {
     private volatile long chargedReadyAt = 0;
 
     private volatile boolean invulnerable = false;
+
+    /**
+     * Tras una mordida, las de otros zombis se ignoran un instante: si no, una horda
+     * que muerde sincronizada derrite al jugador antes de que pueda reaccionar.
+     */
+    static final long BITE_GRACE_MS = 350;
+    private volatile long biteGraceUntil = 0;
+
+    private volatile Weapon equipped = Weapon.FISTS;
+    private volatile int reserveAmmo = 0;
+    private final Map<Weapon, Integer> magazines = new EnumMap<>(Weapon.class);
+    private volatile long reloadingUntil = 0;
+    private volatile Weapon reloadingWeapon = null;
+    /** Cuenta los disparos para que los demas clientes dibujen las balas de este jugador. */
+    private volatile int shotSeq = 0;
+    private volatile double shotFacing = 0;
+
+    private volatile long lastDamagedAt = 0;
+    // Estadisticas de la corrida actual (pantalla de resultados y ranking).
+    private int statKills;
+    private int statMissions;
+    private int statEarned;
+    private int statDamage;
+    private int statRevives;
+    private int statDowns;
+
+    /** Ultima posicion aceptada (para validar la siguiente) y ultima correccion enviada. */
+    private volatile long lastMoveAt = 0;
+    private volatile long lastCorrectionAt = 0;
+    private volatile int rejectedMoves = 0;
+
+    /** Momento en que se cayo su conexion, o 0 si esta conectado. */
+    private volatile long disconnectedAt = 0;
+    /** Enfriamiento de la habilidad del rol (p. ej. la barricada de Infraestructura). */
+    private volatile long abilityReadyAt = 0;
+    /** Compañero caido que este jugador (Biomedica) esta reviviendo, o null. */
+    private volatile String reviveTargetId = null;
+    private volatile long reviveStartedAt = 0;
+    private volatile long reviveUntil = 0;
 
     public Player(String role) {
         this.playerId = role;
@@ -86,11 +129,128 @@ public class Player {
         if (lifeState == PlayerLifeState.DOWNED || invulnerable) {
             return false;
         }
+        int before = health;
         health = Math.max(0, health - amount);
+        statDamage += before - health;
+        lastDamagedAt = System.currentTimeMillis();
         if (health == 0) {
             lifeState = PlayerLifeState.DOWNED;
+            statDowns++;
         }
         return true;
+    }
+
+    public synchronized boolean tryConsumeAbility(long now, long cooldownMs) {
+        if (now < abilityReadyAt) {
+            return false;
+        }
+        abilityReadyAt = now + cooldownMs;
+        return true;
+    }
+
+    public long abilityReadyInMs(long now) {
+        return Math.max(0, abilityReadyAt - now);
+    }
+
+    /** Saca {@code amount} Garavitos si los tiene (para transferirlos). */
+    public synchronized boolean tryTakeGaravitos(int amount) {
+        if (amount <= 0 || garavitos < amount) {
+            return false;
+        }
+        garavitos -= amount;
+        return true;
+    }
+
+    public long getLastMoveAt() {
+        return lastMoveAt;
+    }
+
+    public void setLastMoveAt(long now) {
+        lastMoveAt = now;
+    }
+
+    public synchronized void countRejectedMove() {
+        rejectedMoves++;
+    }
+
+    public int getRejectedMoves() {
+        return rejectedMoves;
+    }
+
+    /** True si toca avisarle al cliente que corrija su posicion (como mucho cada {@code everyMs}). */
+    public synchronized boolean shouldSendCorrection(long now, long everyMs) {
+        if (now - lastCorrectionAt < everyMs) {
+            return false;
+        }
+        lastCorrectionAt = now;
+        return true;
+    }
+
+    public boolean isConnected() {
+        return disconnectedAt == 0;
+    }
+
+    public long getDisconnectedAt() {
+        return disconnectedAt;
+    }
+
+    public void markDisconnected(long now) {
+        disconnectedAt = now;
+    }
+
+    public void markConnected() {
+        disconnectedAt = 0;
+    }
+
+    public long getLastDamagedAt() {
+        return lastDamagedAt;
+    }
+
+    public String getReviveTargetId() {
+        return reviveTargetId;
+    }
+
+    public long getReviveStartedAt() {
+        return reviveStartedAt;
+    }
+
+    public long getReviveUntil() {
+        return reviveUntil;
+    }
+
+    public synchronized void startRevive(String targetId, long now, long durationMs) {
+        reviveTargetId = targetId;
+        reviveStartedAt = now;
+        reviveUntil = now + durationMs;
+    }
+
+    public synchronized void stopRevive() {
+        reviveTargetId = null;
+        reviveStartedAt = 0;
+        reviveUntil = 0;
+    }
+
+    /** Avance (0..1) de la reanimacion que esta haciendo este jugador. */
+    public double reviveProgress(long now) {
+        String target = reviveTargetId;
+        long until = reviveUntil;
+        long started = reviveStartedAt;
+        if (target == null || until <= started) {
+            return 0;
+        }
+        return Math.min(1, Math.max(0, (now - started) / (double) (until - started)));
+    }
+
+    /** Dano de una mordida de zombi: respeta la ventana de gracia entre mordidas. */
+    public synchronized boolean takeBite(int amount, long now) {
+        if (now < biteGraceUntil) {
+            return false;
+        }
+        boolean damaged = takeDamage(amount);
+        if (damaged) {
+            biteGraceUntil = now + BITE_GRACE_MS;
+        }
+        return damaged;
     }
 
     public synchronized void revive(int toHealth) {
@@ -129,8 +289,9 @@ public class Player {
         return null;
     }
 
-    public synchronized boolean hasWeapon() {
-        return inventory.stream().anyMatch(slot -> slot.type() == ItemType.WEAPON);
+    public synchronized boolean owns(Weapon weapon) {
+        return weapon == Weapon.FISTS
+                || inventory.stream().anyMatch(slot -> weapon.itemId().equals(slot.itemId()));
     }
 
     public synchronized boolean tryAddItem(InventorySlot slot) {
@@ -138,7 +299,117 @@ public class Player {
             return false;
         }
         inventory.add(slot);
+        onAcquired(slot);
         return true;
+    }
+
+    /** Un arma de fuego nueva llega con el cargador lleno. */
+    private void onAcquired(InventorySlot slot) {
+        Weapon weapon = Weapon.fromItemId(slot.itemId());
+        if (weapon != null && weapon.ranged()) {
+            magazines.putIfAbsent(weapon, weapon.magazineSize());
+        }
+    }
+
+    public Weapon getEquipped() {
+        return equipped;
+    }
+
+    /** Equipa un arma que el jugador tenga (null = puños). Cancela una recarga en curso. */
+    public synchronized boolean equip(Weapon weapon) {
+        Weapon target = weapon == null ? Weapon.FISTS : weapon;
+        if (!owns(target)) {
+            return false;
+        }
+        equipped = target;
+        reloadingUntil = 0;
+        reloadingWeapon = null;
+        return true;
+    }
+
+    public synchronized void addAmmo(int rounds) {
+        reserveAmmo += rounds;
+    }
+
+    public int getReserveAmmo() {
+        return reserveAmmo;
+    }
+
+    /** Balas en el cargador de esa arma (termina primero una recarga ya cumplida). */
+    public synchronized int magazine(Weapon weapon) {
+        settleReload(System.currentTimeMillis());
+        return loaded(weapon);
+    }
+
+    private int loaded(Weapon weapon) {
+        return magazines.getOrDefault(weapon, 0);
+    }
+
+    public int getShotSeq() {
+        return shotSeq;
+    }
+
+    public double getShotFacing() {
+        return shotFacing;
+    }
+
+    /** Ms que faltan para terminar la recarga (0 si no esta recargando). */
+    public synchronized long reloadingInMs(long now) {
+        settleReload(now);
+        return reloadingWeapon == null ? 0 : Math.max(0, reloadingUntil - now);
+    }
+
+    /** Empieza a recargar el arma equipada. Devuelve el motivo si no se puede, o null. */
+    public synchronized String startReload(long now) {
+        settleReload(now);
+        Weapon weapon = equipped;
+        if (!weapon.ranged()) {
+            return "not_ranged";
+        }
+        if (reloadingWeapon != null) {
+            return "reloading";
+        }
+        if (loaded(weapon) >= weapon.magazineSize()) {
+            return "magazine_full";
+        }
+        if (reserveAmmo <= 0) {
+            return "no_ammo";
+        }
+        reloadingWeapon = weapon;
+        reloadingUntil = now + weapon.reloadMs();
+        return null;
+    }
+
+    private void settleReload(long now) {
+        if (reloadingWeapon == null || now < reloadingUntil) {
+            return;
+        }
+        int missing = reloadingWeapon.magazineSize() - loaded(reloadingWeapon);
+        int moved = Math.min(missing, reserveAmmo);
+        magazines.put(reloadingWeapon, loaded(reloadingWeapon) + moved);
+        reserveAmmo -= moved;
+        reloadingWeapon = null;
+        reloadingUntil = 0;
+    }
+
+    /**
+     * Gasta una bala del arma de fuego equipada. Devuelve null si disparo, o el motivo
+     * si no pudo; con el cargador vacio y balas de reserva empieza a recargar solo.
+     */
+    public synchronized String tryFire(long now, double facing) {
+        settleReload(now);
+        Weapon weapon = equipped;
+        if (reloadingWeapon != null) {
+            return "reloading";
+        }
+        int loaded = loaded(weapon);
+        if (loaded <= 0) {
+            return startReload(now) == null ? "reloading" : "no_ammo";
+        }
+        magazines.put(weapon, loaded - 1);
+        shotSeq++;
+        shotFacing = facing;
+        return null;
     }
 
     public synchronized void heal(int amount) {
@@ -149,16 +420,52 @@ public class Player {
         garavitos += amount;
     }
 
+    /** Garavitos ganados (kills, misiones, jefe): suman al saldo y a las estadisticas. */
+    public synchronized void addEarnings(int amount) {
+        garavitos += amount;
+        statEarned += amount;
+    }
+
+    public synchronized void recordKills(int kills) {
+        statKills += kills;
+    }
+
+    public synchronized void recordMission() {
+        statMissions++;
+    }
+
+    public synchronized void recordRevive() {
+        statRevives++;
+    }
+
+    public synchronized MatchSummary.PlayerSummary statsSnapshot() {
+        return new MatchSummary.PlayerSummary(role, statKills, statMissions, statEarned, statDamage, statRevives, statDowns);
+    }
+
+    public synchronized void resetStats() {
+        statKills = 0;
+        statMissions = 0;
+        statEarned = 0;
+        statDamage = 0;
+        statRevives = 0;
+        statDowns = 0;
+    }
+
     public synchronized PurchaseResult purchase(int price, InventorySlot slot) {
         if (garavitos < price) {
             return PurchaseResult.rejected("insufficient_garavitos");
         }
-        if (inventory.size() >= MAX_INVENTORY_SLOTS) {
+        if (slot.type() != ItemType.AMMO && inventory.size() >= MAX_INVENTORY_SLOTS) {
             return PurchaseResult.rejected("inventory_full");
         }
 
         garavitos -= price;
+        if (slot.type() == ItemType.AMMO) {
+            reserveAmmo += AMMO_PER_PACK;
+            return PurchaseResult.ok();
+        }
         inventory.add(slot);
+        onAcquired(slot);
         return PurchaseResult.ok();
     }
 
@@ -173,9 +480,29 @@ public class Player {
         floor = 1;
         x = 608;
         y = 800;
+        lastMoveAt = 0;
+        rejectedMoves = 0;
+        statKills = 0;
+        statMissions = 0;
+        statEarned = 0;
+        statDamage = 0;
+        statRevives = 0;
+        statDowns = 0;
         lifeState = PlayerLifeState.ALIVE;
         attackReadyAt = 0;
         chargedReadyAt = 0;
         invulnerable = false;
+        biteGraceUntil = 0;
+        lastDamagedAt = 0;
+        abilityReadyAt = 0;
+        reviveTargetId = null;
+        reviveStartedAt = 0;
+        reviveUntil = 0;
+        equipped = Weapon.FISTS;
+        reserveAmmo = 0;
+        magazines.clear();
+        reloadingUntil = 0;
+        reloadingWeapon = null;
+        shotSeq = 0;
     }
 }

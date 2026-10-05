@@ -4,10 +4,28 @@ import SockJS from 'sockjs-client';
 const SOCKET_URL = import.meta.env.VITE_WS_URL
   ?? `${window.location.protocol}//${window.location.hostname}:8080/ws`;
 
+/** Base de la API REST del mismo servidor (p. ej. /api/ranking). */
+export const API_BASE = SOCKET_URL.replace(/\/ws\/?$/, '');
+
 class SocketService {
   constructor() {
     this.client = null;
     this.connectListeners = new Set();
+    this.statusListeners = new Set();
+    this.status = 'connecting';
+  }
+
+  setStatus(status) {
+    if (this.status === status) return;
+    this.status = status;
+    this.statusListeners.forEach((cb) => cb(status));
+  }
+
+  /** 'connecting' | 'connected' | 'disconnected'. Llama de inmediato con el estado actual. */
+  onStatusChange(callback) {
+    this.statusListeners.add(callback);
+    callback(this.status);
+    return () => this.statusListeners.delete(callback);
   }
 
   connect({ onConnect, onError } = {}) {
@@ -22,7 +40,11 @@ class SocketService {
     this.client = new Client({
       webSocketFactory: () => new SockJS(SOCKET_URL),
       reconnectDelay: 5000,
-      onConnect: (frame) => this.connectListeners.forEach((cb) => cb(frame)),
+      onConnect: (frame) => {
+        this.setStatus('connected');
+        this.connectListeners.forEach((cb) => cb(frame));
+      },
+      onWebSocketClose: () => this.setStatus('disconnected'),
       onStompError: (frame) => onError?.(frame),
     });
 
@@ -71,3 +93,8 @@ class SocketService {
 }
 
 export const socketService = new SocketService();
+
+if (import.meta.env.DEV) {
+  // Para pruebas: simular un corte con window.__socket.client.forceDisconnect().
+  window.__socket = socketService;
+}

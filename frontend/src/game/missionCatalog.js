@@ -1,35 +1,83 @@
+// Espejo de backend/.../MissionType.java y MissionCatalog.java. Las misiones de cada
+// jugador las reparte el servidor (3 por Kinder); aqui solo esta como mostrarlas.
 
-export const REWARD_GARAVITOS = 25;
+export const MISSIONS_PER_KINDER = 3;
+export const MISSION_RANGE_PX = 80;
 
-const zone = (missionId, role, floor, x, y, room) => ({
-  missionId, role, floor, x, y, room, rewardGaravitos: REWARD_GARAVITOS,
-});
+export const MISSION_TYPES = {
+  CAMARAS: { role: 'SEGURIDAD', name: 'Cámaras de seguridad', icon: '📹', action: 'Revisar las cámaras' },
+  CODIGO: { role: 'SEGURIDAD', name: 'Código de acceso', icon: '🔐', action: 'Reprogramar la cerradura' },
+  CABLES: { role: 'SALUD', name: 'Cableado del equipo médico', icon: '🔌', action: 'Reparar el cableado' },
+  VACUNA: { role: 'SALUD', name: 'Preparar la vacuna', icon: '💉', action: 'Mezclar la vacuna' },
+  CUENTAS: { role: 'ECONOMIA', name: 'Cuentas de la caja', icon: '🧮', action: 'Hacer las cuentas' },
+  CAJA: { role: 'ECONOMIA', name: 'Dar el cambio', icon: '💵', action: 'Dar el cambio exacto' },
+  TORRE: { role: 'INFRAESTRUCTURA', name: 'Levantar la estructura', icon: '🧱', action: 'Apilar los bloques' },
+  FUSIBLES: { role: 'INFRAESTRUCTURA', name: 'Tablero de fusibles', icon: '⚡', action: 'Restablecer los fusibles' },
+};
 
-// Espejo de backend/.../MissionCatalog.java, por edificio: las coordenadas de un
-// edificio caen dentro de paredes del otro, asi que no se pueden compartir.
-const ZONES_BY_BUILDING = {
-  // Edificio F: una mision por rol, como estaba antes del Edificio C.
+export function missionType(type) {
+  return MISSION_TYPES[type] ?? { role: null, name: 'Misión', icon: '❔', action: 'Hacer la misión' };
+}
+
+export function missionTypesForRole(role) {
+  return Object.entries(MISSION_TYPES)
+    .filter(([, info]) => info.role === role)
+    .map(([type, info]) => ({ type, ...info }));
+}
+
+// Salas donde pueden tocar misiones (para iluminarlas); las coordenadas de cada mision
+// asignada llegan del servidor.
+const SITES_BY_BUILDING = {
   F: [
-    zone('mission-economia', 'ECONOMIA', 1, 1632, 1312, 'Cafetería'),
-    zone('mission-seguridad', 'SEGURIDAD', 2, 1632, 1312, 'Armero'),
-    zone('mission-salud', 'SALUD', 3, 736, 224, 'Laboratorio'),
-    zone('mission-infraestructura', 'INFRAESTRUCTURA', 3, 1632, 1312, 'Sala de Máquinas'),
+    { siteId: 'f1-aula-f-104', room: 'Aula F-104', floor: 1, x: 608, y: 288 },
+    { siteId: 'f1-sala-de-profesores', room: 'Sala de Profesores', floor: 1, x: 1760, y: 288 },
+    { siteId: 'f1-terraza', room: 'Terraza', floor: 1, x: 608, y: 1248 },
+    { siteId: 'f1-cafeteria', room: 'Cafetería', floor: 1, x: 1760, y: 1248 },
+    { siteId: 'f2-biblioteca', room: 'Biblioteca', floor: 2, x: 608, y: 288 },
+    { siteId: 'f2-sala-de-reuniones', room: 'Sala de Reuniones', floor: 2, x: 1888, y: 288 },
+    { siteId: 'f2-sala-de-estudio', room: 'Sala de Estudio', floor: 2, x: 608, y: 1248 },
+    { siteId: 'f2-armero', room: 'Armero', floor: 2, x: 1760, y: 1248 },
+    { siteId: 'f3-laboratorio-biomedico', room: 'Laboratorio Biomédico', floor: 3, x: 608, y: 288 },
+    { siteId: 'f3-sala-de-servidores', room: 'Sala de Servidores', floor: 3, x: 1760, y: 288 },
+    { siteId: 'f3-auditorio', room: 'Auditorio', floor: 3, x: 608, y: 1248 },
+    { siteId: 'f3-sala-de-maquinas', room: 'Sala de Máquinas', floor: 3, x: 1760, y: 1248 },
   ],
-  // Edificio C: 2 pisos, una sala por rol en cada piso.
   C: [
-    zone('mission-economia', 'ECONOMIA', 1, 1632, 1312, 'Cafetería'),
-    zone('mission-economia-f2', 'ECONOMIA', 2, 1568, 160, 'Sala de Reuniones'),
-    zone('mission-seguridad-f1', 'SEGURIDAD', 1, 288, 1376, 'Terraza'),
-    zone('mission-seguridad', 'SEGURIDAD', 2, 1632, 1312, 'Armero'),
-    zone('mission-salud-f1', 'SALUD', 1, 352, 288, 'Sala de Estudio'),
-    zone('mission-salud-f2', 'SALUD', 2, 608, 416, 'Biblioteca'),
-    zone('mission-infraestructura-f1', 'INFRAESTRUCTURA', 1, 1888, 160, 'Depósito de Servicio'),
-    zone('mission-infraestructura-f2', 'INFRAESTRUCTURA', 2, 800, 1376, 'Sala de Estudio'),
+    { siteId: 'c1-sala-de-estudio', room: 'Sala de Estudio', floor: 1, x: 416, y: 288 },
+    { siteId: 'c1-deposito-de-servicio', room: 'Depósito de Servicio', floor: 1, x: 1760, y: 288 },
+    { siteId: 'c1-terraza', room: 'Terraza', floor: 1, x: 416, y: 1248 },
+    { siteId: 'c1-cafeteria', room: 'Cafetería', floor: 1, x: 1760, y: 1248 },
+    { siteId: 'c2-biblioteca', room: 'Biblioteca', floor: 2, x: 608, y: 288 },
+    { siteId: 'c2-sala-de-reuniones', room: 'Sala de Reuniones', floor: 2, x: 1888, y: 288 },
+    { siteId: 'c2-sala-de-estudio', room: 'Sala de Estudio', floor: 2, x: 608, y: 1248 },
+    { siteId: 'c2-armero', room: 'Armero', floor: 2, x: 1760, y: 1248 },
+  ],
+  G: [
+    { siteId: 'g1-sala-de-computo', room: 'Sala de Cómputo', floor: 1, x: 608, y: 288 },
+    { siteId: 'g1-laboratorio-de-suelos', room: 'Laboratorio de Suelos', floor: 1, x: 1760, y: 288 },
+    { siteId: 'g1-taller-de-modelos', room: 'Taller de Modelos', floor: 1, x: 608, y: 1248 },
+    { siteId: 'g1-cafeteria', room: 'Cafetería', floor: 1, x: 1760, y: 1248 },
+    { siteId: 'g2-laboratorio-de-hidraulica', room: 'Laboratorio de Hidráulica', floor: 2, x: 608, y: 288 },
+    { siteId: 'g2-sala-de-proyectos', room: 'Sala de Proyectos', floor: 2, x: 1888, y: 288 },
+    { siteId: 'g2-archivo-de-planos', room: 'Archivo de Planos', floor: 2, x: 608, y: 1248 },
+    { siteId: 'g2-armeria', room: 'Armería', floor: 2, x: 1760, y: 1248 },
+  ],
+  A: [
+    { siteId: 'a1-registro-academico', room: 'Registro Académico', floor: 1, x: 608, y: 288 },
+    { siteId: 'a1-tesoreria', room: 'Tesorería', floor: 1, x: 1760, y: 288 },
+    { siteId: 'a1-bienestar-universitario', room: 'Bienestar Universitario', floor: 1, x: 608, y: 1248 },
+    { siteId: 'a1-cafeteria', room: 'Cafetería', floor: 1, x: 1760, y: 1248 },
+    { siteId: 'a2-decanatura', room: 'Decanatura', floor: 2, x: 608, y: 288 },
+    { siteId: 'a2-sala-de-consejo', room: 'Sala de Consejo', floor: 2, x: 1888, y: 288 },
+    { siteId: 'a2-archivo-central', room: 'Archivo Central', floor: 2, x: 608, y: 1248 },
+    { siteId: 'a2-armeria', room: 'Armería', floor: 2, x: 1760, y: 1248 },
+    { siteId: 'a3-rectoria', room: 'Rectoría', floor: 3, x: 608, y: 288 },
+    { siteId: 'a3-centro-de-datos', room: 'Centro de Datos', floor: 3, x: 1760, y: 288 },
+    { siteId: 'a3-auditorio-principal', room: 'Auditorio Principal', floor: 3, x: 608, y: 1248 },
+    { siteId: 'a3-sala-de-prensa', room: 'Sala de Prensa', floor: 3, x: 1760, y: 1248 },
   ],
 };
 
-export function missionZonesFor(building) {
-  return ZONES_BY_BUILDING[building] ?? ZONES_BY_BUILDING.F;
+export function missionSitesFor(building) {
+  return SITES_BY_BUILDING[building] ?? SITES_BY_BUILDING.F;
 }
-
-export const MISSION_RANGE_PX = 80;
