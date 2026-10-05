@@ -1,0 +1,194 @@
+{
+  "frames": {
+    "banca_roja": {
+      "frame": {
+        "x": 2,
+        "y": 46,
+        "w": 48,
+        "h": 28
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 48,
+        "h": 28
+      },
+      "sourceSize": {
+        "w": 48,
+        "h": 28
+      }
+    },
+    "sombrilla_roja": {
+      "frame": {
+        "x": 52,
+        "y": 30,
+        "w": 40,
+        "h": 44
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 40,
+        "h": 44
+      },
+      "sourceSize": {
+        "w": 40,
+        "h": 44
+      }
+    },
+    "caneca": {
+      "frame": {
+        "x": 94,
+        "y": 46,
+        "w": 20,
+        "h": 28
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 20,
+        "h": 28
+      },
+      "sourceSize": {
+        "w": 20,
+        "h": 28
+      }
+    },
+    "farola": {
+      "frame": {
+        "x": 116,
+        "y": 2,
+        "w": 20,
+        "h": 72
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 20,
+        "h": 72
+      },
+      "sourceSize": {
+        "w": 20,
+        "h": 72
+      }
+    },
+    "arbol": {
+      "frame": {
+        "x": 138,
+        "y": 2,
+        "w": 56,
+        "h": 72
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 56,
+        "h": 72
+      },
+      "sourceSize": {
+        "w": 56,
+        "h": 72
+      }
+    },
+    "busto": {
+      "frame": {
+        "x": 196,
+        "y": 34,
+        "w": 24,
+        "h": 40
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 40
+      },
+      "sourceSize": {
+        "w": 24,
+        "h": 40
+      }
+    },
+    "maquina_expendedora": {
+      "frame": {
+        "x": 222,
+        "y": 22,
+        "w": 28,
+        "h": 52
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 28,
+        "h": 52
+      },
+      "sourceSize": {
+        "w": 28,
+        "h": 52
+      }
+    },
+    "mesa_redonda": {
+      "frame": {
+        "x": 252,
+        "y": 54,
+        "w": 32,
+        "h": 20
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 32,
+        "h": 20
+      },
+      "sourceSize": {
+        "w": 32,
+        "h": 20
+      }
+    },
+    "silla_negra": {
+      "frame": {
+        "x": 286,
+        "y": 48,
+        "w": 18,
+        "h": 26
+      },
+      "rotated": false,
+      "trimmed": false,
+      "spriteSourceSize": {
+        "x": 0,
+        "y": 0,
+        "w": 18,
+        "h": 26
+      },
+      "sourceSize": {
+        "w": 18,
+        "h": 26
+      }
+    }
+  },
+  "meta": {
+    "app": "pillow-procedural",
+    "image": "exterior_c_props.png",
+    "format": "RGBA8888",
+    "size": {
+      "w": 306,
+      "h": 76
+    },
+    "scale": "1"
+  }
+}

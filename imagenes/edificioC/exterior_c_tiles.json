@@ -1,0 +1,378 @@
+{
+  "columns": 8,
+  "image": "exterior_c_tiles.png",
+  "imageheight": 160,
+  "imagewidth": 256,
+  "margin": 0,
+  "spacing": 0,
+  "name": "exterior_c_tiles",
+  "tilecount": 33,
+  "tilewidth": 32,
+  "tileheight": 32,
+  "firstgid": 1,
+  "tiles": [
+    {
+      "id": 0,
+      "type": "paver",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "type": "paver_var",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "type": "plaza",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "type": "concreto",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "type": "concreto_oscuro",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "grass1",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "type": "grass2",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "type": "grass3",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "type": "dirt",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "type": "edge_grass_n",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "edge_grass_s",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "edge_grass_e",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "edge_grass_w",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "type": "hedge",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "type": "ladrillo_c",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "type": "ladrillo_c_zocalo",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "type": "ventana_sana",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "type": "ventana_rota",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "type": "ventana_tapiada",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "type": "ventana_oscura",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "type": "columna",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "type": "puerta_marron",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "type": "celosia",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": true
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "type": "piso_espina_a",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "type": "piso_espina_b",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "type": "piso_recto",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "type": "baldosa_bano",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "type": "decal_sangre",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "type": "decal_grieta",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "type": "decal_cinta",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "type": "decal_escombros",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 31,
+      "type": "decal_maleza",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    },
+    {
+      "id": 32,
+      "type": "decal_charco",
+      "properties": [
+        {
+          "name": "colisiona",
+          "type": "bool",
+          "value": false
+        }
+      ]
+    }
+  ]
+}
