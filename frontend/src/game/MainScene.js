@@ -3,6 +3,7 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLay
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
+import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
@@ -123,7 +124,7 @@ export function cameraZoomFor(width, height) {
 }
 
 const WALK_WOBBLE_HZ = 3;
-const WALK_WOBBLE_DEG = 2.5;
+const WALK_WOBBLE_DEG = 1.5;
 
 const TILE_TEXTURE_FILES = {
   v2_floor_terrazo: 'v2_floor_terrazo_64.png',
@@ -383,6 +384,7 @@ export default class MainScene extends Phaser.Scene {
     this.createMap(layout);
 
     const spawn = this.spawnOverride ?? layout.spawn;
+    bakeAllWalkFrames(this, ROLE_CATALOG.map((entry) => entry.spritePrefix));
     this.player = this.physics.add.sprite(spawn.x, spawn.y, this.roleTexture('down'));
 
     this.player.setCollideWorldBounds(true);
@@ -609,9 +611,13 @@ export default class MainScene extends Phaser.Scene {
       const dx = state.x - entry.sprite.x;
       const dy = state.y - entry.sprite.y;
       if (Math.hypot(dx, dy) > 3) {
-        const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-        entry.sprite.setTexture(`${entry.prefix}_${direction}`);
+        entry.direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
         entry.aim = Math.atan2(dy, dx);
+        entry.walkMs = (entry.walkMs ?? 0) + delta;
+        entry.sprite.setTexture(walkKey(entry.prefix, entry.direction, walkFrameAt(entry.walkMs)));
+      } else if (entry.walkMs) {
+        entry.walkMs = 0;
+        entry.sprite.setTexture(`${entry.prefix}_${entry.direction ?? 'down'}`);
       }
       if ((state.shotSeq ?? 0) > entry.shotSeq) {
         // Un compañero disparo: se dibuja su bala con la direccion que reporto el servidor.
@@ -951,7 +957,9 @@ export default class MainScene extends Phaser.Scene {
       const quarter = Math.round(Phaser.Math.Angle.Wrap(this.aimAngle) / (Math.PI / 2));
       this.currentDirection = AIM_DIRECTIONS[(quarter + 4) % 4];
     }
-    this.player.setTexture(this.roleTexture(this.currentDirection));
+    this.player.setTexture(direction
+      ? walkKey(this.spritePrefix, this.currentDirection, walkFrameAt(this.walkWobblePhaseMs))
+      : this.roleTexture(this.currentDirection));
     this.syncLocalWeapon();
     if (direction) {
       this.walkWobblePhaseMs += delta;
