@@ -3,7 +3,8 @@ FROM eclipse-temurin:21-jdk AS build
 WORKDIR /app
 COPY .mvn .mvn
 COPY mvnw pom.xml ./
-RUN sed -i "s/$//" mvnw && chmod +x mvnw && ./mvnw -q dependency:go-offline
+RUN sed -i 's/$//' mvnw && chmod +x mvnw && ./mvnw -q dependency:go-offline
+$//" mvnw && chmod +x mvnw && ./mvnw -q dependency:go-offline
 COPY src src
 RUN ./mvnw -q package -DskipTests
 
