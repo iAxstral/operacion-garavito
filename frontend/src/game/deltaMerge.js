@@ -17,6 +17,8 @@ export function mergeDelta(body, previous) {
         missions: old?.missions ?? [],
         name: old?.name ?? null,
         costume: old?.costume ?? null,
+        perks: old?.perks ?? [],
+        perkOffer: old?.perkOffer ?? [],
       };
     });
   }
