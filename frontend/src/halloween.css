@@ -1018,3 +1018,58 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .hud-portrait-frame img, .hud-portrait-frame--hit, .hud-portrait--critical .hud-portrait-frame { animation: none; }
 }
+
+/* Perfil del jugador */
+.profile-panel { max-width: 620px; }
+.profile-head { display: flex; gap: 14px; align-items: center; margin-bottom: 14px; }
+.profile-portrait {
+  width: 84px;
+  height: 84px;
+  flex: none;
+  object-fit: cover;
+  object-position: top center;
+  border: 2px solid #8a5a2a;
+  border-radius: 12px;
+  background: #1a0c10;
+  image-rendering: pixelated;
+}
+.profile-portrait--empty { display: grid; place-items: center; font-size: 2rem; color: #8a5a2a; }
+.profile-name { display: flex; flex-direction: column; gap: 4px; font-size: 0.8rem; color: #c9b4a4; }
+.profile-name input {
+  font: inherit;
+  font-size: 1.1rem;
+  padding: 6px 8px;
+  border: 1px solid #6a3a20;
+  border-radius: 6px;
+  background: #120708;
+  color: #f3e6d8;
+  max-width: 100%;
+}
+.profile-favorite { margin: 6px 0 0; color: #ffb347; }
+.profile-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+.profile-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 4px;
+  border: 1px solid #4a2a2a;
+  border-radius: 8px;
+  background: #160a0c;
+  text-align: center;
+}
+.profile-tile strong { font-size: 1.2rem; color: #f3e6d8; }
+.profile-tile small { color: #c9b4a4; font-size: 0.75rem; }
+.profile-buildings { margin: 12px 0 0; color: #c9b4a4; font-size: 0.85rem; }
+.profile-subtitle { margin: 16px 0 6px; font-size: 0.95rem; color: #9dff3a; letter-spacing: 0.08em; text-transform: uppercase; }
+.profile-history { list-style: none; margin: 0; padding: 0; font-size: 0.82rem; }
+.profile-history li {
+  display: grid;
+  grid-template-columns: 4em 6em 1fr 6.5em 5.5em 3.5em;
+  gap: 6px;
+  padding: 5px 4px;
+  border-bottom: 1px solid #2a1414;
+}
+.profile-history--win { color: #7dffa6; }
+@media (max-width: 560px) {
+  .profile-history li { grid-template-columns: 1fr 1fr 1fr; }
+}
