@@ -126,6 +126,8 @@ const DECEL_PER_S = 16;
 // servidor acepta hasta 240 px/s, asi que 1,35x (216) no provoca correcciones.
 const SPRINT_FACTOR = 1.35;
 const STAMINA_DRAIN_PER_S = 0.34;
+// La salida del escape final (GameSession.EXIT_X/EXIT_Y en el servidor).
+const EXIT_POINT = { x: 608, y: 800 };
 const STAMINA_REGEN_PER_S = 0.24;
 const STAMINA_REGEN_DELAY_MS = 600;
 const STAMINA_RECOVERED = 0.35;
@@ -822,8 +824,8 @@ export default class MainScene extends Phaser.Scene {
       if (downed) entry.sprite.setTint(0x9a9a9a);
       else entry.sprite.clearTint();
       entry.downed = downed;
-      // Un compañero escondido en un armario no se ve.
-      const hidden = Boolean(state.hidingIn);
+      // Un compañero escondido en un armario (o que ya escapo) no se ve.
+      const hidden = Boolean(state.hidingIn) || Boolean(state.escaped);
       entry.sprite.setVisible(!hidden);
       entry.label.setVisible(!hidden);
       entry.shadow.setVisible(!hidden);
@@ -1029,6 +1031,47 @@ export default class MainScene extends Phaser.Scene {
     this.pingLayer.add({ kind: event.itemId, x, y, label: `${who}: ${PING_KINDS[event.itemId]?.label ?? '¡Aquí!'}` });
   }
 
+  // Escape final: la salida (entrada del piso 1) brilla y una flecha en el borde de la
+  // pantalla apunta hacia ella; si estoy en otro piso, la flecha no aparece (el HUD lo dice).
+  syncExit(time) {
+    const wave = getLatestState().wave;
+    const escaping = Boolean(wave?.escaping);
+    if (escaping && !this.exitMarker) {
+      this.exitMarker = this.add.container(EXIT_POINT.x, EXIT_POINT.y).setDepth(4);
+      const glow = this.add.circle(0, 0, 90, 0x3cff7a, 0.18).setBlendMode(Phaser.BlendModes.ADD);
+      const ring = this.add.circle(0, 0, 90).setStrokeStyle(4, 0x3cff7a, 0.9);
+      const label = this.add.text(0, -110, 'SALIDA', {
+        fontFamily: GOTHIC_FONT, fontSize: '28px', color: '#7dffa6', stroke: '#06140a', strokeThickness: 6,
+      }).setOrigin(0.5);
+      this.exitMarker.add([glow, ring, label]);
+      this.tweens.add({ targets: [glow, ring], scale: 1.15, alpha: 0.5, yoyo: true, repeat: -1, duration: 600 });
+      this.exitArrow = this.add.triangle(0, 0, 0, -14, 10, 10, -10, 10, 0x3cff7a).setDepth(6000).setScrollFactor(0);
+      playSample('creak', { channel: 'sfx', volume: 0.9, rate: 0.7 });
+      if (getSettings().screenShake) this.cameras.main.shake(400, 0.006);
+    } else if (!escaping && this.exitMarker) {
+      this.exitMarker.destroy();
+      this.exitArrow.destroy();
+      this.exitMarker = null;
+      this.exitArrow = null;
+    }
+    if (!this.exitMarker) return;
+    const onExitFloor = this.floor === 1;
+    this.exitMarker.setVisible(onExitFloor);
+    const view = this.cameras.main.worldView;
+    const offscreen = !view.contains(EXIT_POINT.x, EXIT_POINT.y);
+    const me = getMyPlayerState();
+    this.exitArrow.setVisible(onExitFloor && offscreen && !me?.escaped);
+    if (this.exitArrow.visible) {
+      const cam = this.cameras.main;
+      const angle = Math.atan2(EXIT_POINT.y - this.player.y, EXIT_POINT.x - this.player.x);
+      const radius = Math.min(cam.width, cam.height) / 2 - 40;
+      this.exitArrow
+        .setPosition(cam.width / 2 + Math.cos(angle) * radius, cam.height / 2 + Math.sin(angle) * radius)
+        .setRotation(angle + Math.PI / 2)
+        .setAlpha(0.65 + 0.35 * Math.sin(time / 120));
+    }
+  }
+
   // Explosiones de zombis explosivos: destello, fuego, sangre, sacudida y estruendo.
   syncBlasts() {
     if (!this.seenBlasts) this.seenBlasts = new Set();
@@ -1108,6 +1151,7 @@ export default class MainScene extends Phaser.Scene {
     if (ear) setListener(ear.x, ear.y, this.floor);
     this.syncPuddles();
     this.syncBlasts();
+    this.syncExit(time);
     this.pingLayer?.update(time);
     this.hauntLayer?.update(time);
     this.checkDamageTaken();
