@@ -51,6 +51,28 @@ public class GameSessionService {
                 loseTargetMs, speedPxPerSecond, maxHealth, biteDamage, attackCooldownMs);
     }
 
+    // Metricas (Micrometer): salas, jugadores y zombis en vivo, cuanto tarda el tick de
+    // una sala y cuantos mensajes se mandan completos o livianos. Llegan por setter para
+    // que las pruebas que arman el servicio a mano no las necesiten.
+    private io.micrometer.core.instrument.Timer tickTimer;
+    private io.micrometer.core.instrument.Counter fullMessages;
+    private io.micrometer.core.instrument.Counter deltaMessages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setMeterRegistry(io.micrometer.core.instrument.MeterRegistry registry) {
+        registry.gauge("garavito.rooms", sessions, Map::size);
+        registry.gauge("garavito.players", sessions,
+                all -> all.values().stream().mapToInt(GameSession::playerCount).sum());
+        registry.gauge("garavito.zombies", sessions,
+                all -> all.values().stream().mapToInt(GameSession::zombieCount).sum());
+        tickTimer = io.micrometer.core.instrument.Timer.builder("garavito.tick")
+                .description("Duracion del tick de una sala")
+                .publishPercentiles(0.5, 0.99)
+                .register(registry);
+        fullMessages = registry.counter("garavito.messages", "kind", "full");
+        deltaMessages = registry.counter("garavito.messages", "kind", "delta");
+    }
+
     private static final long TICK_PERIOD_MS = 66;
     private static final long BROADCAST_PERIOD_MS = 125;
     private static final java.util.Set<String> FULL_STATE_EVENTS = java.util.Set.of("LOBBY_OK", "JOIN_OK", "REJOIN_OK");
@@ -145,6 +167,9 @@ public class GameSessionService {
         boolean forceFull = lastEvent != null && FULL_STATE_EVENTS.contains(lastEvent.type());
         GameStateMessage message = encoders.computeIfAbsent(gameId, id -> new DeltaEncoder())
                 .encode(message(session, lastEvent), forceFull);
+        if (fullMessages != null) {
+            (message.full() ? fullMessages : deltaMessages).increment();
+        }
         messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }
 
@@ -195,7 +220,11 @@ public class GameSessionService {
                 double deltaSeconds = Math.min(0.25, (now - lastTickAt[0]) / 1000.0);
                 lastTickAt[0] = now;
 
-                session.tick(now, deltaSeconds);
+                if (tickTimer != null) {
+                    tickTimer.record(() -> session.tick(now, deltaSeconds));
+                } else {
+                    session.tick(now, deltaSeconds);
+                }
                 for (MatchSummary summary = session.pollSummaryToSave(); summary != null; summary = session.pollSummaryToSave()) {
                     history.saveAsync(summary);
                 }

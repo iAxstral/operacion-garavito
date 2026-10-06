@@ -160,6 +160,15 @@ public class GameSession {
         return building;
     }
 
+    /** Para el monitoreo: jugadores en la sala y zombis vivos. */
+    public int playerCount() {
+        return players.size();
+    }
+
+    public int zombieCount() {
+        return aliveZombieCount();
+    }
+
     public boolean hasPlayers() {
         return !players.isEmpty();
     }
