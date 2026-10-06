@@ -912,3 +912,42 @@ kbd {
 }
 @keyframes perk-in { from { opacity: 0; transform: translate(-50%, 20px); } to { opacity: 1; transform: translate(-50%, 0); } }
 @media (max-width: 520px) { .perk-card { width: 100px; } .perk-panel { bottom: 170px; } }
+
+/* Escape final y creditos */
+.hud-wave--escape {
+  border-color: #3cff7a !important;
+  color: #c8ffd9;
+  animation: escape-pulse 0.8s ease-in-out infinite alternate;
+}
+@keyframes escape-pulse { from { box-shadow: 0 0 4px #3cff7a55; } to { box-shadow: 0 0 22px #3cff7acc; } }
+.hud-escaped span { border-color: #3cff7a; color: #c8ffd9; }
+.credits-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow: hidden;
+  background: radial-gradient(ellipse at center, #1a0a12 0%, #050203 75%);
+  color: #f3e6d8;
+}
+.credits-roll {
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  width: min(560px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  text-align: center;
+  animation-name: credits-up;
+  animation-timing-function: linear;
+  animation-fill-mode: forwards;
+}
+.credits-roll h1 { font-size: clamp(2rem, 7vw, 3.4rem); color: #ff8a1a; text-shadow: 0 0 18px #ff5a0088; margin: 0 0 8px; }
+.credits-tagline { font-style: italic; color: #c9b4a4; margin-bottom: 48px; }
+.credits-roll section { margin: 0 0 44px; }
+.credits-roll h2 { font-size: 0.95rem; letter-spacing: 0.18em; text-transform: uppercase; color: #9dff3a; margin: 0 0 10px; }
+.credits-roll p { margin: 4px 0; font-size: 1.1rem; }
+.credits-end { margin-top: 80px !important; font-size: 1.5rem !important; color: #ffb347; }
+.credits-skip { position: absolute; right: 16px; bottom: 16px; }
+@keyframes credits-up { from { top: 100%; transform: translate(-50%, 0); } to { top: 0; transform: translate(-50%, -100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .credits-roll { animation: none; top: 50%; transform: translate(-50%, -50%); max-height: 90vh; overflow-y: auto; }
+}
