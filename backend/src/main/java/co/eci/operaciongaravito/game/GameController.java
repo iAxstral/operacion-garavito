@@ -30,7 +30,10 @@ public class GameController {
         } else {
             session = sessionService.find(gameId);
             if (session == null) {
-                sessionService.broadcastRejected(gameId, LastEvent.lobbyRejected(request.clientId(), "lobby_not_found"));
+                String owner = sessionService.redirectFor(gameId);
+                sessionService.broadcastRejected(gameId, owner != null
+                        ? LastEvent.lobbyRedirect(request.clientId(), owner)
+                        : LastEvent.lobbyRejected(request.clientId(), "lobby_not_found"));
                 return;
             }
         }

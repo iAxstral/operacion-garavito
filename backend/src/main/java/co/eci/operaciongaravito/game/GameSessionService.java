@@ -73,6 +73,32 @@ public class GameSessionService {
         deltaMessages = registry.counter("garavito.messages", "kind", "delta");
     }
 
+    // Varios nodos (ver cluster/): que nodo tiene cada sala y la URL publica de este.
+    // Sin perfil cluster, un registro en memoria y nunca hay a donde redirigir.
+    private co.eci.operaciongaravito.cluster.RoomRegistry roomRegistry =
+            new co.eci.operaciongaravito.cluster.InMemoryRoomRegistry();
+    private String nodeUrl = "local";
+    private static final long REGISTRY_REFRESH_MS = 30_000;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRoomRegistry(co.eci.operaciongaravito.cluster.RoomRegistry registry) {
+        this.roomRegistry = registry;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setNodeUrl(@Value("${app.node.public-url:local}") String url) {
+        this.nodeUrl = url;
+    }
+
+    /** URL del nodo que tiene la sala si no es este, o null (la sala esta aqui o no existe). */
+    public String redirectFor(String gameId) {
+        if (sessions.containsKey(gameId)) {
+            return null;
+        }
+        String owner = roomRegistry.ownerOf(gameId);
+        return owner != null && !owner.equals(nodeUrl) ? owner : null;
+    }
+
     private static final long TICK_PERIOD_MS = 66;
     private static final long BROADCAST_PERIOD_MS = 125;
     private static final java.util.Set<String> FULL_STATE_EVENTS = java.util.Set.of("LOBBY_OK", "JOIN_OK", "REJOIN_OK");
@@ -89,6 +115,10 @@ public class GameSessionService {
 
     public GameSession create(String gameId, Building building) {
         if (!isValidCode(gameId)) {
+            return null;
+        }
+        // Con varios nodos, el codigo puede estar tomado en otro.
+        if (!roomRegistry.claim(gameId, nodeUrl)) {
             return null;
         }
         boolean[] created = { false };
@@ -119,6 +149,7 @@ public class GameSessionService {
         } else {
             sessions.remove(gameId);
             encoders.remove(gameId);
+            roomRegistry.release(gameId, nodeUrl);
         }
     }
 
@@ -198,6 +229,7 @@ public class GameSessionService {
     private void startTicking(String gameId) {
         long[] lastTickAt = { System.currentTimeMillis() };
         long[] lastBroadcastAt = { 0 };
+        long[] lastRegistryRefresh = { System.currentTimeMillis() };
 
         gameLoop.scheduleAtFixedRate(() -> {
             GameSession session = sessions.get(gameId);
@@ -206,6 +238,10 @@ public class GameSessionService {
             }
 
             expireSeats(gameId, session, System.currentTimeMillis());
+            if (System.currentTimeMillis() - lastRegistryRefresh[0] >= REGISTRY_REFRESH_MS) {
+                lastRegistryRefresh[0] = System.currentTimeMillis();
+                roomRegistry.refresh(gameId, nodeUrl);
+            }
             if (!sessions.containsKey(gameId)) {
                 throw new IllegalStateException("partida cerrada");
             }

@@ -44,6 +44,11 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("LOBBY_OK", clientId, null, null);
     }
 
+    /** La sala esta en otro nodo: {@code reason} es su URL publica (el cliente se reconecta alla). */
+    public static LastEvent lobbyRedirect(String clientId, String nodeUrl) {
+        return new LastEvent("LOBBY_REDIRECT", clientId, null, nodeUrl);
+    }
+
     public static LastEvent lobbyRejected(String clientId, String reason) {
         return new LastEvent("LOBBY_REJECTED", clientId, null, reason);
     }
