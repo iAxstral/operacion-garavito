@@ -1073,3 +1073,24 @@ kbd {
 @media (max-width: 560px) {
   .profile-history li { grid-template-columns: 1fr 1fr 1fr; }
 }
+
+/* Modos de juego */
+.lobby-modes { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 10px auto 0; max-width: calc(100vw - 32px); }
+.lobby-mode {
+  padding: 7px 14px;
+  border: 1px solid #5a3a2a;
+  border-radius: 999px;
+  background: rgba(14, 6, 10, 0.85);
+  color: #e8d8c8;
+  font: inherit;
+  cursor: pointer;
+}
+.lobby-mode--active.lobby-mode--normal { border-color: #9dff8a; color: #c8ffbe; }
+.lobby-mode--active.lobby-mode--hard { border-color: #ff3a2a; color: #ffb0a8; box-shadow: 0 0 10px #ff3a2a66; }
+.lobby-mode--active.lobby-mode--daily { border-color: #ffb347; color: #ffd9a0; box-shadow: 0 0 10px #ffb34766; }
+.lobby-mode-help { text-align: center; color: #c9b4a4; font-size: 0.85rem; margin: 6px auto 0; max-width: 560px; padding: 0 16px; }
+.lobby-mode-help small { opacity: 0.7; }
+.waiting-mode { margin: -4px 0 10px; font-weight: bold; }
+.waiting-mode.lobby-mode--hard { color: #ff6a5a; }
+.waiting-mode.lobby-mode--daily { color: #ffb347; }
+.ranking-mode-tabs { margin-top: 6px; }
