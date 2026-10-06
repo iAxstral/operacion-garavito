@@ -53,6 +53,9 @@ public class GameSessionService {
 
     private static final long TICK_PERIOD_MS = 66;
     private static final long BROADCAST_PERIOD_MS = 125;
+    private static final java.util.Set<String> FULL_STATE_EVENTS = java.util.Set.of("LOBBY_OK", "JOIN_OK", "REJOIN_OK");
+    /** Un codificador de mensajes livianos por sala (ver DeltaEncoder). */
+    private final Map<String, DeltaEncoder> encoders = new ConcurrentHashMap<>();
 
     public static boolean isValidCode(String gameId) {
         return gameId != null && VALID_CODE.matcher(gameId).matches();
@@ -93,6 +96,7 @@ public class GameSessionService {
             broadcast(gameId, session, null);
         } else {
             sessions.remove(gameId);
+            encoders.remove(gameId);
         }
     }
 
@@ -137,7 +141,11 @@ public class GameSessionService {
     }
 
     public void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
-        messagingTemplate.convertAndSend("/topic/game/" + gameId, message(session, lastEvent));
+        // Al entrar o volver alguien va el estado completo: llega sin nada de antes.
+        boolean forceFull = lastEvent != null && FULL_STATE_EVENTS.contains(lastEvent.type());
+        GameStateMessage message = encoders.computeIfAbsent(gameId, id -> new DeltaEncoder())
+                .encode(message(session, lastEvent), forceFull);
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }
 
     public void broadcastRejected(String gameId, LastEvent event) {

@@ -305,7 +305,7 @@ public class GameSession {
                             p.getShotSeq(), p.getShotFacing(),
                             p.getReviveTargetId(), p.reviveProgress(now),
                             missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now), p.isConnected(),
-                            p.getName(), p.getHidingIn(), p.hiddenMs(now), p.getCandies(), p.getCostume());
+                            p.getName(), p.getHidingIn(), p.hiddenMs(now), p.getCandies(), p.getCostume(), false);
                 })
                 .toList();
     }
