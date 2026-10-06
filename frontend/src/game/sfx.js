@@ -1,4 +1,5 @@
 import { channelVolume } from './settings';
+import { playSample } from './audioBank';
 
 // Efectos cortos sintetizados con Web Audio: golpes, impactos, dano y clicks. No hay
 // archivos para estos sonidos y generarlos asi pesa cero y suena igual en todos lados.
@@ -193,9 +194,31 @@ const SOUNDS = {
 };
 
 /** Reproduce un efecto. `scale` (0..1) atenua por distancia u otra razon. */
-export function playSfx(name, scale = 1) {
+// Efectos que ya tienen audio grabado (audioBank): se usa ese y lo sintetizado queda
+// solo de respaldo mientras carga. Los de la interfaz siguen sintetizados.
+const RECORDED = {
+  hit: 'hit',
+  pistol: 'pistol',
+  rifle: 'rifle',
+  swing: 'swing',
+  draw: 'draw',
+  reload: 'reload',
+  empty: 'empty',
+  coins: 'coins',
+  hurt: 'hurt',
+  build: 'plank',
+  hammer: 'plank',
+  breakWood: 'plankBreak',
+};
+
+/**
+ * Reproduce un efecto. `scale` (0..1) atenua por distancia u otra razon; `at`
+ * ({ x, y, floor }) lo ubica en el mapa si es un sonido grabado.
+ */
+export function playSfx(name, scale = 1, at = null) {
   const sound = SOUNDS[name];
   if (!sound) return;
+  if (RECORDED[name] && playSample(RECORDED[name], { channel: sound.channel, volume: at ? 1 : scale, at })) return;
   const volume = channelVolume(sound.channel) * scale;
   if (volume <= 0.001) return;
   const ctx = audio();
