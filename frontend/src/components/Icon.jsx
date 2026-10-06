@@ -276,6 +276,12 @@ const PATHS = {
   ruler: (
     <path d="M3 21L21 3M3 21h18L3 3zM7 17h3M7 13h2M7 9h1" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" />
   ),
+  chat: (
+    <path
+      d="M4 5h16v11H9l-5 4V5zM8 9h8M8 12h5"
+      fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round"
+    />
+  ),
   megaphone: (
     <path
       d="M3 10v4h3l9 5V5L6 10zM18 9a4 4 0 0 1 0 6M6 14l1.5 6h3L9 15"
