@@ -496,6 +496,11 @@ export default function Hud() {
 
         <div className="hud-stats-row">
           <div className="hud-garavitos"><Icon name="coin" /> {garavitos} Garavitos</div>
+          {(me?.candies ?? 0) > 0 && (
+            <div className="hud-candies" title="Dulces de esta corrida: al terminar van a tu bolsa">
+              <Icon name="pumpkin" /> {me.candies}
+            </div>
+          )}
           <div className="hud-floor">{role.name} — Piso {floor}</div>
         </div>
 

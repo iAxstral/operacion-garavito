@@ -873,3 +873,33 @@
 .hud-hidden strong {
   color: var(--hw-gold);
 }
+
+/* ---------- Dulces ---------- */
+
+.hud-candies {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: #ffb347;
+  background: linear-gradient(180deg, rgba(30, 12, 14, 0.9), rgba(10, 5, 7, 0.92));
+  border: 1px solid rgba(255, 140, 40, 0.55);
+  border-radius: 4px;
+}
+
+.hud-candies .hw-icon {
+  color: #ff8a2a;
+}
+
+.results-candies {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffb347 !important;
+}
+
+.results-candies .hw-icon {
+  color: #ff8a2a;
+}
