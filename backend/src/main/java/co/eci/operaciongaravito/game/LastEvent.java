@@ -44,6 +44,19 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("LOBBY_OK", clientId, null, null);
     }
 
+    /** La sala esta en otro nodo: {@code reason} es su URL publica (el cliente se reconecta alla). */
+    public static LastEvent escapeStarted() {
+        return new LastEvent("ESCAPE_STARTED", null, null, null);
+    }
+
+    public static LastEvent playerEscaped(String playerId) {
+        return new LastEvent("PLAYER_ESCAPED", playerId, null, null);
+    }
+
+    public static LastEvent lobbyRedirect(String clientId, String nodeUrl) {
+        return new LastEvent("LOBBY_REDIRECT", clientId, null, nodeUrl);
+    }
+
     public static LastEvent lobbyRejected(String clientId, String reason) {
         return new LastEvent("LOBBY_REJECTED", clientId, null, reason);
     }
@@ -115,6 +128,11 @@ public record LastEvent(String type, String playerId, String itemId, String reas
     }
 
     /** Aviso al equipo: {@code itemId} es el tipo y {@code reason} "piso,x,y" donde estaba. */
+    /** {@code reason}: EMOTE o CHAT. */
+    public static LastEvent chat(String playerId, String phrase, boolean emote) {
+        return new LastEvent("CHAT", playerId, phrase, emote ? "EMOTE" : "CHAT");
+    }
+
     public static LastEvent ping(String playerId, String kind, int floor, long x, long y) {
         return new LastEvent("PING", playerId, kind, floor + "," + x + "," + y);
     }

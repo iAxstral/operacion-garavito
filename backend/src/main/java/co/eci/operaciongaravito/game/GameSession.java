@@ -74,10 +74,31 @@ public class GameSession {
     static final long PING_COOLDOWN_MS = 1_500;
 
     /** Cuanto puede quedarse escondido en un armario y cuanto espera para volver. */
+    /** La salida del escape final: la entrada del piso 1 (donde empieza todo el mundo). */
+    static final double EXIT_X = 608;
+    static final double EXIT_Y = 800;
+    static final double EXIT_RADIUS_PX = 90;
     static final long HIDE_MAX_MS = 8_000;
     static final long HIDE_COOLDOWN_MS = 12_000;
 
     static final double CANDY_CHANCE = 1.0 / 3;
+
+    /** Explosion del zombi explosivo: radio, dano a otros zombis y cuanto se ve. */
+    static final double BLAST_RADIUS_PX = 95;
+    static final int BLAST_ZOMBIE_DAMAGE = 3;
+    static final long BLAST_VISIBLE_MS = 500;
+    /** Grito: enfurece a los zombis de su piso a esta distancia, por este tiempo. */
+    static final double SCREAM_REACH_PX = 700;
+    static final long ENRAGE_MS = 6_000;
+    /** Zombi ciego: oye a un jugador a esta distancia si hace ruido, y siempre si esta muy cerca. */
+    static final double BLIND_HEAR_PX = 520;
+    static final double BLIND_TOUCH_PX = 140;
+    static final long NOISE_ATTACK_MS = 1_500;
+    static final long NOISE_RUN_MS = 800;
+    /** Mas rapido que esto entre dos reportes cuenta como correr (hace ruido). */
+    static final double NOISY_SPEED_PX_S = 185;
+    private final Map<String, BlastState> blasts = new ConcurrentHashMap<>();
+    private long blastSequence = 0;
     static final int CANDIES_PER_BOSS = 10;
     private final Map<String, Barricade> barricades = new ConcurrentHashMap<>();
     private long barricadeSequence;
@@ -145,7 +166,12 @@ public class GameSession {
     private static final long FIRST_WAVE_PREP_MS = 45_000;
 
     public GameSession(String gameId, Building building, BossConfig bossConfig) {
+        this(gameId, building, bossConfig, Difficulty.NORMAL);
+    }
+
+    public GameSession(String gameId, Building building, BossConfig bossConfig, Difficulty difficulty) {
         this.gameId = gameId;
+        this.difficulty = difficulty;
         this.building = building;
         this.bossConfig = bossConfig;
         this.floors = java.util.stream.IntStream.rangeClosed(1, building.floorCount())
@@ -153,11 +179,27 @@ public class GameSession {
                 .toList();
 
         this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, floors);
+        this.waveDirector.setDifficulty(difficulty);
         this.missionBoard = new MissionBoard(building, java.util.random.RandomGenerator.getDefault());
+    }
+
+    private final Difficulty difficulty;
+
+    public Difficulty getDifficulty() {
+        return difficulty;
     }
 
     public Building getBuilding() {
         return building;
+    }
+
+    /** Para el monitoreo: jugadores en la sala y zombis vivos. */
+    public int playerCount() {
+        return players.size();
+    }
+
+    public int zombieCount() {
+        return aliveZombieCount();
     }
 
     public boolean hasPlayers() {
@@ -254,7 +296,7 @@ public class GameSession {
     }
 
     public LobbyState lobbyState() {
-        return new LobbyState(started, host, building);
+        return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule());
     }
 
     public PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
@@ -305,7 +347,8 @@ public class GameSession {
                             p.getShotSeq(), p.getShotFacing(),
                             p.getReviveTargetId(), p.reviveProgress(now),
                             missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now), p.isConnected(),
-                            p.getName(), p.getHidingIn(), p.hiddenMs(now), p.getCandies(), p.getCostume());
+                            p.getName(), p.getHidingIn(), p.hiddenMs(now), p.getCandies(), p.getCostume(),
+                            p.perkNames(), p.perkOfferNames(), p.isEscaped(), false);
                 })
                 .toList();
     }
@@ -325,6 +368,12 @@ public class GameSession {
         if (!isValidMove(player, floor, x, y, now)) {
             player.countRejectedMove();
             return false;
+        }
+        if (floor == player.getFloor() && player.getLastMoveAt() > 0) {
+            double seconds = Math.max(0.05, (now - player.getLastMoveAt()) / 1000.0);
+            if (Math.hypot(x - player.getX(), y - player.getY()) / seconds > NOISY_SPEED_PX_S) {
+                player.makeNoise(now + NOISE_RUN_MS);
+            }
         }
         player.reportPosition(floor, x, y);
         player.setLastMoveAt(now);
@@ -402,6 +451,65 @@ public class GameSession {
         return PlayerActionResult.ok();
     }
 
+    private boolean blindHears(Zombie zombie, Player player, long now) {
+        if (player.getFloor() != zombie.getFloor()) {
+            return false;
+        }
+        double distance = Math.hypot(player.getX() - zombie.getX(), player.getY() - zombie.getY());
+        return distance <= BLIND_TOUCH_PX || (player.isNoisy(now) && distance <= BLIND_HEAR_PX);
+    }
+
+    // Grito: todos los zombis del piso a su alcance se enfurecen un rato.
+    private void resolveScreams(long now) {
+        zombies.values().stream().filter(Zombie::consumeScream).toList().forEach(screamer ->
+                zombies.values().stream()
+                        .filter(other -> other.isAlive() && other.getFloor() == screamer.getFloor()
+                                && Math.hypot(other.getX() - screamer.getX(), other.getY() - screamer.getY()) <= SCREAM_REACH_PX)
+                        .forEach(other -> other.enrage(now + ENRAGE_MS)));
+    }
+
+    /**
+     * Explosiones: daña a los jugadores y a los zombis cercanos. Un explosivo que muere
+     * por otra explosion revienta tambien (cadena), por eso se repite hasta que no quede
+     * ninguna pendiente. Los zombis que mata una explosion cuentan para la cuota.
+     */
+    private void resolveBlasts(long now) {
+        for (int round = 0; round < 6; round++) {
+            List<Zombie> exploding = zombies.values().stream().filter(z -> z.pendingBlastDamage() > 0).toList();
+            if (exploding.isEmpty()) {
+                return;
+            }
+            for (Zombie bomb : exploding) {
+                int damage = bomb.consumeBlast();
+                String id = "bl" + (++blastSequence);
+                blasts.put(id, new BlastState(id, bomb.getFloor(), Math.round(bomb.getX()), Math.round(bomb.getY()), now));
+                players.values().forEach(player -> {
+                    if (player.isAlive() && player.getFloor() == bomb.getFloor()
+                            && Math.hypot(player.getX() - bomb.getX(), player.getY() - bomb.getY()) <= BLAST_RADIUS_PX) {
+                        player.takeDamage(damage);
+                    }
+                });
+                int killed = 0;
+                for (Zombie other : zombies.values()) {
+                    if (other != bomb && other.isAlive() && other.getFloor() == bomb.getFloor()
+                            && Math.hypot(other.getX() - bomb.getX(), other.getY() - bomb.getY()) <= BLAST_RADIUS_PX) {
+                        double angle = Math.atan2(other.getY() - bomb.getY(), other.getX() - bomb.getX());
+                        if (other.hit(BLAST_ZOMBIE_DAMAGE, Math.cos(angle) * 300, Math.sin(angle) * 300, now)) {
+                            killed++;
+                        }
+                    }
+                }
+                if (killed > 0) {
+                    waveDirector.onZombiesKilled(killed);
+                }
+            }
+        }
+    }
+
+    public List<BlastState> blastStates() {
+        return List.copyOf(blasts.values());
+    }
+
     public List<PuddleState> puddleStates() {
         long now = System.currentTimeMillis();
         return puddles.values().stream().map(puddle -> puddle.toState(now)).toList();
@@ -417,6 +525,52 @@ public class GameSession {
             }
         }
         return candies;
+    }
+
+    /**
+     * Escape final: quien llega a la salida queda a salvo. Se gana cuando todos los que
+     * siguen en pie salieron, o al acabarse el tiempo si al menos uno salio; si nadie
+     * salio, la horda alcanza a todos (y el tick siguiente lo trata como equipo caido).
+     * True si la corrida termino.
+     */
+    private boolean resolveEscape(long now, List<Player> alive) {
+        alive.stream()
+                .filter(p -> !p.isEscaped() && p.getFloor() == 1
+                        && Math.hypot(p.getX() - EXIT_X, p.getY() - EXIT_Y) <= EXIT_RADIUS_PX)
+                .forEach(p -> {
+                    p.escape();
+                    pendingEvents.add(LastEvent.playerEscaped(p.getPlayerId()));
+                });
+        long escaped = alive.stream().filter(Player::isEscaped).count();
+        boolean timedOut = waveDirector.escapeTimedOut(now);
+        if ((!alive.isEmpty() && escaped == alive.size()) || (timedOut && escaped > 0)) {
+            waveDirector.win();
+            zombies.clear();
+            acids.clear();
+            puddles.clear();
+            victoryPending = true;
+            closeRun(true, WaveCurve.KINDER_COUNT, now);
+            return true;
+        }
+        if (timedOut) {
+            alive.forEach(Player::collapse);
+        }
+        return false;
+    }
+
+    /** Elige una de las mejoras que se le ofrecen. */
+    public PlayerActionResult attemptChoosePerk(String playerId, String perkName) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return PlayerActionResult.rejected("unknown_player");
+        }
+        Perk perk;
+        try {
+            perk = Perk.valueOf(perkName);
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            return PlayerActionResult.rejected("invalid_perk");
+        }
+        return player.choosePerk(perk) ? PlayerActionResult.ok() : PlayerActionResult.rejected("not_offered");
     }
 
     /** Disfraz del jugador (se llama al unirse o al volver a su puesto). */
@@ -440,6 +594,27 @@ public class GameSession {
      * servidor tiene del jugador. Devuelve null si el tipo no existe o si mando uno hace
      * muy poco.
      */
+    /** Frases del chat rapido (el cliente las muestra y las dice con la voz del rol). */
+    public static final java.util.Set<String> CHAT_PHRASES = java.util.Set.of(
+            "GRACIAS", "PERDON", "ESPERA", "SIGUEME", "CUBREME", "LISTO", "SI", "NO", "CORRAN", "BIEN_HECHO");
+    /** Emotes que aparecen sobre la cabeza del jugador. */
+    public static final java.util.Set<String> EMOTES = java.util.Set.of(
+            "SALUDO", "RISA", "MIEDO", "FIESTA", "CORAZON", "CALAVERA");
+    static final long CHAT_COOLDOWN_MS = 1_000;
+
+    /** Frase o emote del chat rapido; null si no existe o si escribe demasiado seguido. */
+    public LastEvent attemptChat(String playerId, String phrase, long now) {
+        Player player = players.get(playerId);
+        if (player == null || phrase == null) {
+            return null;
+        }
+        boolean emote = EMOTES.contains(phrase);
+        if ((!emote && !CHAT_PHRASES.contains(phrase)) || !player.tryChat(now, CHAT_COOLDOWN_MS)) {
+            return null;
+        }
+        return LastEvent.chat(playerId, phrase, emote);
+    }
+
     public LastEvent attemptPing(String playerId, String kind, long now) {
         Player player = players.get(playerId);
         if (player == null || kind == null || !PING_KINDS.contains(kind) || !player.tryPing(now, PING_COOLDOWN_MS)) {
@@ -479,6 +654,11 @@ public class GameSession {
         int upcoming = waveDirector.upcomingKinder();
         if (upcoming > 0 && upcoming != missionBoard.getKinder()) {
             missionBoard.deal(upcoming, players.values());
+            // Desde el segundo Kinder, en cada respiro se ofrecen tres mejoras a cada uno.
+            if (upcoming > 1) {
+                java.util.random.RandomGenerator random = java.util.concurrent.ThreadLocalRandom.current();
+                players.values().forEach(player -> player.offerPerks(random));
+            }
         }
         players.values().forEach(missionBoard::ensureDealt);
     }
@@ -506,13 +686,21 @@ public class GameSession {
             if (waveDirector.isVictory()) {
                 victoryPending = true;
                 closeRun(true, WaveCurve.KINDER_COUNT, now);
+            } else if (waveDirector.isEscaping()) {
+                pendingEvents.add(LastEvent.escapeStarted());
             }
         }
 
-        players.values().forEach(player -> player.expireHide(now, HIDE_COOLDOWN_MS));
+        players.values().forEach(player -> {
+            player.expireHide(now, HIDE_COOLDOWN_MS);
+            player.regenerate(now);
+        });
         List<Player> alive = players.values().stream().filter(Player::isAlive).toList();
         // Los escondidos estan vivos pero los zombis no los ven.
-        List<Player> targets = alive.stream().filter(player -> !player.isHidden()).toList();
+        List<Player> targets = alive.stream().filter(player -> !player.isHidden() && !player.isEscaped()).toList();
+        if (waveDirector.isEscaping() && resolveEscape(now, alive)) {
+            return;
+        }
 
         if (alive.isEmpty() && !players.isEmpty()) {
             closeRun(false, waveDirector.getKinder(), now);
@@ -534,7 +722,9 @@ public class GameSession {
                         floorGrid(target.getFloor()).distanceField(target.getX(), target.getY())));
 
         for (Zombie zombie : living) {
-            Player target = nearestPlayer(zombie, targets);
+            Player target = nearestPlayer(zombie, zombie.getKind() == ZombieKind.BLIND
+                    ? targets.stream().filter(player -> blindHears(zombie, player, now)).toList()
+                    : targets);
             if (target == null) {
                 // Sin nadie en su piso igual termina la mordida o el aturdimiento en curso.
                 zombie.updateAttack(null, now);
@@ -548,6 +738,10 @@ public class GameSession {
             collectAcid(zombie);
         }
         acids.values().removeIf(acid -> !acid.step(floorGrid(acid.getFloor()), players.values(), deltaSeconds, now));
+
+        resolveScreams(now);
+        resolveBlasts(now);
+        blasts.values().removeIf(blast -> now - blast.bornAt() > BLAST_VISIBLE_MS);
 
         // El escupidor muerto deja un charco de acido donde cayo.
         zombies.values().stream()
@@ -582,7 +776,7 @@ public class GameSession {
                 .sorted(java.util.Comparator.comparing(MatchSummary.PlayerSummary::role))
                 .toList();
         MatchSummary summary = new MatchSummary(++summarySequence, building, victory, kinderReached,
-                Math.max(0, (now - runStartedAt) / 1000), stats);
+                Math.max(0, (now - runStartedAt) / 1000), stats, difficulty.mode());
         lastSummary = summary;
         summariesToSave.add(summary);
         players.values().forEach(Player::resetStats);
@@ -984,6 +1178,7 @@ public class GameSession {
         long now = System.currentTimeMillis();
         // El origen del golpe es la posicion del servidor, salvo una diferencia chica
         // (el ataque puede llegar antes que el ultimo reporte de movimiento).
+        player.makeNoise(now + NOISE_ATTACK_MS);
         if (Math.hypot(x - player.getX(), y - player.getY()) > ACTION_POSITION_TOLERANCE_PX) {
             x = player.getX();
             y = player.getY();
@@ -1026,7 +1221,8 @@ public class GameSession {
                 continue;
             }
             hits++;
-            if (zombie.hit(weapon.damage(), Math.cos(angle) * weapon.knockback(), Math.sin(angle) * weapon.knockback(), now)) {
+            int damage = weapon.damage() + (player.hasPerk(Perk.GOLPE_FUERTE) ? 1 : 0);
+            if (zombie.hit(damage, Math.cos(angle) * weapon.knockback(), Math.sin(angle) * weapon.knockback(), now)) {
                 kills++;
             }
         }

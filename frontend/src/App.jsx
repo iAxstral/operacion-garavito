@@ -23,6 +23,7 @@ import TouchControls from './components/TouchControls';
 import SpectatorPanel from './components/SpectatorPanel';
 import TutorialHints from './components/TutorialHints';
 import PingControls from './components/PingControls';
+import PerkPanel from './components/PerkPanel';
 import PhonePanel from './components/PhonePanel';
 import TreasuryPanel from './components/TreasuryPanel';
 import GameOverScreen from './components/GameOverScreen';
@@ -143,6 +144,7 @@ function App() {
         <SpectatorPanel />
         <TutorialHints />
         <PingControls />
+        <PerkPanel />
         <PhonePanel />
         <TreasuryPanel />
         <GameOverScreen onExitToMenu={handleExitToMenu} />

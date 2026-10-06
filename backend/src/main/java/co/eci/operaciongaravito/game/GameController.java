@@ -22,7 +22,8 @@ public class GameController {
             return;
         }
         if (request.create()) {
-            session = sessionService.create(gameId, Building.parseOrDefault(request.building()));
+            session = sessionService.create(gameId, Building.parseOrDefault(request.building()),
+                    GameMode.parseOrDefault(request.mode()));
             if (session == null) {
                 sessionService.broadcastRejected(gameId, LastEvent.lobbyRejected(request.clientId(), "code_taken"));
                 return;
@@ -30,7 +31,10 @@ public class GameController {
         } else {
             session = sessionService.find(gameId);
             if (session == null) {
-                sessionService.broadcastRejected(gameId, LastEvent.lobbyRejected(request.clientId(), "lobby_not_found"));
+                String owner = sessionService.redirectFor(gameId);
+                sessionService.broadcastRejected(gameId, owner != null
+                        ? LastEvent.lobbyRedirect(request.clientId(), owner)
+                        : LastEvent.lobbyRejected(request.clientId(), "lobby_not_found"));
                 return;
             }
         }
@@ -69,6 +73,16 @@ public class GameController {
         sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
     }
 
+    @MessageMapping("/game/{gameId}/perk")
+    public void choosePerk(@DestinationVariable String gameId, PerkRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptChoosePerk(request.playerId(), request.perk());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
     @MessageMapping("/game/{gameId}/hide")
     public void hide(@DestinationVariable String gameId, PlayerRequest request) {
         GameSession session = sessionService.find(gameId);
@@ -77,6 +91,18 @@ public class GameController {
         }
         PlayerActionResult result = session.attemptHide(request.playerId(), System.currentTimeMillis());
         broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
+    @MessageMapping("/game/{gameId}/chat")
+    public void chat(@DestinationVariable String gameId, ChatRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        LastEvent event = session.attemptChat(request.playerId(), request.phrase(), System.currentTimeMillis());
+        if (event != null) {
+            broadcast(gameId, session, event);
+        }
     }
 
     @MessageMapping("/game/{gameId}/ping")

@@ -9,6 +9,8 @@ export const API_BASE = SOCKET_URL.replace(/\/ws\/?$/, '');
 
 class SocketService {
   constructor() {
+    // Con varios nodos el cliente puede pasar al que tiene su sala (switchTo).
+    this.url = SOCKET_URL;
     this.client = null;
     this.connectListeners = new Set();
     this.statusListeners = new Set();
@@ -38,7 +40,7 @@ class SocketService {
     if (this.client) return this.client;
 
     this.client = new Client({
-      webSocketFactory: () => new SockJS(SOCKET_URL),
+      webSocketFactory: () => new SockJS(this.url),
       reconnectDelay: 5000,
       onConnect: (frame) => {
         this.setStatus('connected');
@@ -73,6 +75,19 @@ class SocketService {
   disconnect() {
     this.client?.deactivate();
     this.client = null;
+  }
+
+  /**
+   * Se pasa a otro nodo del servidor (la sala vive alla). `nodeUrl` es su URL publica
+   * (p. ej. http://10.0.0.5:8082); se conecta a su /ws y espera a estar conectado.
+   */
+  async switchTo(nodeUrl) {
+    const target = /\/ws\/?$/.test(nodeUrl) ? nodeUrl : `${nodeUrl.replace(/\/$/, '')}/ws`;
+    if (target === this.url && this.isConnected()) return;
+    this.disconnect();
+    this.url = target;
+    this.setStatus('connecting');
+    await this.whenConnected();
   }
 
   subscribe(destination, callback) {

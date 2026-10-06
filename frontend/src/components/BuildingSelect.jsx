@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import HalloweenCreatures from './HalloweenCreatures';
 import { playSfx } from '../game/sfx';
+import { buildingLabel } from '../game/mapLayout';
 
 // Medidas reales de /mapa/seleccion-edificio-halloween.jpg: las cajas de abajo estan
 // en pixeles de esa imagen y se pasan a porcentajes para que escalen con ella.
@@ -21,7 +22,7 @@ const BUILDINGS = [
     button: [612, 175, 790, 238], marker: [764, 476, 830, 537],
   },
   {
-    id: 'B', info: 'Edificio B · sellado',
+    id: 'B', enabled: true, info: 'Edificio B · Ciencias Básicas · 3 pisos',
     button: [818, 175, 1005, 238], marker: [624, 368, 690, 430], extra: [[535, 505, 575, 560]],
   },
   {
@@ -29,12 +30,12 @@ const BUILDINGS = [
     button: [1032, 175, 1213, 238], marker: [292, 420, 356, 480],
   },
   {
-    id: 'Biblioteca', info: 'Biblioteca · sellada',
+    id: 'BIBLIOTECA', enabled: true, info: 'Biblioteca · 2 pisos',
     button: [1237, 175, 1435, 238], marker: [828, 395, 998, 442],
   },
 ];
 
-const DEFAULT_NOTICE = 'Elige un edificio para comenzar la operación: F, C, G o A.';
+const DEFAULT_NOTICE = 'Elige un edificio para comenzar la operación.';
 
 function toStyle([x0, y0, x1, y1]) {
   return {
@@ -59,7 +60,7 @@ export default function BuildingSelect({ onSelect, onBack }) {
     }
     playSfx('empty');
     setLockedTry((n) => n + 1);
-    setNotice(`${building.id === 'Biblioteca' ? 'La Biblioteca' : `El edificio ${building.id}`} está sellado. Por ahora: F, C, G y A.`);
+    setNotice(`${building.id === 'BIBLIOTECA' ? 'La Biblioteca' : `El edificio ${building.id}`} está sellado.`);
   };
 
   const hoveredBuilding = BUILDINGS.find((b) => b.id === hovered);
@@ -96,8 +97,8 @@ export default function BuildingSelect({ onSelect, onBack }) {
               onMouseLeave={() => setHovered(null)}
               onFocus={() => setHovered(building.id)}
               onBlur={() => setHovered(null)}
-              aria-label={building.enabled ? `Edificio ${building.id}` : `Edificio ${building.id} (no disponible)`}
-              title={building.enabled ? `Entrar al edificio ${building.id}` : 'Sellado'}
+              aria-label={building.enabled ? buildingLabel(building.id) : `${buildingLabel(building.id)} (no disponible)`}
+              title={building.enabled ? `Entrar: ${buildingLabel(building.id)}` : 'Sellado'}
             />
           ));
         })}

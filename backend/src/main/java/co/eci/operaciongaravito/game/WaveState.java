@@ -16,11 +16,13 @@ public record WaveState(
         boolean victory,
         boolean waitingForMissions,
         int teamMissionsDone,
-        int teamMissionsRequired) {
+        int teamMissionsRequired,
+        boolean escaping,
+        int escapeSeconds) {
 
     /** La misma vista con el avance de misiones del equipo (lo lleva el MissionBoard). */
     public WaveState withMissions(int done, int required) {
         return new WaveState(number, total, kills, quota, remaining, restingSeconds, bossStage, victory,
-                waitingForMissions, done, required);
+                waitingForMissions, done, required, escaping, escapeSeconds);
     }
 }

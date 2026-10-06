@@ -2,6 +2,7 @@
 import { API_BASE, socketService } from '../services/socketService';
 import { getNickname } from './profile';
 import { getEquippedCostume } from './costumes';
+import { mergeDelta } from './deltaMerge';
 
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -14,7 +15,9 @@ const SEAT_KEY = 'garavito.seat';
 
 function saveSeat() {
   try {
-    sessionStorage.setItem(SEAT_KEY, JSON.stringify({ gameId, role: myRole, token: seatToken, building: myBuilding }));
+    sessionStorage.setItem(SEAT_KEY, JSON.stringify({
+      gameId, role: myRole, token: seatToken, building: myBuilding, node: socketService.url,
+    }));
   } catch {
     // Sin almacenamiento no se puede volver tras recargar, pero si tras un corte.
   }
@@ -151,7 +154,7 @@ function awaitEvent(predicate) {
 
 function handleMessage(body) {
   latestState = {
-    ...body,
+    ...mergeDelta(body, latestState),
     lastEvent: body.lastEvent ?? latestState.lastEvent,
   };
   if (body.lastEvent) {
@@ -170,15 +173,15 @@ export function generateLobbyCode() {
   return Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('');
 }
 
-export async function openLobby(code, create, building) {
+export async function openLobby(code, create, building, redirected = false, mode = 'NORMAL') {
   await socketService.whenConnected();
   resetLocalState();
   gameId = code;
   topicSubscription = socketService.subscribe(`/topic/game/${code}`, handleMessage);
 
   const reply = awaitEvent((event) => event.playerId === CLIENT_ID
-    && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED'));
-  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building });
+    && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED' || event.type === 'LOBBY_REDIRECT'));
+  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building, mode });
 
   let event;
   try {
@@ -186,6 +189,13 @@ export async function openLobby(code, create, building) {
   } catch (error) {
     closeTopic();
     throw error;
+  }
+  if (event.type === 'LOBBY_REDIRECT') {
+    // La sala esta en otro nodo: se pasa alla y se pide de nuevo (una sola vez).
+    closeTopic();
+    if (redirected) throw new Error('lobby_not_found');
+    await socketService.switchTo(event.reason);
+    return openLobby(code, create, building, true, mode);
   }
   if (event.type === 'LOBBY_REJECTED') {
     closeTopic();
@@ -234,6 +244,8 @@ socketService.connect({ onConnect: handleReconnect });
 export async function resumeSession() {
   const seat = loadSeat();
   if (!seat?.gameId || !seat?.token) return null;
+  // Con varios nodos se vuelve al nodo donde estaba la sala.
+  if (seat.node && seat.node !== socketService.url) await socketService.switchTo(seat.node);
   await socketService.whenConnected();
   resetLocalState();
   gameId = seat.gameId;
@@ -419,6 +431,16 @@ export function getNearHide() {
 }
 
 /** Entra al armario cercano o sale del que esta. */
+export function requestChat(phrase) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/chat`, { playerId: myRole, phrase });
+}
+
+export function requestPerk(perk) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/perk`, { playerId: myRole, perk });
+}
+
 export function requestHide() {
   if (!joined || !socketService.isConnected()) return;
   socketService.publish(`/app/game/${gameId}/hide`, { playerId: myRole });

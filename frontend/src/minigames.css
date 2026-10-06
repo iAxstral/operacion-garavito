@@ -1004,3 +1004,18 @@
     font-size: 15px;
   }
 }
+
+/* Chat rapido */
+.chat-menu { max-height: 60vh; overflow-y: auto; }
+.chat-emotes { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; margin-bottom: 6px; }
+.chat-emote {
+  font-size: 1.35rem;
+  line-height: 1;
+  padding: 6px 0;
+  border: 1px solid #4a2a2a;
+  border-radius: 6px;
+  background: #1a0c10;
+  cursor: pointer;
+}
+.chat-emote:hover, .chat-emote:focus-visible { border-color: #ffb347; transform: scale(1.1); }
+.ping-feed-item--chat { border-color: #c9b4a4; }

@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: garavito
+    folder: Operación Garavito
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

@@ -6,6 +6,10 @@ import RankingPanel from './RankingPanel';
 import Icon from './Icon';
 import { earnAchievements } from '../game/achievements';
 import { creditRun } from '../game/costumes';
+import Credits from './Credits';
+import { recordRun } from '../game/playerStats';
+import { startReplayRecorder, takeBestPlay } from '../game/replayRecorder';
+import ReplayViewer from './ReplayViewer';
 
 const OUTCOMES = {
   TEAM_WIPED: {
@@ -49,6 +53,11 @@ export default function GameOverScreen({ onExitToMenu }) {
   const [showRanking, setShowRanking] = useState(false);
   const [earned, setEarned] = useState([]);
   const [candies, setCandies] = useState(0);
+  const [showCredits, setShowCredits] = useState(false);
+  const [bestPlay, setBestPlay] = useState(null);
+  const [showReplay, setShowReplay] = useState(false);
+
+  useEffect(() => startReplayRecorder(), []);
 
   useEffect(() => onGameEvent((event) => {
     if (!OUTCOMES[event.type]) return;
@@ -57,13 +66,19 @@ export default function GameOverScreen({ onExitToMenu }) {
     const runSummary = getLatestState().summary ?? null;
     setSummary(runSummary);
     setEarned(earnAchievements(runSummary, getMyRole()));
+    recordRun(runSummary, getMyRole());
+    setBestPlay(takeBestPlay());
     const mine = runSummary?.players?.find((p) => p.role === getMyRole());
     setCandies(runSummary ? creditRun(runSummary.id, mine?.candies ?? 0) : 0);
     setInputLocked(true);
+    setShowCredits(event.type === 'VICTORY');
     playSfx(event.type === 'VICTORY' ? 'coins' : 'breakWood');
   }), []);
 
   if (!outcome) return null;
+  if (showCredits) {
+    return <Credits survivors={summary?.players ?? []} onClose={() => setShowCredits(false)} />;
+  }
 
   const handleRetry = () => {
     setOutcome(null);
@@ -160,6 +175,16 @@ export default function GameOverScreen({ onExitToMenu }) {
               Reintentar
             </button>
           )}
+          {bestPlay && (
+            <button type="button" className="game-over-btn" onClick={() => setShowReplay(true)} title={bestPlay.title}>
+              ⏪ Mejor jugada
+            </button>
+          )}
+          {summary?.victory && (
+            <button type="button" className="game-over-btn" onClick={() => setShowCredits(true)}>
+              Créditos
+            </button>
+          )}
           <button type="button" className="game-over-btn" onClick={() => setShowRanking(true)}>
             <Icon name="trophy" /> Ranking
           </button>
@@ -173,6 +198,7 @@ export default function GameOverScreen({ onExitToMenu }) {
         </div>
       </div>
       {showRanking && <RankingPanel initialBuilding={summary?.building} onClose={() => setShowRanking(false)} />}
+      {showReplay && bestPlay && <ReplayViewer play={bestPlay} onClose={() => setShowReplay(false)} />}
     </div>
   );
 }

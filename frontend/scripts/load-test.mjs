@@ -169,6 +169,20 @@ async function main() {
     idaYVueltaMovimientoMs: { p50: Math.round(percentile(roundTrips, 50)), p95: Math.round(percentile(roundTrips, 95)), p99: Math.round(percentile(roundTrips, 99)) },
   };
   console.log(JSON.stringify(report, null, 2));
+  if (args.out) {
+    // Para comparar corridas (p. ej. desde otra maquina): se guarda con fecha y destino.
+    const { writeFileSync } = await import('node:fs');
+    const { hostname, cpus } = await import('node:os');
+    writeFileSync(args.out, JSON.stringify({
+      fecha: new Date().toISOString(),
+      destino: URL,
+      desde: hostname(),
+      nucleosGenerador: cpus().length,
+      segundos: SECONDS,
+      ...report,
+    }, null, 2));
+    console.log(`reporte guardado en ${args.out}`);
+  }
   bots.forEach((bot) => bot.client.deactivate());
   setTimeout(() => process.exit(0), 500);
 }

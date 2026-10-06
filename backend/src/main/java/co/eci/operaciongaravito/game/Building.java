@@ -11,7 +11,11 @@ public enum Building {
     /** Ingenieria: laboratorios y talleres. */
     G(2),
     /** Administrativo: oficinas, rectoria y centro de datos. */
-    A(3);
+    A(3),
+    /** Ciencias Basicas: laboratorios de fisica, quimica y biologia. */
+    B(3),
+    /** Biblioteca: estantes, hemeroteca y salas de lectura. */
+    BIBLIOTECA(2);
 
     private final int floorCount;
 

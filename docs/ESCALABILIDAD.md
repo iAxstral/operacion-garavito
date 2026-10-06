@@ -93,6 +93,16 @@ por segundo a cada jugador aunque casi nada cambie:
 - Redondear posiciones y usar nombres cortos de campos (o un formato binario).
 - Estimado: bajar a ~1 KB por estado, ~3–4× menos tráfico.
 
+**Hecho (`DeltaEncoder`, 2026-10-06):** cada sala tiene un codificador que recuerda lo
+último enviado. Puertas, sala, barricadas, objetos recogidos, resumen y evento del Kinder
+se omiten si no cambiaron (el mensaje los nombra en `unchanged`), y de cada jugador se
+omiten inventario, misiones, apodo y disfraz si son iguales (`staticOmitted`). Cada 16
+mensajes (2 s) y cuando alguien entra o vuelve va el estado completo, así quien llega
+tarde o perdió un mensaje se pone al día. El cliente completa lo omitido
+(`frontend/src/game/deltaMerge.js`). Medido en `DeltaEncoderTest` con 4 jugadores
+al empezar: **4 328 B → 2 252 B por mensaje (48 % menos)**. Lo que sigue pesando son
+las posiciones y los zombis; el siguiente paso sería redondearlas y acortar nombres.
+
 ### 4.2 Varios nodos (escalado horizontal)
 
 Las salas no comparten estado, así que se reparten por **código de sala**:
@@ -117,8 +127,28 @@ navegador ──▶   │  /ws?sala=ABCD  → nodo = hash(ABCD) % N  (o tabla en
 - Si un nodo cae se pierden sus salas en curso (no el historial). Para tolerarlo
   habría que guardar instantáneas de sala en Redis — no se justifica para este juego.
 
+**Hecho (2026-10-06), sin balanceador externo:**
+
+- `cluster/RoomRegistry`: en memoria con un nodo y `RedisRoomRegistry` con el perfil
+  `cluster` (`garavito:room:CODIGO` → URL del nodo, `SET NX` con caducidad de 2 min que
+  el nodo renueva cada 30 s mientras la sala vive; si el nodo se cae, la sala se libera
+  sola).
+- Al crear una sala el nodo la reclama; si otro nodo ya la tiene, el código está
+  tomado. Si un jugador pide una sala que vive en otro nodo, recibe `LOBBY_REDIRECT`
+  con la URL pública de ese nodo y el cliente se reconecta allá (`socketService.switchTo`).
+  El puesto guardado recuerda el nodo, así que al recargar la página vuelve al mismo.
+- Los tokens de reconexión siguen en memoria: con afinidad, el jugador siempre vuelve
+  al nodo que tiene su sala.
+- `docker-compose.cluster.yml` levanta Redis, PostgreSQL y dos nodos (8081 y 8082);
+  `ClusterRoutingTest` prueba la redirección con dos servicios que comparten registro.
+- Sin probar todavía: el compose completo con Redis real (Docker no se levantó en la
+  máquina de desarrollo para no quedarse sin memoria).
+
 ### 4.3 Siguientes pasos
 
-1. Repetir la prueba de carga con los bots en otra máquina para fijar el techo real.
-2. Implementar 4.1 (deltas) y volver a medir.
-3. Si se necesitan más de ~100 salas simultáneas, 4.2.
+1. Repetir la prueba de carga con los bots en otra máquina para fijar el techo real
+   (ver `docs/PRUEBA_DE_CARGA.md`).
+2. ~~Implementar 4.1 (deltas) y volver a medir.~~ Hecho; falta volver a medir por la red.
+3. ~~Si se necesitan más de ~100 salas simultáneas, 4.2.~~ Hecho (sección 4.2).
+4. Monitoreo: `monitoring/` (Prometheus + Grafana) muestra salas, jugadores, duración
+   del tick y mensajes por nodo.

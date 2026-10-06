@@ -84,6 +84,30 @@ const SITES_BY_BUILDING = {
     { siteId: 'a3-auditorio-principal', room: 'Auditorio Principal', floor: 3, x: 608, y: 1248 },
     { siteId: 'a3-sala-de-prensa', room: 'Sala de Prensa', floor: 3, x: 1760, y: 1248 },
   ],
+  B: [
+    { siteId: 'b1-laboratorio-de-fisica', room: 'Laboratorio de Física', floor: 1, x: 608, y: 288 },
+    { siteId: 'b1-laboratorio-de-quimica', room: 'Laboratorio de Química', floor: 1, x: 1760, y: 288 },
+    { siteId: 'b1-aula-101', room: 'Aula 101', floor: 1, x: 608, y: 1248 },
+    { siteId: 'b1-cafeteria', room: 'Cafetería', floor: 1, x: 1760, y: 1248 },
+    { siteId: 'b2-laboratorio-de-biologia', room: 'Laboratorio de Biología', floor: 2, x: 608, y: 288 },
+    { siteId: 'b2-sala-de-matematicas', room: 'Sala de Matemáticas', floor: 2, x: 1888, y: 288 },
+    { siteId: 'b2-salon-de-profesores', room: 'Salón de Profesores', floor: 2, x: 608, y: 1248 },
+    { siteId: 'b2-armeria', room: 'Armería', floor: 2, x: 1760, y: 1248 },
+    { siteId: 'b3-observatorio', room: 'Observatorio', floor: 3, x: 608, y: 288 },
+    { siteId: 'b3-laboratorio-de-electronica', room: 'Laboratorio de Electrónica', floor: 3, x: 1760, y: 288 },
+    { siteId: 'b3-deposito-de-reactivos', room: 'Depósito de Reactivos', floor: 3, x: 608, y: 1248 },
+    { siteId: 'b3-sala-de-tutorias', room: 'Sala de Tutorías', floor: 3, x: 1760, y: 1248 },
+  ],
+  BIBLIOTECA: [
+    { siteId: 'bib1-prestamo-y-devolucion', room: 'Préstamo y Devolución', floor: 1, x: 608, y: 288 },
+    { siteId: 'bib1-hemeroteca', room: 'Hemeroteca', floor: 1, x: 1760, y: 288 },
+    { siteId: 'bib1-sala-de-lectura', room: 'Sala de Lectura', floor: 1, x: 608, y: 1248 },
+    { siteId: 'bib1-cafeteria', room: 'Cafetería', floor: 1, x: 1760, y: 1248 },
+    { siteId: 'bib2-colecciones-especiales', room: 'Colecciones Especiales', floor: 2, x: 608, y: 288 },
+    { siteId: 'bib2-sala-de-estudio-grupal', room: 'Sala de Estudio Grupal', floor: 2, x: 1888, y: 288 },
+    { siteId: 'bib2-archivo-historico', room: 'Archivo Histórico', floor: 2, x: 608, y: 1248 },
+    { siteId: 'bib2-armeria', room: 'Armería', floor: 2, x: 1760, y: 1248 },
+  ],
 };
 
 export function missionSitesFor(building) {

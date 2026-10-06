@@ -7,9 +7,11 @@ import HauntLayer from './HauntLayer';
 import { pollGamepad } from './gamepad';
 import { bakeCostumes, costumeKey, COSTUME_LAYOUT, HEAD_Y, NECK_Y } from './costumeArt';
 import { setStamina } from './stamina';
+import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
+import { NIGHT_CONE_FACTOR } from './gameModes';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
-import { PING_KINDS } from './voice';
+import { CHAT_PHRASES, EMOTES, PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
@@ -125,6 +127,8 @@ const DECEL_PER_S = 16;
 // servidor acepta hasta 240 px/s, asi que 1,35x (216) no provoca correcciones.
 const SPRINT_FACTOR = 1.35;
 const STAMINA_DRAIN_PER_S = 0.34;
+// La salida del escape final (GameSession.EXIT_X/EXIT_Y en el servidor).
+const EXIT_POINT = { x: 608, y: 800 };
 const STAMINA_REGEN_PER_S = 0.24;
 const STAMINA_REGEN_DELAY_MS = 600;
 const STAMINA_RECOVERED = 0.35;
@@ -287,7 +291,8 @@ export default class MainScene extends Phaser.Scene {
     const wants = this.sprintKey.isDown || touchInput.sprint || Math.hypot(touchInput.moveX, touchInput.moveY) >= TOUCH_SPRINT;
     const sprinting = wants && moving && !this.exhausted && this.stamina > 0;
     if (sprinting) {
-      this.stamina = Math.max(0, this.stamina - (STAMINA_DRAIN_PER_S * delta) / 1000);
+      const drain = STAMINA_DRAIN_PER_S * (hasPerk(getMyPlayerState(), 'ENERGIA') ? ENERGIA_DRAIN_FACTOR : 1);
+      this.stamina = Math.max(0, this.stamina - (drain * delta) / 1000);
       this.lastSprintAt = time;
       if (this.stamina === 0) this.exhausted = true;
     } else if (time - this.lastSprintAt > STAMINA_REGEN_DELAY_MS) {
@@ -417,6 +422,15 @@ export default class MainScene extends Phaser.Scene {
   zombieHooks() {
     return {
       onWindup: (entry) => {
+        if (entry.screaming) {
+          // Griton: alarido agudo y ondas violetas.
+          playSample('ghost', { channel: 'zombies', volume: 1, rate: 1.7, at: { x: entry.x, y: entry.y, floor: this.floor } });
+          [0, 180, 360].forEach((delay) => {
+            const wave = this.add.circle(entry.x, entry.y, 20, 0xd94aff, 0).setStrokeStyle(4, 0xd94aff, 0.8).setDepth(5002);
+            this.tweens.add({ targets: wave, radius: 260, alpha: 0, delay, duration: 700, onComplete: () => wave.destroy() });
+          });
+          return;
+        }
         if (entry.spitting) {
           playSfx('spitCharge', this.hearing(entry.x, entry.y));
           return;
@@ -626,6 +640,7 @@ export default class MainScene extends Phaser.Scene {
     const offCorrection = onGameEvent((event) => {
       if (event.type === 'POSITION_CORRECTED' && event.playerId === getMyRole()) this.applyServerPosition();
       if (event.type === 'PING') this.showPing(event);
+      if (event.type === 'CHAT') this.showChat(event);
     });
     this.events.once('shutdown', () => {
       offCorrection();
@@ -811,8 +826,8 @@ export default class MainScene extends Phaser.Scene {
       if (downed) entry.sprite.setTint(0x9a9a9a);
       else entry.sprite.clearTint();
       entry.downed = downed;
-      // Un compañero escondido en un armario no se ve.
-      const hidden = Boolean(state.hidingIn);
+      // Un compañero escondido en un armario (o que ya escapo) no se ve.
+      const hidden = Boolean(state.hidingIn) || Boolean(state.escaped);
       entry.sprite.setVisible(!hidden);
       entry.label.setVisible(!hidden);
       entry.shadow.setVisible(!hidden);
@@ -1011,11 +1026,100 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
+  // Emote o frase del chat rapido sobre la cabeza de quien la mando (si esta a la vista).
+  showChat(event) {
+    const mine = event.playerId === getMyRole();
+    const sprite = mine ? this.player : this.remotePlayers.get(event.playerId)?.sprite;
+    if (!sprite?.visible) return;
+    const emote = event.reason === 'EMOTE';
+    const text = emote ? EMOTES[event.itemId] : CHAT_PHRASES[event.itemId];
+    if (!text) return;
+    const bubble = this.add.text(sprite.x, sprite.y - sprite.displayHeight / 2 - 26, text, emote
+      ? { fontSize: '30px' }
+      : { fontFamily: 'Georgia, serif', fontSize: '15px', color: '#1a0d08', backgroundColor: '#f3e6d8', padding: { x: 6, y: 3 } })
+      .setOrigin(0.5).setDepth(6000);
+    const follow = () => bubble.setPosition(sprite.x, bubble.y);
+    this.events.on('update', follow);
+    this.tweens.add({
+      targets: bubble,
+      y: bubble.y - 22,
+      alpha: { from: 1, to: 0 },
+      ease: 'Quad.easeIn',
+      duration: emote ? 2200 : 2800,
+      onComplete: () => {
+        this.events.off('update', follow);
+        bubble.destroy();
+      },
+    });
+  }
+
   showPing(event) {
     const [floor, x, y] = String(event.reason ?? '').split(',').map(Number);
     if (floor !== this.floor || !Number.isFinite(x)) return;
     const who = displayName(getLatestState().players.find((p) => p.playerId === event.playerId) ?? { role: event.playerId });
     this.pingLayer.add({ kind: event.itemId, x, y, label: `${who}: ${PING_KINDS[event.itemId]?.label ?? '¡Aquí!'}` });
+  }
+
+  // Escape final: la salida (entrada del piso 1) brilla y una flecha en el borde de la
+  // pantalla apunta hacia ella; si estoy en otro piso, la flecha no aparece (el HUD lo dice).
+  syncExit(time) {
+    const wave = getLatestState().wave;
+    const escaping = Boolean(wave?.escaping);
+    if (escaping && !this.exitMarker) {
+      this.exitMarker = this.add.container(EXIT_POINT.x, EXIT_POINT.y).setDepth(4);
+      const glow = this.add.circle(0, 0, 90, 0x3cff7a, 0.18).setBlendMode(Phaser.BlendModes.ADD);
+      const ring = this.add.circle(0, 0, 90).setStrokeStyle(4, 0x3cff7a, 0.9);
+      const label = this.add.text(0, -110, 'SALIDA', {
+        fontFamily: GOTHIC_FONT, fontSize: '28px', color: '#7dffa6', stroke: '#06140a', strokeThickness: 6,
+      }).setOrigin(0.5);
+      this.exitMarker.add([glow, ring, label]);
+      this.tweens.add({ targets: [glow, ring], scale: 1.15, alpha: 0.5, yoyo: true, repeat: -1, duration: 600 });
+      this.exitArrow = this.add.triangle(0, 0, 0, -14, 10, 10, -10, 10, 0x3cff7a).setDepth(6000).setScrollFactor(0);
+      playSample('creak', { channel: 'sfx', volume: 0.9, rate: 0.7 });
+      if (getSettings().screenShake) this.cameras.main.shake(400, 0.006);
+    } else if (!escaping && this.exitMarker) {
+      this.exitMarker.destroy();
+      this.exitArrow.destroy();
+      this.exitMarker = null;
+      this.exitArrow = null;
+    }
+    if (!this.exitMarker) return;
+    const onExitFloor = this.floor === 1;
+    this.exitMarker.setVisible(onExitFloor);
+    const view = this.cameras.main.worldView;
+    const offscreen = !view.contains(EXIT_POINT.x, EXIT_POINT.y);
+    const me = getMyPlayerState();
+    this.exitArrow.setVisible(onExitFloor && offscreen && !me?.escaped);
+    if (this.exitArrow.visible) {
+      const cam = this.cameras.main;
+      const angle = Math.atan2(EXIT_POINT.y - this.player.y, EXIT_POINT.x - this.player.x);
+      const radius = Math.min(cam.width, cam.height) / 2 - 40;
+      this.exitArrow
+        .setPosition(cam.width / 2 + Math.cos(angle) * radius, cam.height / 2 + Math.sin(angle) * radius)
+        .setRotation(angle + Math.PI / 2)
+        .setAlpha(0.65 + 0.35 * Math.sin(time / 120));
+    }
+  }
+
+  // Explosiones de zombis explosivos: destello, fuego, sangre, sacudida y estruendo.
+  syncBlasts() {
+    if (!this.seenBlasts) this.seenBlasts = new Set();
+    (getLatestState().blasts ?? []).filter((b) => b.floor === this.floor && !this.seenBlasts.has(b.id)).forEach((b) => {
+      this.seenBlasts.add(b.id);
+      const at = { x: b.x, y: b.y, floor: this.floor };
+      playSample('plankBreak', { channel: 'zombies', volume: 1, rate: 0.6, at });
+      playSample('hitHeavy', { channel: 'zombies', volume: 1, rate: 0.5, at });
+      this.lighting?.pulse(b.x, b.y, 300, 260);
+      this.gore.burst(b.x, b.y, 0xff6a1a);
+      const fire = this.add.circle(b.x, b.y, 18, 0xffb347, 0.9).setDepth(5004).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: fire, radius: 95, alpha: 0, duration: 380, onComplete: () => fire.destroy() });
+      const scorch = this.add.ellipse(b.x, b.y + 10, 120, 60, 0x0d0705, 0.55).setDepth(1.5);
+      this.tweens.add({ targets: scorch, alpha: 0, delay: 8000, duration: 1500, onComplete: () => scorch.destroy() });
+      if (getSettings().screenShake && Math.hypot(this.player.x - b.x, this.player.y - b.y) < 500) {
+        this.cameras.main.shake(220, 0.01);
+      }
+    });
+    if (this.seenBlasts.size > 200) this.seenBlasts.clear();
   }
 
   // Charcos de acido de los escupidores muertos: verdes, burbujean y se secan.
@@ -1070,10 +1174,14 @@ export default class MainScene extends Phaser.Scene {
     // La linterna apunta hacia donde mira el jugador (o el compañero que se espectea).
     const watched = this.spectating ? this.remotePlayers.get(getSpectateTarget()) : null;
     const flashlightAim = this.spectating ? (watched?.aim ?? null) : this.aimAngle;
+    this.lighting.coneFactor = (!this.spectating && hasPerk(getMyPlayerState(), 'LINTERNA') ? LINTERNA_CONE_FACTOR : 1)
+      * (getLatestState().lobby?.dailyRule === 'NOCHE_CERRADA' ? NIGHT_CONE_FACTOR : 1);
     this.lighting.update(time, this.focusSprite(), this.remotePlayers, flashlightAim);
     const ear = this.focusSprite();
     if (ear) setListener(ear.x, ear.y, this.floor);
     this.syncPuddles();
+    this.syncBlasts();
+    this.syncExit(time);
     this.pingLayer?.update(time);
     this.hauntLayer?.update(time);
     this.checkDamageTaken();

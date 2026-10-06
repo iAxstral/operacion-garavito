@@ -1,0 +1,53 @@
+# Dos nodos del backend que comparten Redis (registro sala -> nodo) y PostgreSQL
+# (historial y ranking). Cada sala vive en un nodo; si un jugador pide una sala del otro
+# nodo, el servidor le responde LOBBY_REDIRECT y el cliente se reconecta alla.
+#
+#   docker compose -f docker-compose.cluster.yml up --build
+#   Nodo 1: http://localhost:8081   Nodo 2: http://localhost:8082
+#
+# El frontend se apunta a cualquiera de los dos (VITE_WS_URL=http://localhost:8081/ws).
+# NODE_PUBLIC_URL debe ser la direccion con la que los navegadores llegan a ese nodo:
+# si se juega desde otros equipos de la red, cambiar localhost por la IP de esta maquina.
+
+services:
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: operaciongaravito
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+
+  node1:
+    build: ./backend
+    ports:
+      - "8081:8080"
+    environment: &node
+      SPRING_PROFILES_ACTIVE: cluster
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/operaciongaravito
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+      REDIS_HOST: redis
+      NODE_PUBLIC_URL: http://localhost:8081
+      NODE_NAME: nodo-1
+    depends_on:
+      - redis
+      - postgres
+
+  node2:
+    build: ./backend
+    ports:
+      - "8082:8080"
+    environment:
+      <<: *node
+      NODE_PUBLIC_URL: http://localhost:8082
+      NODE_NAME: nodo-2
+    depends_on:
+      - redis
+      - postgres

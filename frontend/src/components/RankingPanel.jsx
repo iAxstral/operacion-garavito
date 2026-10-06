@@ -3,29 +3,31 @@ import { API_BASE } from '../services/socketService';
 import { roleInfo } from '../game/roleCatalog';
 import { playSfx } from '../game/sfx';
 import Icon from './Icon';
+import { MODES } from '../game/gameModes';
 
-const BUILDINGS = ['F', 'C', 'G', 'A'];
+import { BUILDINGS } from '../game/mapLayout';
 const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 const formatDate = (iso) => new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
 
 /** Mejores partidas guardadas por edificio (GET /api/ranking). */
 export default function RankingPanel({ onClose, initialBuilding = 'F' }) {
   const [building, setBuilding] = useState(BUILDINGS.includes(initialBuilding) ? initialBuilding : 'F');
+  const [mode, setMode] = useState('NORMAL');
   const [result, setResult] = useState({ status: 'loading', data: null, building: null });
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`${API_BASE}/api/ranking?building=${building}`)
+    fetch(`${API_BASE}/api/ranking?building=${building}&mode=${mode}`)
       .then((response) => {
         if (!response.ok) throw new Error(String(response.status));
         return response.json();
       })
-      .then((data) => !cancelled && setResult({ status: 'ok', data, building }))
-      .catch(() => !cancelled && setResult({ status: 'error', data: null, building }));
+      .then((data) => !cancelled && setResult({ status: 'ok', data, building, mode }))
+      .catch(() => !cancelled && setResult({ status: 'error', data: null, building, mode }));
     return () => {
       cancelled = true;
     };
-  }, [building]);
+  }, [building, mode]);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -37,7 +39,7 @@ export default function RankingPanel({ onClose, initialBuilding = 'F' }) {
     return () => window.removeEventListener('keydown', onKeyDown, true);
   }, [onClose]);
 
-  const loading = result.building !== building;
+  const loading = result.building !== building || result.mode !== mode;
   const data = loading ? null : result.data;
 
   return (
@@ -61,7 +63,25 @@ export default function RankingPanel({ onClose, initialBuilding = 'F' }) {
                 playSfx('click');
               }}
             >
-              Edificio {id}
+              {id === 'BIBLIOTECA' ? 'Biblioteca' : id}
+            </button>
+          ))}
+        </div>
+
+        <div className="howto-tabs ranking-mode-tabs" role="tablist" aria-label="Modo">
+          {Object.entries(MODES).map(([id, info]) => (
+            <button
+              key={id}
+              type="button"
+              role="tab"
+              aria-selected={mode === id}
+              className={`howto-tab${mode === id ? ' howto-tab--active' : ''}`}
+              onClick={() => {
+                setMode(id);
+                playSfx('click');
+              }}
+            >
+              {id === 'DAILY' ? 'Hoy' : info.label}
             </button>
           ))}
         </div>

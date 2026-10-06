@@ -16,5 +16,8 @@ public record WaveBlueprint(
         double maxSpeed,
         boolean boss,
         double runnerChance,
-        double spitterChance) {
+        double spitterChance,
+        double exploderChance,
+        double screamerChance,
+        double blindChance) {
 }

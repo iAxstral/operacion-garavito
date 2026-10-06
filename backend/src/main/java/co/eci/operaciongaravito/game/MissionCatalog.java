@@ -66,7 +66,29 @@ public final class MissionCatalog {
                     site("a3-rectoria", "Rectoría", 3, 608, 288),
                     site("a3-centro-de-datos", "Centro de Datos", 3, 1760, 288),
                     site("a3-auditorio-principal", "Auditorio Principal", 3, 608, 1248),
-                    site("a3-sala-de-prensa", "Sala de Prensa", 3, 1760, 1248))));
+                    site("a3-sala-de-prensa", "Sala de Prensa", 3, 1760, 1248)),
+            Building.B, List.of(
+                    site("b1-laboratorio-de-fisica", "Laboratorio de Física", 1, 608, 288),
+                    site("b1-laboratorio-de-quimica", "Laboratorio de Química", 1, 1760, 288),
+                    site("b1-aula-101", "Aula 101", 1, 608, 1248),
+                    site("b1-cafeteria", "Cafetería", 1, 1760, 1248),
+                    site("b2-laboratorio-de-biologia", "Laboratorio de Biología", 2, 608, 288),
+                    site("b2-sala-de-matematicas", "Sala de Matemáticas", 2, 1888, 288),
+                    site("b2-salon-de-profesores", "Salón de Profesores", 2, 608, 1248),
+                    site("b2-armeria", "Armería", 2, 1760, 1248),
+                    site("b3-observatorio", "Observatorio", 3, 608, 288),
+                    site("b3-laboratorio-de-electronica", "Laboratorio de Electrónica", 3, 1760, 288),
+                    site("b3-deposito-de-reactivos", "Depósito de Reactivos", 3, 608, 1248),
+                    site("b3-sala-de-tutorias", "Sala de Tutorías", 3, 1760, 1248)),
+            Building.BIBLIOTECA, List.of(
+                    site("bib1-prestamo-y-devolucion", "Préstamo y Devolución", 1, 608, 288),
+                    site("bib1-hemeroteca", "Hemeroteca", 1, 1760, 288),
+                    site("bib1-sala-de-lectura", "Sala de Lectura", 1, 608, 1248),
+                    site("bib1-cafeteria", "Cafetería", 1, 1760, 1248),
+                    site("bib2-colecciones-especiales", "Colecciones Especiales", 2, 608, 288),
+                    site("bib2-sala-de-estudio-grupal", "Sala de Estudio Grupal", 2, 1888, 288),
+                    site("bib2-archivo-historico", "Archivo Histórico", 2, 608, 1248),
+                    site("bib2-armeria", "Armería", 2, 1760, 1248))));
 
     private MissionCatalog() {
     }

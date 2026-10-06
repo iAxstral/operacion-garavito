@@ -32,6 +32,7 @@ import { CAFETERIA_MENU, WEAPON_MACHINE_MENU } from '../game/shopCatalog';
 import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog';
 import { abilityFor, BARRICADE_COOLDOWN_MS, MAX_BARRICADES, priceFor } from '../game/abilityCatalog';
 import { roleInfo } from '../game/roleCatalog';
+import HudPortrait from './HudPortrait';
 import { displayName, nameWithRole } from '../game/profile';
 import { getStamina, onStaminaChange } from '../game/stamina';
 import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
@@ -94,6 +95,7 @@ function WeaponAction({ slot, equipped }) {
 
 function kinderStatus(wave, boss) {
   if (wave.victory) return `¡Edificio despejado! Superaron los ${wave.total} Kinders`;
+  if (wave.escaping) return `¡ESCAPEN! Corran a la salida del piso 1 — ${wave.escapeSeconds}s`;
   if (wave.bossStage) {
     const health = boss ? ` (${boss.health}/${boss.maxHealth})` : '';
     return `Kinder ${wave.number}/${wave.total} — ¡Derroten al Ingeniero de Sistemas!${health}`;
@@ -480,6 +482,17 @@ export default function Hud() {
       {health > 0 && health <= 30 && me?.lifeState !== 'DOWNED' && <div className="hud-low-health" aria-hidden="true" />}
 
       <div className="hud-top-left">
+        <div className="hud-portrait-row">
+        <HudPortrait
+          portrait={role.portrait}
+          name={role.name}
+          health={health}
+          downed={me?.lifeState === 'DOWNED'}
+          hurtKey={hurtKey}
+          hidden={Boolean(me?.hidingIn)}
+          escaped={Boolean(me?.escaped)}
+        />
+        <div className="hud-portrait-bars">
         <div className={`hud-health${health <= 30 ? ' hud-health--low' : ''}`}>
           <Icon name="heart" className="hud-health-heart" />
           <div className="hud-health-bar">
@@ -492,6 +505,8 @@ export default function Hud() {
           title={touch ? 'Energía: lleva el joystick al tope para correr' : 'Energía: mantén Espacio para correr'}
         >
           <div style={{ width: `${Math.round(stamina.value * 100)}%` }} />
+        </div>
+        </div>
         </div>
 
         <div className="hud-stats-row">
@@ -588,7 +603,7 @@ export default function Hud() {
         </div>
 
         {state.wave && (
-          <div className={`hud-wave${state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
+          <div className={`hud-wave${state.wave.escaping ? ' hud-wave--escape' : state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
             {kinderStatus(state.wave, state.boss)}
           </div>
         )}
@@ -640,6 +655,12 @@ export default function Hud() {
       {getNearEvent() && state.event && (
         <div className="hud-interact-hint">
           {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {state.event.type === 'BLACKOUT' ? 'Restablecer la luz' : 'Recoger los suministros'}
+        </div>
+      )}
+
+      {me?.escaped && !state.wave?.victory && (
+        <div className="hud-hidden hud-escaped" aria-live="polite">
+          <span>¡Escapaste! Esperando al resto del equipo…</span>
         </div>
       )}
 

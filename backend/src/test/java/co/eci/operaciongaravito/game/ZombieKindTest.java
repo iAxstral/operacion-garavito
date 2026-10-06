@@ -138,5 +138,9 @@ class ZombieKindTest {
         assertEquals(ZombieKind.RUNNER, WaveCurve.rollKind(WaveCurve.blueprint(2), 0.0));
         assertEquals(ZombieKind.WALKER, WaveCurve.rollKind(WaveCurve.blueprint(2), 0.3), "Kinder 2 sin escupidores");
         assertEquals(ZombieKind.SPITTER, WaveCurve.rollKind(WaveCurve.blueprint(3), 0.3));
+        assertEquals(ZombieKind.EXPLODER, WaveCurve.rollKind(WaveCurve.blueprint(3), 0.42));
+        assertEquals(ZombieKind.SCREAMER, WaveCurve.rollKind(WaveCurve.blueprint(3), 0.50));
+        assertEquals(ZombieKind.BLIND, WaveCurve.rollKind(WaveCurve.blueprint(3), 0.55));
+        assertEquals(ZombieKind.WALKER, WaveCurve.rollKind(WaveCurve.blueprint(3), 0.9));
     }
 }

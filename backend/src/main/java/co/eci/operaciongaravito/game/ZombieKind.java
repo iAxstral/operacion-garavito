@@ -10,7 +10,13 @@ public enum ZombieKind {
     /** Rapido y fragil: llega primero y apura al jugador, pero cae de un golpe. */
     RUNNER(1,     1.7,       40,     54,     300,        3),
     /** Lento: escupe acido a distancia (ver {@link Zombie#SPIT_RANGE_PX}); de cerca muerde. */
-    SPITTER(3,    0.8,       42,     58,     420,        4);
+    SPITTER(3,    0.8,       42,     58,     420,        4),
+    /** Revienta al alcanzarte (alcance = radio de la explosion) y tambien al morir. */
+    EXPLODER(2,   1.15,      40,     95,     520,        14),
+    /** Al verte grita y enfurece a los zombis cercanos; de cerca muerde flojo. */
+    SCREAMER(3,   0.9,       42,     58,     420,        3),
+    /** No ve: solo te encuentra si estas muy cerca o haces ruido (disparar, pegar, correr). */
+    BLIND(4,      1.25,      42,     60,     380,        6);
 
     private final int health;
     private final double speedFactor;

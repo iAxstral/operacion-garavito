@@ -16,7 +16,25 @@ public record GameStateMessage(
         List<BarricadeState> barricades,
         MatchSummary summary,
         KinderEvent event,
-        List<PuddleState> puddles) {
+        List<PuddleState> puddles,
+        List<BlastState> blasts,
+        List<String> unchanged,
+        boolean full) {
+
+    /** Estado completo (sin omitir nada). */
+    public GameStateMessage(List<PlayerState> players, Set<String> claimedItemIds, LastEvent lastEvent,
+            List<ZombieState> zombies, WaveState wave, List<DoorState> doors, LobbyState lobby, BossView boss,
+            List<ProjectileState> projectiles, List<BarricadeState> barricades, MatchSummary summary,
+            KinderEvent event, List<PuddleState> puddles) {
+        this(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles, barricades, summary,
+                event, puddles, List.of(), List.of(), true);
+    }
+
+    /** Copia con las explosiones que se estan viendo. */
+    public GameStateMessage withBlasts(List<BlastState> current) {
+        return new GameStateMessage(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles,
+                barricades, summary, event, puddles, current, unchanged, full);
+    }
 
     public static GameStateMessage eventOnly(LastEvent event) {
         return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of(), List.of(),

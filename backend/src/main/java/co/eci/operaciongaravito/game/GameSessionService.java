@@ -51,8 +51,59 @@ public class GameSessionService {
                 loseTargetMs, speedPxPerSecond, maxHealth, biteDamage, attackCooldownMs);
     }
 
+    // Metricas (Micrometer): salas, jugadores y zombis en vivo, cuanto tarda el tick de
+    // una sala y cuantos mensajes se mandan completos o livianos. Llegan por setter para
+    // que las pruebas que arman el servicio a mano no las necesiten.
+    private io.micrometer.core.instrument.Timer tickTimer;
+    private io.micrometer.core.instrument.Counter fullMessages;
+    private io.micrometer.core.instrument.Counter deltaMessages;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setMeterRegistry(io.micrometer.core.instrument.MeterRegistry registry) {
+        registry.gauge("garavito.rooms", sessions, Map::size);
+        registry.gauge("garavito.players", sessions,
+                all -> all.values().stream().mapToInt(GameSession::playerCount).sum());
+        registry.gauge("garavito.zombies", sessions,
+                all -> all.values().stream().mapToInt(GameSession::zombieCount).sum());
+        tickTimer = io.micrometer.core.instrument.Timer.builder("garavito.tick")
+                .description("Duracion del tick de una sala")
+                .publishPercentiles(0.5, 0.99)
+                .register(registry);
+        fullMessages = registry.counter("garavito.messages", "kind", "full");
+        deltaMessages = registry.counter("garavito.messages", "kind", "delta");
+    }
+
+    // Varios nodos (ver cluster/): que nodo tiene cada sala y la URL publica de este.
+    // Sin perfil cluster, un registro en memoria y nunca hay a donde redirigir.
+    private co.eci.operaciongaravito.cluster.RoomRegistry roomRegistry =
+            new co.eci.operaciongaravito.cluster.InMemoryRoomRegistry();
+    private String nodeUrl = "local";
+    private static final long REGISTRY_REFRESH_MS = 30_000;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setRoomRegistry(co.eci.operaciongaravito.cluster.RoomRegistry registry) {
+        this.roomRegistry = registry;
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setNodeUrl(@Value("${app.node.public-url:local}") String url) {
+        this.nodeUrl = url;
+    }
+
+    /** URL del nodo que tiene la sala si no es este, o null (la sala esta aqui o no existe). */
+    public String redirectFor(String gameId) {
+        if (sessions.containsKey(gameId)) {
+            return null;
+        }
+        String owner = roomRegistry.ownerOf(gameId);
+        return owner != null && !owner.equals(nodeUrl) ? owner : null;
+    }
+
     private static final long TICK_PERIOD_MS = 66;
     private static final long BROADCAST_PERIOD_MS = 125;
+    private static final java.util.Set<String> FULL_STATE_EVENTS = java.util.Set.of("LOBBY_OK", "JOIN_OK", "REJOIN_OK");
+    /** Un codificador de mensajes livianos por sala (ver DeltaEncoder). */
+    private final Map<String, DeltaEncoder> encoders = new ConcurrentHashMap<>();
 
     public static boolean isValidCode(String gameId) {
         return gameId != null && VALID_CODE.matcher(gameId).matches();
@@ -63,13 +114,21 @@ public class GameSessionService {
     }
 
     public GameSession create(String gameId, Building building) {
+        return create(gameId, building, GameMode.NORMAL);
+    }
+
+    public GameSession create(String gameId, Building building, GameMode mode) {
         if (!isValidCode(gameId)) {
+            return null;
+        }
+        // Con varios nodos, el codigo puede estar tomado en otro.
+        if (!roomRegistry.claim(gameId, nodeUrl)) {
             return null;
         }
         boolean[] created = { false };
         GameSession session = sessions.computeIfAbsent(gameId, id -> {
             created[0] = true;
-            GameSession fresh = new GameSession(id, building, bossConfig);
+            GameSession fresh = new GameSession(id, building, bossConfig, Difficulty.forMode(mode));
             startTicking(id);
             return fresh;
         });
@@ -93,6 +152,8 @@ public class GameSessionService {
             broadcast(gameId, session, null);
         } else {
             sessions.remove(gameId);
+            encoders.remove(gameId);
+            roomRegistry.release(gameId, nodeUrl);
         }
     }
 
@@ -137,7 +198,14 @@ public class GameSessionService {
     }
 
     public void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
-        messagingTemplate.convertAndSend("/topic/game/" + gameId, message(session, lastEvent));
+        // Al entrar o volver alguien va el estado completo: llega sin nada de antes.
+        boolean forceFull = lastEvent != null && FULL_STATE_EVENTS.contains(lastEvent.type());
+        GameStateMessage message = encoders.computeIfAbsent(gameId, id -> new DeltaEncoder())
+                .encode(message(session, lastEvent), forceFull);
+        if (fullMessages != null) {
+            (message.full() ? fullMessages : deltaMessages).increment();
+        }
+        messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }
 
     public void broadcastRejected(String gameId, LastEvent event) {
@@ -159,12 +227,13 @@ public class GameSessionService {
                 session.lastSummary(),
                 session.kinderEvent(),
                 session.puddleStates()
-        );
+        ).withBlasts(session.blastStates());
     }
 
     private void startTicking(String gameId) {
         long[] lastTickAt = { System.currentTimeMillis() };
         long[] lastBroadcastAt = { 0 };
+        long[] lastRegistryRefresh = { System.currentTimeMillis() };
 
         gameLoop.scheduleAtFixedRate(() -> {
             GameSession session = sessions.get(gameId);
@@ -173,6 +242,10 @@ public class GameSessionService {
             }
 
             expireSeats(gameId, session, System.currentTimeMillis());
+            if (System.currentTimeMillis() - lastRegistryRefresh[0] >= REGISTRY_REFRESH_MS) {
+                lastRegistryRefresh[0] = System.currentTimeMillis();
+                roomRegistry.refresh(gameId, nodeUrl);
+            }
             if (!sessions.containsKey(gameId)) {
                 throw new IllegalStateException("partida cerrada");
             }
@@ -187,7 +260,11 @@ public class GameSessionService {
                 double deltaSeconds = Math.min(0.25, (now - lastTickAt[0]) / 1000.0);
                 lastTickAt[0] = now;
 
-                session.tick(now, deltaSeconds);
+                if (tickTimer != null) {
+                    tickTimer.record(() -> session.tick(now, deltaSeconds));
+                } else {
+                    session.tick(now, deltaSeconds);
+                }
                 for (MatchSummary summary = session.pollSummaryToSave(); summary != null; summary = session.pollSummaryToSave()) {
                     history.saveAsync(summary);
                 }

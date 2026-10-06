@@ -1,6 +1,8 @@
 package co.eci.operaciongaravito.history;
 
 import co.eci.operaciongaravito.game.Building;
+import co.eci.operaciongaravito.game.Difficulty;
+import co.eci.operaciongaravito.game.GameMode;
 import co.eci.operaciongaravito.game.MatchSummary;
 import jakarta.annotation.PreDestroy;
 import java.time.Instant;
@@ -46,7 +48,8 @@ public class MatchHistoryService {
     @Transactional
     public MatchRecord save(MatchSummary summary) {
         MatchRecord record = new MatchRecord(summary.building().name(), summary.victory(),
-                summary.kinderReached(), summary.durationSeconds(), Instant.now());
+                summary.kinderReached(), summary.durationSeconds(), Instant.now(),
+                summary.mode() == null ? GameMode.NORMAL.name() : summary.mode().name());
         summary.players().forEach(p -> record.addPlayer(new MatchPlayerRecord(
                 p.role(), p.kills(), p.missions(), p.garavitosEarned(), p.damageTaken(), p.revives(), p.downs(),
                 p.name())));
@@ -54,7 +57,7 @@ public class MatchHistoryService {
     }
 
     /** Lo que muestra el ranking de un edificio. */
-    public record Ranking(String building, long matches, long victories, List<RankedMatch> best) {
+    public record Ranking(String building, long matches, long victories, List<RankedMatch> best, String mode) {
     }
 
     public record RankedMatch(long id, boolean victory, int kinderReached, long durationSeconds, Instant playedAt,
@@ -63,13 +66,28 @@ public class MatchHistoryService {
 
     @Transactional(readOnly = true)
     public Ranking ranking(Building building) {
+        return ranking(building, GameMode.NORMAL);
+    }
+
+    /**
+     * Ranking de un edificio en un modo. El desafio del dia solo cuenta las partidas de
+     * hoy (hora de Bogota), porque cada dia la regla es otra.
+     */
+    @Transactional(readOnly = true)
+    public Ranking ranking(Building building, GameMode mode) {
+        java.time.Instant since = mode == GameMode.DAILY
+                ? java.time.LocalDate.now(Difficulty.ZONE).atStartOfDay(Difficulty.ZONE).toInstant()
+                : Instant.EPOCH;
         List<RankedMatch> best = repository
-                .findTop10ByBuildingOrderByVictoryDescKinderReachedDescDurationSecondsAsc(building.name())
+                .findTop10ByBuildingAndModeAndPlayedAtGreaterThanEqualOrderByVictoryDescKinderReachedDescDurationSecondsAsc(
+                        building.name(), mode.name(), since)
                 .stream()
                 .map(MatchHistoryService::toRanked)
                 .toList();
-        return new Ranking(building.name(), repository.countByBuilding(building.name()),
-                repository.countByBuildingAndVictoryTrue(building.name()), best);
+        return new Ranking(building.name(),
+                repository.countByBuildingAndModeAndPlayedAtGreaterThanEqual(building.name(), mode.name(), since),
+                repository.countByBuildingAndModeAndPlayedAtGreaterThanEqualAndVictoryTrue(building.name(), mode.name(), since),
+                best, mode.name());
     }
 
     private static RankedMatch toRanked(MatchRecord record) {

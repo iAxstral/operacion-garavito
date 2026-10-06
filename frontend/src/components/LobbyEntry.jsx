@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { generateLobbyCode, openLobby } from '../game/gameSync';
+import { DAILY_RULES, MODES, fetchDailyChallenge } from '../game/gameModes';
+import { buildingLabel } from '../game/mapLayout';
 import { playSfx } from '../game/sfx';
 import HalloweenCreatures from './HalloweenCreatures';
 
@@ -53,6 +55,15 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [mode, setMode] = useState('NORMAL');
+  const [daily, setDaily] = useState(null);
+  useEffect(() => {
+    let cancelled = false;
+    fetchDailyChallenge().then((value) => !cancelled && setDaily(value));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const crop = useTallScreen() ? CROP_TALL : CROP_WIDE;
   const [cx, cy, cw, ch] = crop;
 
@@ -72,7 +83,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
   const handleCreate = () => run(async () => {
     for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt += 1) {
       try {
-        const created = await openLobby(generateLobbyCode(), true, building);
+        const created = await openLobby(generateLobbyCode(), true, building, false, mode);
         onEntered(created);
         return;
       } catch (err) {
@@ -118,7 +129,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
             style={{ left: `${((x - cx) / cw) * 100}%`, top: `${((y - cy) / ch) * 100}%` }}
           />
         ))}
-        <span className="lobby-building-tag">Edificio {building}</span>
+        <span className="lobby-building-tag">{buildingLabel(building)}</span>
 
         <button
           type="button"
@@ -161,6 +172,31 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
           aria-label="Volver"
         />
       </form>
+
+      <div className="lobby-modes" role="radiogroup" aria-label="Modo de la sala nueva">
+        {Object.entries(MODES).map(([id, info]) => (
+          <button
+            key={id}
+            type="button"
+            role="radio"
+            aria-checked={mode === id}
+            className={`lobby-mode${mode === id ? ' lobby-mode--active' : ''} lobby-mode--${id.toLowerCase()}`}
+            title={info.text}
+            onClick={() => {
+              playSfx('click');
+              setMode(id);
+            }}
+          >
+            {info.label}
+          </button>
+        ))}
+      </div>
+      <p className="lobby-mode-help">
+        {mode === 'DAILY' && daily?.rule
+          ? `Hoy: ${DAILY_RULES[daily.rule]?.label} — ${DAILY_RULES[daily.rule]?.text}`
+          : MODES[mode].text}
+        {' '}<small>(solo al crear la sala; al unirte juegas el modo de esa sala)</small>
+      </p>
 
       <HalloweenCreatures bats={3} spiders={0} />
 
