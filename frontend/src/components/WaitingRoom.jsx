@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ROLE_CATALOG, roleInfo } from '../game/roleCatalog';
 import { getLobbyCode, getMyRole, onStateChange, startGame } from '../game/gameSync';
 import HalloweenCreatures from './HalloweenCreatures';
+import { DAILY_RULES, MODES } from '../game/gameModes';
 
 export default function WaitingRoom({ onStarted, onLeave }) {
   const [state, setState] = useState({ players: [], lobby: null });
@@ -23,6 +24,12 @@ export default function WaitingRoom({ onStarted, onLeave }) {
       <div className="role-select-content">
         <p className="main-menu-kicker">Código de la sala</p>
         <h2 className="waiting-code">{getLobbyCode()}</h2>
+        {state.lobby?.mode && state.lobby.mode !== 'NORMAL' && (
+          <p className={`waiting-mode lobby-mode--${state.lobby.mode.toLowerCase()}`}>
+            {MODES[state.lobby.mode]?.label}
+            {state.lobby.dailyRule && ` · ${DAILY_RULES[state.lobby.dailyRule]?.label}: ${DAILY_RULES[state.lobby.dailyRule]?.text}`}
+          </p>
+        )}
         <p className="lobby-help">Comparte este código con tu equipo. Deben estar en la misma red Wi-Fi.</p>
 
         <div className="waiting-players">
