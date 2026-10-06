@@ -10,7 +10,7 @@ import {
   onAbilityPanelChange,
   setAbilityPanel,
 } from '../game/gameSync';
-import { buildFloorLayout, floorCount, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
+import { buildFloorLayout, buildingLabel, floorCount, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
 import { missionSitesFor } from '../game/missionCatalog';
 import { CAMERA_RANGE_PX } from '../game/abilityCatalog';
 import { playSfx } from '../game/sfx';
@@ -174,7 +174,7 @@ export default function PhonePanel() {
   return (
     <div className="phone-panel" role="dialog" aria-label="Teléfono de cámaras">
       <div className="phone-header">
-        <span>📱 Cámaras — Edificio {building}</span>
+        <span>📱 Cámaras — {buildingLabel(building)}</span>
         <button type="button" className="modal-close phone-close" aria-label="Guardar el teléfono" onClick={() => setAbilityPanel(null)}>✕</button>
       </div>
       <div className="phone-tabs">

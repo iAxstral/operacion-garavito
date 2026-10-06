@@ -5,7 +5,7 @@ import { playSfx } from '../game/sfx';
 import Icon from './Icon';
 import { MODES } from '../game/gameModes';
 
-const BUILDINGS = ['F', 'C', 'G', 'A'];
+import { BUILDINGS } from '../game/mapLayout';
 const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 const formatDate = (iso) => new Date(iso).toLocaleDateString('es-CO', { day: '2-digit', month: 'short' });
 
@@ -63,7 +63,7 @@ export default function RankingPanel({ onClose, initialBuilding = 'F' }) {
                 playSfx('click');
               }}
             >
-              Edificio {id}
+              {id === 'BIBLIOTECA' ? 'Biblioteca' : id}
             </button>
           ))}
         </div>

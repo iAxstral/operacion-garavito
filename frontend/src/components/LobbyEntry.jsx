@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { generateLobbyCode, openLobby } from '../game/gameSync';
 import { DAILY_RULES, MODES, fetchDailyChallenge } from '../game/gameModes';
+import { buildingLabel } from '../game/mapLayout';
 import { playSfx } from '../game/sfx';
 import HalloweenCreatures from './HalloweenCreatures';
 
@@ -128,7 +129,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
             style={{ left: `${((x - cx) / cw) * 100}%`, top: `${((y - cy) / ch) * 100}%` }}
           />
         ))}
-        <span className="lobby-building-tag">Edificio {building}</span>
+        <span className="lobby-building-tag">{buildingLabel(building)}</span>
 
         <button
           type="button"

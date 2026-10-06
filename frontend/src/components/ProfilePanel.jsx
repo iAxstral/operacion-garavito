@@ -4,6 +4,7 @@ import { getBag } from '../game/costumes';
 import { favoriteRole, getProfileStats } from '../game/playerStats';
 import { MAX_NICKNAME, cleanNickname, getNickname, setNickname } from '../game/profile';
 import { roleInfo } from '../game/roleCatalog';
+import { buildingLabel } from '../game/mapLayout';
 import Icon from './Icon';
 
 const formatHours = (seconds) => {
@@ -92,7 +93,7 @@ export default function ProfilePanel({ onClose }) {
               {stats.history.map((run) => (
                 <li key={run.at} className={run.victory ? 'profile-history--win' : ''}>
                   <span>{formatDate(run.at)}</span>
-                  <span>Edificio {run.building}</span>
+                  <span>{buildingLabel(run.building)}</span>
                   <span>{roleInfo(run.role).name}</span>
                   <span>{run.victory ? '¡Escaparon!' : `Kinder ${run.kinder}`}</span>
                   <span>{run.kills} zombis</span>
