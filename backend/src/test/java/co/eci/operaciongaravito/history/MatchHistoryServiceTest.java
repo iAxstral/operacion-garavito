@@ -57,6 +57,23 @@ class MatchHistoryServiceTest {
     }
 
     @Test
+    @DisplayName("el ranking es por modo: las partidas dificiles no se mezclan con las normales")
+    void rankingByMode() {
+        history.save(summary(true, 5, 700, 5));
+        MatchSummary hard = summary(false, 2, 300, 4);
+        history.save(new MatchSummary(hard.id(), hard.building(), hard.victory(), hard.kinderReached(),
+                hard.durationSeconds(), hard.players(), co.eci.operaciongaravito.game.GameMode.HARD));
+
+        MatchHistoryService.Ranking normal = history.ranking(Building.C);
+        assertEquals(1, normal.matches());
+        assertEquals("NORMAL", normal.mode());
+        MatchHistoryService.Ranking hardRanking = history.ranking(Building.C, co.eci.operaciongaravito.game.GameMode.HARD);
+        assertEquals(1, hardRanking.matches());
+        assertEquals(2, hardRanking.best().get(0).kinderReached());
+        assertEquals(0, history.ranking(Building.C, co.eci.operaciongaravito.game.GameMode.DAILY).matches());
+    }
+
+    @Test
     @DisplayName("el ranking es por edificio")
     void rankingIsPerBuilding() {
         history.save(summary(true, 5, 500, 9));
