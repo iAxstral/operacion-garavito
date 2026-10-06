@@ -951,3 +951,70 @@ kbd {
 @media (prefers-reduced-motion: reduce) {
   .credits-roll { animation: none; top: 50%; transform: translate(-50%, -50%); max-height: 90vh; overflow-y: auto; }
 }
+
+/* Retrato animado del rol */
+.hud-portrait-row { display: flex; align-items: center; gap: 8px; }
+.hud-portrait-bars { display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1; }
+.hud-portrait { flex: none; width: 56px; height: 56px; }
+.hud-portrait-frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 2px solid #8a5a2a;
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 35%, #3a1e18, #120708);
+  box-shadow: 0 0 8px #000a, inset 0 0 10px #000c;
+}
+.hud-portrait-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  image-rendering: pixelated;
+  transform-origin: 50% 90%;
+  animation: portrait-breathe 3.2s ease-in-out infinite;
+  transition: filter 0.4s;
+}
+.hud-portrait-blood {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0;
+  background:
+    radial-gradient(circle at 20% 15%, #a0000088 0 18%, transparent 30%),
+    radial-gradient(circle at 80% 70%, #7a000099 0 14%, transparent 26%),
+    linear-gradient(transparent 55%, #5a0000aa);
+  transition: opacity 0.4s;
+}
+.hud-portrait-frame--hit { animation: portrait-hit 0.38s ease-out; }
+.hud-portrait-frame--hit::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: #ff1a1a;
+  mix-blend-mode: multiply;
+  animation: portrait-flash 0.38s ease-out forwards;
+}
+.hud-portrait--hurt .hud-portrait-blood { opacity: 0.45; }
+.hud-portrait--critical .hud-portrait-blood { opacity: 1; }
+.hud-portrait--critical .hud-portrait-frame { border-color: #c01010; animation: portrait-alarm 0.9s ease-in-out infinite; }
+.hud-portrait--critical img { animation-duration: 1s; filter: saturate(0.7); }
+.hud-portrait--downed img { filter: grayscale(1) brightness(0.6); transform: rotate(-12deg) translateY(4px); animation: none; }
+.hud-portrait--downed .hud-portrait-frame { border-color: #555; }
+.hud-portrait--hidden img { filter: brightness(0.35); animation-duration: 5s; }
+.hud-portrait--escaped .hud-portrait-frame { border-color: #3cff7a; box-shadow: 0 0 14px #3cff7a99; }
+@keyframes portrait-breathe { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.035) translateY(-1px); } }
+@keyframes portrait-hit {
+  0% { transform: translate(0, 0) rotate(0); }
+  20% { transform: translate(-4px, 1px) rotate(-4deg); }
+  45% { transform: translate(4px, -1px) rotate(3deg); }
+  70% { transform: translate(-2px, 0) rotate(-1deg); }
+  100% { transform: none; }
+}
+@keyframes portrait-flash { from { opacity: 0.85; } to { opacity: 0; } }
+@keyframes portrait-alarm { 0%, 100% { box-shadow: 0 0 4px #c0101066; } 50% { box-shadow: 0 0 14px #ff2a2acc; } }
+@media (max-width: 520px) { .hud-portrait { width: 42px; height: 42px; } }
+@media (prefers-reduced-motion: reduce) {
+  .hud-portrait-frame img, .hud-portrait-frame--hit, .hud-portrait--critical .hud-portrait-frame { animation: none; }
+}
