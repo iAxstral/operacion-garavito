@@ -49,6 +49,7 @@ public class WaveDirector {
     /** Se cumplio la cuota (o cayo el jefe) pero faltan misiones: la horda sigue llegando. */
     private boolean waitingForMissions;
     private long escapeEndsAt;
+    private Difficulty difficulty = Difficulty.NORMAL;
 
     public WaveDirector(long now, long startDelayMs, List<FloorGrid> floors) {
         this.nextEventAt = now + startDelayMs;
@@ -84,6 +85,10 @@ public class WaveDirector {
             case ACTIVE -> kinder;
             case ESCAPE, VICTORY -> 0;
         };
+    }
+
+    public synchronized void setDifficulty(Difficulty difficulty) {
+        this.difficulty = difficulty == null ? Difficulty.NORMAL : difficulty;
     }
 
     public synchronized boolean isEscaping() {
@@ -230,7 +235,7 @@ public class WaveDirector {
     }
 
     private List<Zombie> spawnBurst(int alive, Collection<Player> players) {
-        int room = WaveCurve.maxAlive(blueprint, players.size()) - alive;
+        int room = (int) Math.round(WaveCurve.maxAlive(blueprint, players.size()) * difficulty.maxAliveFactor()) - alive;
         return spawn(Math.min(blueprint.spawnBurst(), room), players);
     }
 
@@ -261,15 +266,18 @@ public class WaveDirector {
             List<Player> onFloor = living.stream().filter(p -> p.getFloor() == floor).toList();
             FloorGrid.SpawnPoint point = pickSpawnPoint(floors.get(floor - 1).spawnPoints(), onFloor, random);
             ZombieKind kind = WaveCurve.rollKind(blueprint, random.nextDouble());
-            int health = kind.health() > 0 ? kind.health() : WaveCurve.rollHealth(blueprint, random.nextDouble());
-            burst.add(new Zombie(
+            int health = difficulty.scaleHealth(
+                    kind.health() > 0 ? kind.health() : WaveCurve.rollHealth(blueprint, random.nextDouble()));
+            Zombie zombie = new Zombie(
                     "z" + (++zombieSequence),
                     floor,
                     point.x(),
                     point.y(),
                     health,
-                    WaveCurve.rollSpeed(blueprint, random.nextDouble()) * kind.speedFactor(),
-                    kind));
+                    WaveCurve.rollSpeed(blueprint, random.nextDouble()) * kind.speedFactor() * difficulty.speedFactor(),
+                    kind);
+            zombie.setBiteBonus(difficulty.biteBonus());
+            burst.add(zombie);
         }
         return burst;
     }

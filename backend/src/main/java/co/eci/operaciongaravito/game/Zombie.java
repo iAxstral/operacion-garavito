@@ -56,6 +56,8 @@ public class Zombie {
 
     /** Explosivo: dano de la explosion pendiente (0 si no hay). */
     private int pendingBlast;
+    /** Daño extra de mordida por el modo de la sala (dificil o desafio del dia). */
+    private volatile int biteBonus;
     /** Griton: la preparacion en curso es un grito; y si ya termino de gritar. */
     private volatile boolean screaming;
     private boolean screamPending;
@@ -98,6 +100,10 @@ public class Zombie {
         AcidProjectile acid = pendingAcid;
         pendingAcid = null;
         return acid;
+    }
+
+    public void setBiteBonus(int bonus) {
+        biteBonus = Math.max(0, bonus);
     }
 
     public String getId() {
@@ -251,7 +257,7 @@ public class Zombie {
                     }
                     if (kind == ZombieKind.EXPLODER) {
                         // No muerde: revienta (el dano a todos lo reparte GameSession).
-                        pendingBlast = kind.biteDamage();
+                        pendingBlast = kind.biteDamage() + biteBonus;
                         health = 0;
                         return false;
                     }
@@ -260,7 +266,7 @@ public class Zombie {
                             && bitten.isAlive()
                             && bitten.getFloor() == floor
                             && distanceTo(bitten) <= (tough ? TOUGH_BITE_REACH_PX : kind.reachPx())
-                            && bitten.takeBite(tough ? TOUGH_BITE_DAMAGE : kind.biteDamage(), now);
+                            && bitten.takeBite((tough ? TOUGH_BITE_DAMAGE : kind.biteDamage()) + biteBonus, now);
                 }
             }
             case STRIKE, STAGGER -> {
