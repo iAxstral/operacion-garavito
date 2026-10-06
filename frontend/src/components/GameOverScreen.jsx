@@ -7,6 +7,7 @@ import Icon from './Icon';
 import { earnAchievements } from '../game/achievements';
 import { creditRun } from '../game/costumes';
 import Credits from './Credits';
+import { recordRun } from '../game/playerStats';
 
 const OUTCOMES = {
   TEAM_WIPED: {
@@ -59,6 +60,7 @@ export default function GameOverScreen({ onExitToMenu }) {
     const runSummary = getLatestState().summary ?? null;
     setSummary(runSummary);
     setEarned(earnAchievements(runSummary, getMyRole()));
+    recordRun(runSummary, getMyRole());
     const mine = runSummary?.players?.find((p) => p.role === getMyRole());
     setCandies(runSummary ? creditRun(runSummary.id, mine?.candies ?? 0) : 0);
     setInputLocked(true);
