@@ -8,6 +8,7 @@ import { pollGamepad } from './gamepad';
 import { bakeCostumes, costumeKey, COSTUME_LAYOUT, HEAD_Y, NECK_Y } from './costumeArt';
 import { setStamina } from './stamina';
 import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
+import { NIGHT_CONE_FACTOR } from './gameModes';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { CHAT_PHRASES, EMOTES, PING_KINDS } from './voice';
@@ -1173,7 +1174,8 @@ export default class MainScene extends Phaser.Scene {
     // La linterna apunta hacia donde mira el jugador (o el compañero que se espectea).
     const watched = this.spectating ? this.remotePlayers.get(getSpectateTarget()) : null;
     const flashlightAim = this.spectating ? (watched?.aim ?? null) : this.aimAngle;
-    this.lighting.coneFactor = !this.spectating && hasPerk(getMyPlayerState(), 'LINTERNA') ? LINTERNA_CONE_FACTOR : 1;
+    this.lighting.coneFactor = (!this.spectating && hasPerk(getMyPlayerState(), 'LINTERNA') ? LINTERNA_CONE_FACTOR : 1)
+      * (getLatestState().lobby?.dailyRule === 'NOCHE_CERRADA' ? NIGHT_CONE_FACTOR : 1);
     this.lighting.update(time, this.focusSprite(), this.remotePlayers, flashlightAim);
     const ear = this.focusSprite();
     if (ear) setListener(ear.x, ear.y, this.floor);
