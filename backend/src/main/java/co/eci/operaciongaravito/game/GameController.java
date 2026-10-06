@@ -51,6 +51,7 @@ public class GameController {
             return;
         }
         session.setPlayerName(request.role(), request.name());
+        session.setPlayerCostume(request.role(), request.costume());
         sessionService.registerSeat(headers.getSessionId(), gameId, request.role());
         sessionService.broadcast(gameId, session, LastEvent.joinOk(request.role(), request.clientId()));
     }
@@ -64,6 +65,7 @@ public class GameController {
             return;
         }
         session.setPlayerName(request.role(), request.name());
+        session.setPlayerCostume(request.role(), request.costume());
         sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
     }
 

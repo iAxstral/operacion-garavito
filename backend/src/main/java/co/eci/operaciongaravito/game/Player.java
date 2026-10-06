@@ -50,6 +50,8 @@ public class Player {
     private int statDamage;
     private int statRevives;
     private int statDowns;
+    /** Dulces que solto la horda a este jugador en la corrida (se guardan en su navegador). */
+    private int statCandies;
 
     /** Ultima posicion aceptada (para validar la siguiente) y ultima correccion enviada. */
     private volatile long lastMoveAt = 0;
@@ -70,6 +72,13 @@ public class Player {
     private volatile long hiddenUntil = 0;
     private volatile long hideReadyAt = 0;
 
+    /** Disfraz que lleva puesto (cosmetico, ver COSTUMES), o null. */
+    private volatile String costume = null;
+
+    /** Disfraces que existen: el cliente los vende y los dibuja; aqui solo se valida el id. */
+    public static final java.util.Set<String> COSTUMES = java.util.Set.of(
+            "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA");
+
     /** Apodo que eligio el jugador, o null (entonces se le llama por su rol). */
     private volatile String name = null;
     /** Ultimo aviso al equipo (pings): se limita para que nadie llene la pantalla. */
@@ -84,6 +93,23 @@ public class Player {
 
     public String getName() {
         return name;
+    }
+
+    public String getCostume() {
+        return costume;
+    }
+
+    /** Solo acepta disfraces que existen; cualquier otra cosa lo deja sin disfraz. */
+    public void setCostume(String id) {
+        costume = id != null && COSTUMES.contains(id) ? id : null;
+    }
+
+    public synchronized void addCandies(int amount) {
+        statCandies += amount;
+    }
+
+    public synchronized int getCandies() {
+        return statCandies;
     }
 
     public String getHidingIn() {
@@ -517,10 +543,12 @@ public class Player {
     }
 
     public synchronized MatchSummary.PlayerSummary statsSnapshot() {
-        return new MatchSummary.PlayerSummary(role, statKills, statMissions, statEarned, statDamage, statRevives, statDowns, name);
+        return new MatchSummary.PlayerSummary(role, statKills, statMissions, statEarned, statDamage, statRevives, statDowns, name,
+                statCandies);
     }
 
     public synchronized void resetStats() {
+        statCandies = 0;
         statKills = 0;
         statMissions = 0;
         statEarned = 0;
@@ -560,6 +588,7 @@ public class Player {
         y = 800;
         lastMoveAt = 0;
         rejectedMoves = 0;
+        statCandies = 0;
         statKills = 0;
         statMissions = 0;
         statEarned = 0;

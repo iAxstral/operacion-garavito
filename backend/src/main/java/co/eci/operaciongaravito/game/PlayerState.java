@@ -27,5 +27,7 @@ public record PlayerState(
         boolean connected,
         String name,
         String hidingIn,
-        long hiddenMs) {
+        long hiddenMs,
+        int candies,
+        String costume) {
 }
