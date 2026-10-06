@@ -2,6 +2,7 @@
 import { API_BASE, socketService } from '../services/socketService';
 import { getNickname } from './profile';
 import { getEquippedCostume } from './costumes';
+import { mergeDelta } from './deltaMerge';
 
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -151,7 +152,7 @@ function awaitEvent(predicate) {
 
 function handleMessage(body) {
   latestState = {
-    ...body,
+    ...mergeDelta(body, latestState),
     lastEvent: body.lastEvent ?? latestState.lastEvent,
   };
   if (body.lastEvent) {
