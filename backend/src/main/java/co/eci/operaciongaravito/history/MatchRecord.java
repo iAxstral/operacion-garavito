@@ -40,6 +40,10 @@ public class MatchRecord {
     @Column(name = "played_at", nullable = false)
     private Instant playedAt;
 
+    /** NORMAL, HARD o DAILY (V3). */
+    @Column(nullable = false, length = 16)
+    private String mode = "NORMAL";
+
     @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
     private List<MatchPlayerRecord> players = new ArrayList<>();
 
@@ -52,6 +56,16 @@ public class MatchRecord {
         this.kinderReached = kinderReached;
         this.durationSeconds = durationSeconds;
         this.playedAt = playedAt;
+    }
+
+    public MatchRecord(String building, boolean victory, int kinderReached, long durationSeconds, Instant playedAt,
+                       String mode) {
+        this(building, victory, kinderReached, durationSeconds, playedAt);
+        this.mode = mode;
+    }
+
+    public String getMode() {
+        return mode;
     }
 
     public void addPlayer(MatchPlayerRecord player) {

@@ -11,4 +11,13 @@ public interface MatchRecordRepository extends JpaRepository<MatchRecord, Long> 
     long countByBuilding(String building);
 
     long countByBuildingAndVictoryTrue(String building);
+
+    /** Igual, pero de un modo y desde una fecha (el desafio del dia solo cuenta las de hoy). */
+    List<MatchRecord> findTop10ByBuildingAndModeAndPlayedAtGreaterThanEqualOrderByVictoryDescKinderReachedDescDurationSecondsAsc(
+            String building, String mode, java.time.Instant since);
+
+    long countByBuildingAndModeAndPlayedAtGreaterThanEqual(String building, String mode, java.time.Instant since);
+
+    long countByBuildingAndModeAndPlayedAtGreaterThanEqualAndVictoryTrue(String building, String mode,
+                                                                        java.time.Instant since);
 }
