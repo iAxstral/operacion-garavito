@@ -6,7 +6,14 @@ import { channelVolume, onSettingsChange } from './settings';
 // (canal "Ambiente" de la configuracion). Suena desde el primer toque del jugador, que
 // es cuando el navegador deja arrancar el audio.
 
-const BASE_GAIN = 0.55;
+// Afuera (menus) suena claro; adentro del edificio, mas bajo y apagado, como si el
+// viento, las puertas y los gemidos vinieran de otros pisos.
+const MODES = {
+  outdoor: { gain: 0.55, cutoff: 12000 },
+  indoor: { gain: 0.32, cutoff: 750 },
+};
+let mode = 'outdoor';
+let muffle = null;
 const WIND_SECONDS = 4;
 
 let master = null;
@@ -18,7 +25,7 @@ let unsubscribeSettings = null;
 function applyVolume() {
   const ctx = audio();
   if (!ctx || !master) return;
-  const target = playing ? BASE_GAIN * channelVolume('ambient') : 0;
+  const target = playing ? MODES[mode].gain * channelVolume('ambient') : 0;
   master.gain.cancelScheduledValues(ctx.currentTime);
   master.gain.setTargetAtTime(target, ctx.currentTime, 0.6);
 }
@@ -149,15 +156,23 @@ function scheduleEvent() {
   }, 6000 + Math.random() * 9000);
 }
 
-export function startAmbience() {
+/** Arranca (o pasa de afuera a adentro) el ambiente: 'outdoor' en menus, 'indoor' en la partida. */
+export function startAmbience(nextMode = 'outdoor') {
   const ctx = audio();
   if (!ctx) return;
   if (!master) {
     master = ctx.createGain();
     master.gain.value = 0;
-    master.connect(ctx.destination);
+    muffle = ctx.createBiquadFilter();
+    muffle.type = 'lowpass';
+    master.connect(muffle).connect(ctx.destination);
   }
-  if (playing) return;
+  mode = MODES[nextMode] ? nextMode : 'outdoor';
+  muffle.frequency.setTargetAtTime(MODES[mode].cutoff, ctx.currentTime, 0.8);
+  if (playing) {
+    applyVolume();
+    return;
+  }
   playing = true;
   windNodes = startWind(ctx);
   applyVolume();
