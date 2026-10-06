@@ -5,7 +5,7 @@ import { mergeDelta } from './deltaMerge.js';
 const before = {
   doors: [{ doorId: 'd1', open: true }],
   lobby: { started: true },
-  players: [{ playerId: 'SALUD', x: 1, inventory: ['a'], missions: ['m'], name: 'Ana', costume: 'BRUJA' }],
+  players: [{ playerId: 'SALUD', x: 1, inventory: ['a'], missions: ['m'], name: 'Ana', costume: 'BRUJA', perks: ['ENERGIA'], perkOffer: [] }],
 };
 
 test('lo que el servidor marca sin cambios se conserva', () => {
@@ -19,7 +19,7 @@ test('el jugador con staticOmitted recupera inventario, misiones, apodo y disfra
     players: [{ playerId: 'SALUD', x: 9, staticOmitted: true, inventory: null, missions: null, name: null, costume: null }],
   }, before);
   assert.deepEqual(merged.players[0], {
-    playerId: 'SALUD', x: 9, staticOmitted: true, inventory: ['a'], missions: ['m'], name: 'Ana', costume: 'BRUJA',
+    playerId: 'SALUD', x: 9, staticOmitted: true, inventory: ['a'], missions: ['m'], name: 'Ana', costume: 'BRUJA', perks: ['ENERGIA'], perkOffer: [],
   });
 });
 
