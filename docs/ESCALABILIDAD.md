@@ -93,6 +93,16 @@ por segundo a cada jugador aunque casi nada cambie:
 - Redondear posiciones y usar nombres cortos de campos (o un formato binario).
 - Estimado: bajar a ~1 KB por estado, ~3–4× menos tráfico.
 
+**Hecho (`DeltaEncoder`, 2026-10-06):** cada sala tiene un codificador que recuerda lo
+último enviado. Puertas, sala, barricadas, objetos recogidos, resumen y evento del Kinder
+se omiten si no cambiaron (el mensaje los nombra en `unchanged`), y de cada jugador se
+omiten inventario, misiones, apodo y disfraz si son iguales (`staticOmitted`). Cada 16
+mensajes (2 s) y cuando alguien entra o vuelve va el estado completo, así quien llega
+tarde o perdió un mensaje se pone al día. El cliente completa lo omitido
+(`frontend/src/game/deltaMerge.js`). Medido en `DeltaEncoderTest` con 4 jugadores
+al empezar: **4 328 B → 2 252 B por mensaje (48 % menos)**. Lo que sigue pesando son
+las posiciones y los zombis; el siguiente paso sería redondearlas y acortar nombres.
+
 ### 4.2 Varios nodos (escalado horizontal)
 
 Las salas no comparten estado, así que se reparten por **código de sala**:
