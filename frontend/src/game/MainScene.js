@@ -19,6 +19,9 @@ import {
   getMyRole,
   getBoss,
   getProjectiles,
+  loadHideSpots,
+  setNearHide,
+  requestHide,
   getPuddles,
   getZombies,
   isInputLocked,
@@ -59,7 +62,7 @@ import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
 import Lighting from './Lighting';
-import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY } from './HauntedDecor';
+import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY, LOCKER_KEY } from './HauntedDecor';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
 const DASH_SPEED = 420;
@@ -314,6 +317,35 @@ export default class MainScene extends Phaser.Scene {
     return nudge;
   }
 
+  // Armarios: E junto a uno libre para esconderse y E otra vez para salir. Mientras
+  // esta adentro el jugador no se mueve ni ataca. Devuelve true si esta escondido.
+  updateHide() {
+    const me = getMyPlayerState();
+    const hiddenIn = me?.hidingIn ?? null;
+    const occupied = new Set(getLatestState().players.map((p) => p.hidingIn).filter(Boolean));
+    let near = null;
+    if (!hiddenIn && !this.spectating) {
+      this.lockers.forEach((locker) => {
+        const distance = Math.hypot(this.player.x - locker.x, this.player.y - locker.y);
+        if (distance <= 70 && !occupied.has(locker.id) && (!near || distance < near.distance)) near = { ...locker, distance };
+      });
+    }
+    setNearHide(hiddenIn ? { hidden: true, ms: me.hiddenMs } : near && { id: near.id });
+    this.lockers.forEach((locker) => {
+      // El armario ocupado tiembla un poco de vez en cuando.
+      const shaking = occupied.has(locker.id) && Math.random() < 0.04;
+      locker.image.setX(locker.x + (shaking ? (Math.random() - 0.5) * 3 : 0));
+    });
+    if ((near || hiddenIn) && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      requestHide();
+      const locker = this.lockers.find((l) => l.id === (hiddenIn ?? near.id));
+      if (locker) playSample(hiddenIn ? 'doorOpen' : 'doorClose', { channel: 'ambient', volume: 0.6, rate: 1.4 });
+    }
+    this.player.setAlpha(hiddenIn ? 0.12 : 1);
+    this.playerShadow?.setVisible(!hiddenIn && this.player.visible);
+    return Boolean(hiddenIn);
+  }
+
   // Superficie bajo los pies: escalera y descanso de madera, el resto baldosa/concreto.
   surfaceAt(x, y) {
     const cell = this.layoutGrid?.[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
@@ -546,6 +578,14 @@ export default class MainScene extends Phaser.Scene {
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
     this.pingLayer = new PingLayer(this);
+    this.lockers = [];
+    loadHideSpots(getMyBuilding()).then((spots) => {
+      if (!this.sys.isActive()) return;
+      this.lockers = spots.filter((spot) => spot.floor === this.floor).map((spot) => ({
+        ...spot,
+        image: this.add.image(spot.x, spot.y - 6, LOCKER_KEY).setDepth(spot.y + 30),
+      }));
+    });
     this.hauntLayer = new HauntLayer(this, {
       rooms: missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor),
       floor: this.floor,
@@ -745,6 +785,11 @@ export default class MainScene extends Phaser.Scene {
       if (downed) entry.sprite.setTint(0x9a9a9a);
       else entry.sprite.clearTint();
       entry.downed = downed;
+      // Un compañero escondido en un armario no se ve.
+      const hidden = Boolean(state.hidingIn);
+      entry.sprite.setVisible(!hidden);
+      entry.label.setVisible(!hidden);
+      entry.shadow.setVisible(!hidden);
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
       entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.sprite.displayHeight / 2 - 5);
       const labelText = state.connected === false ? `${displayName(state)} (desconectado)` : displayName(state);
@@ -1007,7 +1052,7 @@ export default class MainScene extends Phaser.Scene {
     if (this.updateSpectate(delta)) return;
     this.updateRevive();
 
-    if (isInputLocked()) {
+    if (this.updateHide() || isInputLocked()) {
       this.player.setVelocity(0, 0);
       this.zombieLayer.sync(this.zombiesOnFloor());
       this.zombieLayer.update(delta);

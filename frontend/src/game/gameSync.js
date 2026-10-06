@@ -1,5 +1,5 @@
 
-import { socketService } from '../services/socketService';
+import { API_BASE, socketService } from '../services/socketService';
 import { getNickname } from './profile';
 
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
@@ -392,6 +392,33 @@ export function getNearEvent() {
 /** Barricadas de Infraestructura ({ id, ownerId, floor, col, row, health, maxHealth }). */
 export function getBarricades() {
   return latestState.barricades ?? [];
+}
+
+// Armarios para esconderse: fijos por edificio, se piden una vez al servidor.
+const hideSpotsByBuilding = new Map();
+let nearHide = null;
+
+export function loadHideSpots(building) {
+  if (!hideSpotsByBuilding.has(building)) {
+    hideSpotsByBuilding.set(building, fetch(`${API_BASE}/api/buildings/${building}/hide-spots`)
+      .then((response) => (response.ok ? response.json() : []))
+      .catch(() => []));
+  }
+  return hideSpotsByBuilding.get(building);
+}
+
+export function setNearHide(spot) {
+  nearHide = spot;
+}
+
+export function getNearHide() {
+  return nearHide;
+}
+
+/** Entra al armario cercano o sale del que esta. */
+export function requestHide() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/hide`, { playerId: myRole });
 }
 
 export function setNearBarricade(barricade) {
