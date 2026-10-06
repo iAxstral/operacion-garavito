@@ -3,7 +3,7 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLay
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
-import { preloadSamples, setListener, setOcclusion } from './audioBank';
+import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
@@ -128,6 +128,8 @@ const WALK_WOBBLE_HZ = 3;
 // Letra gotica del tema (GameCanvas espera a que cargue antes de crear la escena).
 const GOTHIC_FONT = '"Pirata One", Georgia, serif';
 const WALK_WOBBLE_DEG = 1.5;
+// Cada cuanto suena un paso al caminar (dos por ciclo de cuatro cuadros).
+const STEP_MS = 230;
 
 const TILE_TEXTURE_FILES = {
   v2_floor_terrazo: 'v2_floor_terrazo_64.png',
@@ -258,6 +260,20 @@ export default class MainScene extends Phaser.Scene {
   }
 
   // 1 pegado al jugador, bajando hasta 0 a COMBAT_HEARING_PX.
+  // Superficie bajo los pies: escalera y descanso de madera, el resto baldosa/concreto.
+  surfaceAt(x, y) {
+    const cell = this.layoutGrid?.[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
+    if (cell?.type === 'stair' || cell?.type === 'landing') return 'stepWood';
+    return 'stepConcrete';
+  }
+
+  // Un paso cada vez que el ciclo de caminar cruza un apoyo (cada STEP_MS).
+  stepSounds(fromMs, toMs, x, y, volume, located = false) {
+    if (Math.floor(toMs / STEP_MS) === Math.floor(fromMs / STEP_MS)) return;
+    const at = located ? { x, y, floor: this.floor } : null;
+    playSample(this.surfaceAt(x, y + 40), { channel: 'ambient', volume, variance: 0.12, at });
+  }
+
   // true si entre los dos puntos hay una pared o una puerta cerrada (cada 24 px).
   wallBetween(x1, y1, x2, y2) {
     const steps = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 24);
@@ -575,6 +591,11 @@ export default class MainScene extends Phaser.Scene {
         door.open = doorState.open;
         door.image.setTexture(doorState.open ? 'v2_door_madera_open' : 'v2_door_madera');
         door.image.body.enable = !doorState.open;
+        const at = { x: door.x, y: door.y, floor: this.floor };
+        playSample(doorState.open ? 'doorOpen' : 'doorClose', { channel: 'ambient', at });
+        if (doorState.open && Math.random() < 0.6) {
+          this.time.delayedCall(80, () => playSample('creak', { channel: 'ambient', volume: 0.7, at }));
+        }
       });
     });
   }
@@ -634,6 +655,7 @@ export default class MainScene extends Phaser.Scene {
       if (Math.hypot(dx, dy) > 3) {
         entry.direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
         entry.aim = Math.atan2(dy, dx);
+        this.stepSounds(entry.walkMs ?? 0, (entry.walkMs ?? 0) + delta, entry.sprite.x, entry.sprite.y, 0.35, true);
         entry.walkMs = (entry.walkMs ?? 0) + delta;
         entry.sprite.setTexture(walkKey(entry.prefix, entry.direction, walkFrameAt(entry.walkMs)));
       } else if (entry.walkMs) {
@@ -986,6 +1008,7 @@ export default class MainScene extends Phaser.Scene {
       : this.roleTexture(this.currentDirection));
     this.syncLocalWeapon();
     if (direction) {
+      this.stepSounds(this.walkWobblePhaseMs, this.walkWobblePhaseMs + delta, this.player.x, this.player.y, 0.45);
       this.walkWobblePhaseMs += delta;
       const wobble = Math.sin((this.walkWobblePhaseMs / 1000) * WALK_WOBBLE_HZ * Math.PI * 2);
       this.player.setAngle(wobble * WALK_WOBBLE_DEG);

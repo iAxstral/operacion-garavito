@@ -6,7 +6,7 @@ const STORAGE_KEY = 'garavito.settings.v1';
 export const VOLUME_CHANNELS = [
   { id: 'master', label: 'Volumen general', hint: 'Afecta a todos los sonidos del juego', icon: '🔊' },
   { id: 'music', label: 'Música', hint: 'Música del menú y de la partida', icon: '🎵' },
-  { id: 'ambient', label: 'Ambiente', hint: 'Viento, lluvia, crujidos y gemidos lejanos', icon: '🌧️' },
+  { id: 'ambient', label: 'Ambiente', hint: 'Viento, lluvia, pasos, puertas, crujidos y gemidos lejanos', icon: '🌧️' },
   { id: 'zombies', label: 'Zombis', hint: 'Gruñidos, rugidos y mordidas', icon: '🧟' },
   { id: 'combat', label: 'Combate', hint: 'Tus golpes, impactos y el daño que recibes', icon: '⚔️' },
   { id: 'ui', label: 'Interfaz', hint: 'Botones y menús', icon: '🖱️' },
