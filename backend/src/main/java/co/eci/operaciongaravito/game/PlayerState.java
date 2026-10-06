@@ -30,12 +30,14 @@ public record PlayerState(
         long hiddenMs,
         int candies,
         String costume,
+        List<String> perks,
+        List<String> perkOffer,
         boolean staticOmitted) {
 
     /** Copia sin lo que casi nunca cambia (el cliente conserva lo que ya tenia). */
     public PlayerState withoutStatic() {
         return new PlayerState(playerId, role, health, garavitos, null, floor, x, y, lifeState, invulnerable,
                 chargedReadyInMs, weapon, magazine, reserveAmmo, reloadingMs, shotSeq, shotFacing, reviving,
-                reviveProgress, null, abilityReadyInMs, connected, null, hidingIn, hiddenMs, candies, null, true);
+                reviveProgress, null, abilityReadyInMs, connected, null, hidingIn, hiddenMs, candies, null, null, null, true);
     }
 }

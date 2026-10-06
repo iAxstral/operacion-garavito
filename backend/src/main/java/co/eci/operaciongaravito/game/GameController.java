@@ -72,6 +72,16 @@ public class GameController {
         sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
     }
 
+    @MessageMapping("/game/{gameId}/perk")
+    public void choosePerk(@DestinationVariable String gameId, PerkRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptChoosePerk(request.playerId(), request.perk());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
     @MessageMapping("/game/{gameId}/hide")
     public void hide(@DestinationVariable String gameId, PlayerRequest request) {
         GameSession session = sessionService.find(gameId);

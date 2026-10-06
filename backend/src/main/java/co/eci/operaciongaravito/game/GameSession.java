@@ -331,7 +331,8 @@ public class GameSession {
                             p.getShotSeq(), p.getShotFacing(),
                             p.getReviveTargetId(), p.reviveProgress(now),
                             missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now), p.isConnected(),
-                            p.getName(), p.getHidingIn(), p.hiddenMs(now), p.getCandies(), p.getCostume(), false);
+                            p.getName(), p.getHidingIn(), p.hiddenMs(now), p.getCandies(), p.getCostume(),
+                            p.perkNames(), p.perkOfferNames(), false);
                 })
                 .toList();
     }
@@ -510,6 +511,21 @@ public class GameSession {
         return candies;
     }
 
+    /** Elige una de las mejoras que se le ofrecen. */
+    public PlayerActionResult attemptChoosePerk(String playerId, String perkName) {
+        Player player = players.get(playerId);
+        if (player == null) {
+            return PlayerActionResult.rejected("unknown_player");
+        }
+        Perk perk;
+        try {
+            perk = Perk.valueOf(perkName);
+        } catch (IllegalArgumentException | NullPointerException ex) {
+            return PlayerActionResult.rejected("invalid_perk");
+        }
+        return player.choosePerk(perk) ? PlayerActionResult.ok() : PlayerActionResult.rejected("not_offered");
+    }
+
     /** Disfraz del jugador (se llama al unirse o al volver a su puesto). */
     public synchronized void setPlayerCostume(String role, String costume) {
         Player player = players.get(role);
@@ -570,6 +586,11 @@ public class GameSession {
         int upcoming = waveDirector.upcomingKinder();
         if (upcoming > 0 && upcoming != missionBoard.getKinder()) {
             missionBoard.deal(upcoming, players.values());
+            // Desde el segundo Kinder, en cada respiro se ofrecen tres mejoras a cada uno.
+            if (upcoming > 1) {
+                java.util.random.RandomGenerator random = java.util.concurrent.ThreadLocalRandom.current();
+                players.values().forEach(player -> player.offerPerks(random));
+            }
         }
         players.values().forEach(missionBoard::ensureDealt);
     }
@@ -600,7 +621,10 @@ public class GameSession {
             }
         }
 
-        players.values().forEach(player -> player.expireHide(now, HIDE_COOLDOWN_MS));
+        players.values().forEach(player -> {
+            player.expireHide(now, HIDE_COOLDOWN_MS);
+            player.regenerate(now);
+        });
         List<Player> alive = players.values().stream().filter(Player::isAlive).toList();
         // Los escondidos estan vivos pero los zombis no los ven.
         List<Player> targets = alive.stream().filter(player -> !player.isHidden()).toList();
@@ -1124,7 +1148,8 @@ public class GameSession {
                 continue;
             }
             hits++;
-            if (zombie.hit(weapon.damage(), Math.cos(angle) * weapon.knockback(), Math.sin(angle) * weapon.knockback(), now)) {
+            int damage = weapon.damage() + (player.hasPerk(Perk.GOLPE_FUERTE) ? 1 : 0);
+            if (zombie.hit(damage, Math.cos(angle) * weapon.knockback(), Math.sin(angle) * weapon.knockback(), now)) {
                 kills++;
             }
         }

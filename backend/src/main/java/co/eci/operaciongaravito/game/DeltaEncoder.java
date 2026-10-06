@@ -28,9 +28,11 @@ public class DeltaEncoder {
     /** Con un mensaje cada 125 ms, uno completo cada 2 s. */
     public static final int KEYFRAME_EVERY = 16;
 
-    private record PlayerStatic(List<InventorySlot> inventory, List<MissionView> missions, String name, String costume) {
+    private record PlayerStatic(List<InventorySlot> inventory, List<MissionView> missions, String name, String costume,
+                                List<String> perks, List<String> perkOffer) {
         static PlayerStatic of(PlayerState state) {
-            return new PlayerStatic(state.inventory(), state.missions(), state.name(), state.costume());
+            return new PlayerStatic(state.inventory(), state.missions(), state.name(), state.costume(), state.perks(),
+                    state.perkOffer());
         }
     }
 
