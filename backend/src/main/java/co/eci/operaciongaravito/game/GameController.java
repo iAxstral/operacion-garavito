@@ -67,6 +67,16 @@ public class GameController {
         sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
     }
 
+    @MessageMapping("/game/{gameId}/hide")
+    public void hide(@DestinationVariable String gameId, PlayerRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptHide(request.playerId(), System.currentTimeMillis());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
     @MessageMapping("/game/{gameId}/ping")
     public void ping(@DestinationVariable String gameId, PingRequest request) {
         GameSession session = sessionService.find(gameId);

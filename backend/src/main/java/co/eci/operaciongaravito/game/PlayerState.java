@@ -25,5 +25,7 @@ public record PlayerState(
         List<MissionView> missions,
         long abilityReadyInMs,
         boolean connected,
-        String name) {
+        String name,
+        String hidingIn,
+        long hiddenMs) {
 }

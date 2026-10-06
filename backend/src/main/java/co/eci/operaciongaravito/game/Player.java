@@ -65,6 +65,11 @@ public class Player {
     private volatile long reviveStartedAt = 0;
     private volatile long reviveUntil = 0;
 
+    /** Armario en el que esta escondido (o null), hasta cuando, y desde cuando puede volver. */
+    private volatile String hidingIn = null;
+    private volatile long hiddenUntil = 0;
+    private volatile long hideReadyAt = 0;
+
     /** Apodo que eligio el jugador, o null (entonces se le llama por su rol). */
     private volatile String name = null;
     /** Ultimo aviso al equipo (pings): se limita para que nadie llene la pantalla. */
@@ -79,6 +84,46 @@ public class Player {
 
     public String getName() {
         return name;
+    }
+
+    public String getHidingIn() {
+        return hidingIn;
+    }
+
+    public boolean isHidden() {
+        return hidingIn != null;
+    }
+
+    public long hiddenMs(long now) {
+        return hidingIn == null ? 0 : Math.max(0, hiddenUntil - now);
+    }
+
+    public synchronized boolean canHide(long now) {
+        return now >= hideReadyAt;
+    }
+
+    public synchronized void hide(String spotId, long now, long maxMs) {
+        hidingIn = spotId;
+        hiddenUntil = now + maxMs;
+    }
+
+    /** Sale del armario y empieza la espera para volver a esconderse. */
+    public synchronized void unhide(long now, long cooldownMs) {
+        if (hidingIn == null) {
+            return;
+        }
+        hidingIn = null;
+        hiddenUntil = 0;
+        hideReadyAt = now + cooldownMs;
+    }
+
+    /** True si se le acabo el tiempo escondido (y lo saca). */
+    public synchronized boolean expireHide(long now, long cooldownMs) {
+        if (hidingIn != null && now >= hiddenUntil) {
+            unhide(now, cooldownMs);
+            return true;
+        }
+        return false;
     }
 
     /** Guarda el apodo con los caracteres de control vueltos espacio, espacios simples y largo maximo 16. */
@@ -159,7 +204,7 @@ public class Player {
     }
 
     public synchronized boolean takeDamage(int amount) {
-        if (lifeState == PlayerLifeState.DOWNED || invulnerable) {
+        if (lifeState == PlayerLifeState.DOWNED || invulnerable || hidingIn != null) {
             return false;
         }
         int before = health;
