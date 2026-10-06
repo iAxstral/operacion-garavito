@@ -39,6 +39,29 @@ export const PING_KINDS = {
   },
 };
 
+// Chat rapido: frases fijas (se dicen con la voz del rol) y emotes sobre la cabeza.
+export const CHAT_PHRASES = {
+  GRACIAS: '¡Gracias!',
+  PERDON: '¡Perdón!',
+  ESPERA: '¡Espérenme!',
+  SIGUEME: '¡Síganme!',
+  CUBREME: '¡Cúbranme!',
+  LISTO: '¡Listo!',
+  SI: 'Sí',
+  NO: 'No',
+  CORRAN: '¡Corran!',
+  BIEN_HECHO: '¡Bien hecho!',
+};
+
+export const EMOTES = {
+  SALUDO: '👋',
+  RISA: '😂',
+  MIEDO: '😱',
+  FIESTA: '🎉',
+  CORAZON: '❤️',
+  CALAVERA: '💀',
+};
+
 // Tono (pitch 0-2) y velocidad por rol, y si prefiere una voz femenina o masculina.
 const ROLE_VOICES = {
   SEGURIDAD: { pitch: 0.75, rate: 1.0, prefer: 'male' },
@@ -83,13 +106,23 @@ export function phraseFor(kind) {
   return phrases[Math.floor(Math.random() * phrases.length)];
 }
 
-/** Dice el aviso con la voz del rol. Corta lo que se estuviera diciendo para no amontonar. */
+/** Dice el aviso con la voz del rol. */
 export function speakPing(kind, role) {
+  speakAs(phraseFor(kind), role);
+}
+
+/** Dice una frase del chat rapido con la voz del rol. */
+export function speakChat(phrase, role) {
+  if (CHAT_PHRASES[phrase]) speakAs(CHAT_PHRASES[phrase], role);
+}
+
+/** Habla con la voz del rol. Corta lo que se estuviera diciendo para no amontonar. */
+function speakAs(text, role) {
   const volume = channelVolume('voices');
   playSfx('radio', Math.min(1, volume + 0.2));
   if (!canSpeak() || volume <= 0.01) return;
   const style = ROLE_VOICES[role] ?? ROLE_VOICES.SEGURIDAD;
-  const utterance = new SpeechSynthesisUtterance(phraseFor(kind));
+  const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'es-ES';
   const voice = voiceFor(style.prefer);
   if (voice) {
