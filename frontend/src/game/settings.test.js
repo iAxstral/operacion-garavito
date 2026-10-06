@@ -67,3 +67,18 @@ test('restablecer vuelve a los valores por defecto', () => {
     volumes: { ...DEFAULT_SETTINGS.volumes },
   });
 });
+
+test('las formas para daltonismo vienen apagadas, se guardan y sobreviven a valores raros', () => {
+  assert.equal(getSettings().typeShapes, false);
+  updateSettings({ typeShapes: true });
+  assert.equal(getSettings().typeShapes, true);
+  assert.equal(JSON.parse(store.get('garavito.settings.v1')).typeShapes, true);
+  updateSettings({ typeShapes: 'si' });
+  assert.equal(getSettings().typeShapes, false);
+});
+
+test('el canal de voces del equipo tiene volumen propio', () => {
+  setChannelVolume('master', 1);
+  setChannelVolume('voices', 0.3);
+  assert.equal(channelVolume('voices'), 0.3);
+});
