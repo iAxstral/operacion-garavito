@@ -27,6 +27,7 @@ const KEYBOARD = [
   ['M / Tab', 'Mapa y equipo'],
   ['Z / X / V / G / B', 'Avisar al equipo: zombis, ayuda, revívanme, vamos, munición'],
   ['Esc', 'Configuración'],
+  ['Control', 'Palancas: moverse y apuntar · A atacar · B dash · X interactuar · Y habilidad · LT correr · cruceta: avisos'],
 ];
 
 const TOUCH = [

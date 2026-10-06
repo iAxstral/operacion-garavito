@@ -4,6 +4,7 @@ import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
 import HauntLayer from './HauntLayer';
+import { pollGamepad } from './gamepad';
 import { bakeCostumes, costumeKey, COSTUME_LAYOUT, HEAD_Y, NECK_Y } from './costumeArt';
 import { setStamina } from './stamina';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
@@ -283,7 +284,7 @@ export default class MainScene extends Phaser.Scene {
   // Energia: baja mientras corre, se recupera despues de un rato sin correr. Si se
   // agota, no deja correr hasta recuperar un tercio.
   updateStamina(time, delta, moving) {
-    const wants = this.sprintKey.isDown || Math.hypot(touchInput.moveX, touchInput.moveY) >= TOUCH_SPRINT;
+    const wants = this.sprintKey.isDown || touchInput.sprint || Math.hypot(touchInput.moveX, touchInput.moveY) >= TOUCH_SPRINT;
     const sprinting = wants && moving && !this.exhausted && this.stamina > 0;
     if (sprinting) {
       this.stamina = Math.max(0, this.stamina - (STAMINA_DRAIN_PER_S * delta) / 1000);
@@ -534,7 +535,7 @@ export default class MainScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
     this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
-    startDust(this, this.player);
+    if (!getSettings().lowPerf) startDust(this, this.player);
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
@@ -1080,6 +1081,8 @@ export default class MainScene extends Phaser.Scene {
     if (this.updateSpectate(delta)) return;
     this.updateRevive();
 
+    // Control de consola: escribe en las mismas entradas que los botones tactiles.
+    this.padAim = pollGamepad();
     if (this.updateHide() || isInputLocked()) {
       this.player.setVelocity(0, 0);
       this.zombieLayer.sync(this.zombiesOnFloor());
@@ -1142,6 +1145,7 @@ export default class MainScene extends Phaser.Scene {
 
     reportPosition(Math.round(this.player.x), Math.round(this.player.y), time);
     this.updateAim(time);
+    if (this.padAim != null) this.aimAngle = this.padAim;
     this.updateWeaponSelection();
     this.updateAbility();
     this.updateAttack(time);
@@ -1149,8 +1153,8 @@ export default class MainScene extends Phaser.Scene {
     this.zombieLayer.update(delta);
     this.syncBoss(delta);
 
-    if (time - this.mouseAimAt < MOUSE_AIM_MS) {
-      // Con el mouse el personaje mira hacia donde apunta.
+    if (time - this.mouseAimAt < MOUSE_AIM_MS || this.padAim != null) {
+      // Con el mouse (o la palanca derecha) el personaje mira hacia donde apunta.
       const quarter = Math.round(Phaser.Math.Angle.Wrap(this.aimAngle) / (Math.PI / 2));
       this.currentDirection = AIM_DIRECTIONS[(quarter + 4) % 4];
     }
@@ -1626,7 +1630,7 @@ export default class MainScene extends Phaser.Scene {
     this.layoutGrid = layout.grid;
     this.lighting = new Lighting(this);
     bakeHauntedTextures(this);
-    this.gore = new GoreFx(this);
+    this.gore = new GoreFx(this, { lowPerf: getSettings().lowPerf });
     renderOutside(this, layout.grid, this.lighting, getMyBuilding());
     this.renderGridTiles(layout.grid);
     this.renderDecorations(layout.decorations);
