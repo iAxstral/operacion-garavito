@@ -1,0 +1,11 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  # Cada nodo del backend. Con varios nodos (docker-compose.cluster.yml) se agregan aqui.
+  - job_name: garavito
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["host.docker.internal:8080"]
+        labels:
+          node: local

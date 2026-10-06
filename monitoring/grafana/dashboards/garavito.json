@@ -1,0 +1,66 @@
+{
+  "uid": "garavito",
+  "title": "Operación Garavito",
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": { "from": "now-15m", "to": "now" },
+  "schemaVersion": 39,
+  "panels": [
+    {
+      "type": "stat", "title": "Salas activas", "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(garavito_rooms)", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Jugadores conectados", "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(garavito_players)", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Zombis vivos", "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [{ "expr": "sum(garavito_zombies)", "refId": "A" }]
+    },
+    {
+      "type": "stat", "title": "Mensajes livianos (%)", "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "targets": [{
+        "expr": "100 * sum(rate(garavito_messages_total{kind=\"delta\"}[1m])) / sum(rate(garavito_messages_total[1m]))",
+        "refId": "A"
+      }]
+    },
+    {
+      "type": "timeseries", "title": "Duración del tick de una sala", "gridPos": { "x": 0, "y": 5, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "unit": "s" } },
+      "targets": [
+        { "expr": "max(garavito_tick_seconds{quantile=\"0.5\"})", "legendFormat": "p50", "refId": "A" },
+        { "expr": "max(garavito_tick_seconds{quantile=\"0.99\"})", "legendFormat": "p99", "refId": "B" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Mensajes por segundo", "gridPos": { "x": 12, "y": 5, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "sum by (kind) (rate(garavito_messages_total[1m]))", "legendFormat": "{{kind}}", "refId": "A" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "Salas y jugadores por nodo", "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "garavito_rooms", "legendFormat": "salas {{node}}", "refId": "A" },
+        { "expr": "garavito_players", "legendFormat": "jugadores {{node}}", "refId": "B" }
+      ]
+    },
+    {
+      "type": "timeseries", "title": "CPU y memoria del JVM", "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        { "expr": "process_cpu_usage", "legendFormat": "CPU {{node}}", "refId": "A" },
+        { "expr": "sum by (node) (jvm_memory_used_bytes{area=\"heap\"}) / sum by (node) (jvm_memory_max_bytes{area=\"heap\"})", "legendFormat": "heap {{node}}", "refId": "B" }
+      ]
+    }
+  ]
+}
