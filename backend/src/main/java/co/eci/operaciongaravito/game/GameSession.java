@@ -74,6 +74,10 @@ public class GameSession {
     static final long PING_COOLDOWN_MS = 1_500;
 
     /** Cuanto puede quedarse escondido en un armario y cuanto espera para volver. */
+    /** La salida del escape final: la entrada del piso 1 (donde empieza todo el mundo). */
+    static final double EXIT_X = 608;
+    static final double EXIT_Y = 800;
+    static final double EXIT_RADIUS_PX = 90;
     static final long HIDE_MAX_MS = 8_000;
     static final long HIDE_COOLDOWN_MS = 12_000;
 
@@ -332,7 +336,7 @@ public class GameSession {
                             p.getReviveTargetId(), p.reviveProgress(now),
                             missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now), p.isConnected(),
                             p.getName(), p.getHidingIn(), p.hiddenMs(now), p.getCandies(), p.getCostume(),
-                            p.perkNames(), p.perkOfferNames(), false);
+                            p.perkNames(), p.perkOfferNames(), p.isEscaped(), false);
                 })
                 .toList();
     }
@@ -511,6 +515,37 @@ public class GameSession {
         return candies;
     }
 
+    /**
+     * Escape final: quien llega a la salida queda a salvo. Se gana cuando todos los que
+     * siguen en pie salieron, o al acabarse el tiempo si al menos uno salio; si nadie
+     * salio, la horda alcanza a todos (y el tick siguiente lo trata como equipo caido).
+     * True si la corrida termino.
+     */
+    private boolean resolveEscape(long now, List<Player> alive) {
+        alive.stream()
+                .filter(p -> !p.isEscaped() && p.getFloor() == 1
+                        && Math.hypot(p.getX() - EXIT_X, p.getY() - EXIT_Y) <= EXIT_RADIUS_PX)
+                .forEach(p -> {
+                    p.escape();
+                    pendingEvents.add(LastEvent.playerEscaped(p.getPlayerId()));
+                });
+        long escaped = alive.stream().filter(Player::isEscaped).count();
+        boolean timedOut = waveDirector.escapeTimedOut(now);
+        if ((!alive.isEmpty() && escaped == alive.size()) || (timedOut && escaped > 0)) {
+            waveDirector.win();
+            zombies.clear();
+            acids.clear();
+            puddles.clear();
+            victoryPending = true;
+            closeRun(true, WaveCurve.KINDER_COUNT, now);
+            return true;
+        }
+        if (timedOut) {
+            alive.forEach(Player::collapse);
+        }
+        return false;
+    }
+
     /** Elige una de las mejoras que se le ofrecen. */
     public PlayerActionResult attemptChoosePerk(String playerId, String perkName) {
         Player player = players.get(playerId);
@@ -618,6 +653,8 @@ public class GameSession {
             if (waveDirector.isVictory()) {
                 victoryPending = true;
                 closeRun(true, WaveCurve.KINDER_COUNT, now);
+            } else if (waveDirector.isEscaping()) {
+                pendingEvents.add(LastEvent.escapeStarted());
             }
         }
 
@@ -627,7 +664,10 @@ public class GameSession {
         });
         List<Player> alive = players.values().stream().filter(Player::isAlive).toList();
         // Los escondidos estan vivos pero los zombis no los ven.
-        List<Player> targets = alive.stream().filter(player -> !player.isHidden()).toList();
+        List<Player> targets = alive.stream().filter(player -> !player.isHidden() && !player.isEscaped()).toList();
+        if (waveDirector.isEscaping() && resolveEscape(now, alive)) {
+            return;
+        }
 
         if (alive.isEmpty() && !players.isEmpty()) {
             closeRun(false, waveDirector.getKinder(), now);

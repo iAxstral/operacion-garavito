@@ -45,6 +45,14 @@ public record LastEvent(String type, String playerId, String itemId, String reas
     }
 
     /** La sala esta en otro nodo: {@code reason} es su URL publica (el cliente se reconecta alla). */
+    public static LastEvent escapeStarted() {
+        return new LastEvent("ESCAPE_STARTED", null, null, null);
+    }
+
+    public static LastEvent playerEscaped(String playerId) {
+        return new LastEvent("PLAYER_ESCAPED", playerId, null, null);
+    }
+
     public static LastEvent lobbyRedirect(String clientId, String nodeUrl) {
         return new LastEvent("LOBBY_REDIRECT", clientId, null, nodeUrl);
     }
