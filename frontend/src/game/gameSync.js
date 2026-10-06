@@ -431,6 +431,11 @@ export function getNearHide() {
 }
 
 /** Entra al armario cercano o sale del que esta. */
+export function requestPerk(perk) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/perk`, { playerId: myRole, perk });
+}
+
 export function requestHide() {
   if (!joined || !socketService.isConnected()) return;
   socketService.publish(`/app/game/${gameId}/hide`, { playerId: myRole });
