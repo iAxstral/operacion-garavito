@@ -3,6 +3,7 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLay
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
+import { preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
@@ -250,13 +251,22 @@ export default class MainScene extends Phaser.Scene {
     this.sound.add('rain', { loop: true, volume: RAIN_MIN_VOLUME * channelVolume('ambient') }).play();
   }
 
-  playZombieSound(key, volume) {
+  playZombieSound(key, volume, pan = 0) {
     const sound = this.sound.get(key) ?? this.sound.add(key);
     if (sound.isPlaying) return;
-    sound.play({ volume: volume * channelVolume('zombies') });
+    sound.play({ volume: volume * channelVolume('zombies'), pan });
   }
 
   // 1 pegado al jugador, bajando hasta 0 a COMBAT_HEARING_PX.
+  // true si entre los dos puntos hay una pared o una puerta cerrada (cada 24 px).
+  wallBetween(x1, y1, x2, y2) {
+    const steps = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 24);
+    for (let i = 1; i < steps; i += 1) {
+      if (!this.isOpenAt(x1 + ((x2 - x1) * i) / steps, y1 + ((y2 - y1) * i) / steps)) return true;
+    }
+    return false;
+  }
+
   hearing(x, y) {
     if (!this.player) return 0;
     const distance = Math.hypot(this.player.x - x, this.player.y - y);
@@ -296,7 +306,7 @@ export default class MainScene extends Phaser.Scene {
       },
       onStagger: (entry) => playSfx('stagger', this.hearing(entry.x, entry.y)),
       onHit: (entry, amount) => {
-        playSfx('hit', this.hearing(entry.x, entry.y));
+        playSfx('hit', this.hearing(entry.x, entry.y), { x: entry.x, y: entry.y, floor: this.floor });
         const from = this.nearestPlayerTo(entry.x, entry.y) ?? { x: entry.x, y: entry.y - 1 };
         this.gore.splatter(entry.x, entry.y, from.x, from.y);
         this.gore.blood(entry.x, entry.y);
@@ -370,15 +380,19 @@ export default class MainScene extends Phaser.Scene {
       const range = zombie.tough ? ROAR_RANGE_PX : GROAN_RANGE_PX;
       if (distance > range) return;
       const closeness = 1 - distance / range;
-      if (!nearest || closeness > nearest.closeness) nearest = { closeness, tough: zombie.tough };
+      if (!nearest || closeness > nearest.closeness) {
+        const behindWall = this.wallBetween(this.player.x, this.player.y, zombie.x, zombie.y);
+        nearest = { closeness: behindWall ? closeness * 0.55 : closeness, tough: zombie.tough, dx: zombie.x - this.player.x };
+      }
     });
 
     if (!nearest || time < this.nextZombieSoundAt) return;
 
-    const { closeness, tough } = nearest;
+    const { closeness, tough, dx } = nearest;
     this.nextZombieSoundAt = time + FAR_COOLDOWN_MS - (FAR_COOLDOWN_MS - NEAR_COOLDOWN_MS) * closeness;
     const volume = (tough ? MAX_ROAR_VOLUME : MAX_GROAN_VOLUME) * (0.15 + 0.85 * closeness * closeness);
-    this.playZombieSound(tough ? 'zombie_roar' : 'zombie_groan', volume);
+    // Se oye del lado de donde viene el zombi.
+    this.playZombieSound(tough ? 'zombie_roar' : 'zombie_groan', volume, Math.max(-0.85, Math.min(0.85, dx / 520)));
   }
 
   create() {
@@ -458,6 +472,8 @@ export default class MainScene extends Phaser.Scene {
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
     this.pingLayer = new PingLayer(this);
+    preloadSamples();
+    setOcclusion((x1, y1, x2, y2) => this.wallBetween(x1, y1, x2, y2));
     // El servidor rechazo una posicion (movimiento imposible): se vuelve a la suya.
     // Los avisos del equipo de este piso se marcan en el mapa.
     const offCorrection = onGameEvent((event) => {
@@ -631,7 +647,8 @@ export default class MainScene extends Phaser.Scene {
         const weapon = weaponById(state.weapon);
         const end = this.traceShot(entry.sprite.x, entry.sprite.y, state.shotFacing, weapon);
         this.weaponLayer.fire(state.playerId, end, { heavy: weapon.id === 'RIFLE' });
-        playSfx(weapon.id === 'RIFLE' ? 'rifle' : 'pistol', 0.7 * this.hearing(entry.sprite.x, entry.sprite.y));
+        playSfx(weapon.id === 'RIFLE' ? 'rifle' : 'pistol', 0.7 * this.hearing(entry.sprite.x, entry.sprite.y),
+          { x: entry.sprite.x, y: entry.sprite.y, floor: this.floor });
       }
       const blend = Math.min(1, (delta / 1000) * REMOTE_LERP_PER_SECOND);
       entry.sprite.x += dx * blend;
@@ -734,7 +751,7 @@ export default class MainScene extends Phaser.Scene {
         this.tweens.add({ targets: image, scale: 1, duration: 220, ease: 'Back.easeOut', onUpdate: () => image.refreshBody() });
         entry = { image, collider, bar, x, y, health: b.health };
         this.barricadeSprites.set(b.id, entry);
-        playSfx('build', this.hearing(x, y));
+        playSfx('build', this.hearing(x, y), { x, y, floor: this.floor });
       }
       if (b.health < entry.health) {
         this.tweens.add({ targets: entry.image, x: { from: entry.x - 3, to: entry.x + 3 }, duration: 50, yoyo: true, onComplete: () => entry.image.setX(entry.x) });
@@ -759,7 +776,7 @@ export default class MainScene extends Phaser.Scene {
           onComplete: () => plank.destroy(),
         });
       }
-      playSfx('breakWood', this.hearing(entry.x, entry.y));
+      playSfx('breakWood', this.hearing(entry.x, entry.y), { x: entry.x, y: entry.y, floor: this.floor });
       this.physics.world.removeCollider(entry.collider);
       entry.image.destroy();
       entry.bar.destroy();
@@ -890,6 +907,8 @@ export default class MainScene extends Phaser.Scene {
       .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)
       .setVisible(this.player.visible);
     this.lighting.update(time, this.focusSprite(), this.remotePlayers);
+    const ear = this.focusSprite();
+    if (ear) setListener(ear.x, ear.y, this.floor);
     this.syncPuddles();
     this.pingLayer?.update(time);
     this.checkDamageTaken();
