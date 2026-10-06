@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 import { OUTSIDE_MARGIN_TILES } from './outsideDecor';
+import { getSettings } from './settings';
 
 const DARK_KEY = 'darkness_layer';
 const GLOW_KEY = 'light_glow';
@@ -9,6 +10,8 @@ const BULB_KEY = 'bulb_fixture';
 // Noche de Halloween: penumbra mas cerrada y algo violeta.
 const DARKNESS_COLOR = 'rgba(8, 5, 16, 0.72)';
 const RESOLUTION = 0.5;
+// Modo de rendimiento: la capa de oscuridad a menor resolucion y sin efectos extra.
+const LOW_PERF_RESOLUTION = 0.33;
 
 const PLAYER_RADIUS = 340;
 // Linterna: halo corto alrededor del jugador y un cono largo hacia donde apunta. Lo
@@ -53,7 +56,9 @@ export default class Lighting {
     this.makeGlowTexture();
     this.makeFogTexture();
     this.makeBulbTexture();
-    this.makeFog();
+    this.lowPerf = getSettings().lowPerf;
+    this.resolution = this.lowPerf ? LOW_PERF_RESOLUTION : RESOLUTION;
+    if (!this.lowPerf) this.makeFog();
     this.build();
     scene.scale.on('resize', this.build, this);
   }
@@ -165,8 +170,8 @@ export default class Lighting {
 
     this.texture = this.scene.textures.createCanvas(
       DARK_KEY,
-      Math.max(2, Math.ceil(width * RESOLUTION)),
-      Math.max(2, Math.ceil(height * RESOLUTION)),
+      Math.max(2, Math.ceil(width * this.resolution)),
+      Math.max(2, Math.ceil(height * this.resolution)),
     );
     this.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
     this.image = this.scene.add
@@ -234,7 +239,8 @@ export default class Lighting {
     const sx = (x - view.x) * view.scale;
     const sy = (y - view.y) * view.scale;
     const r = length * view.scale;
-    [[CONE_HALF_ANGLE * 1.35, 0.45], [CONE_HALF_ANGLE, 1]].forEach(([half, power]) => {
+    const passes = this.lowPerf ? [[CONE_HALF_ANGLE, 1]] : [[CONE_HALF_ANGLE * 1.35, 0.45], [CONE_HALF_ANGLE, 1]];
+    passes.forEach(([half, power]) => {
       const g = ctx.createRadialGradient(sx, sy, r * 0.05, sx, sy, r);
       g.addColorStop(0, `rgba(0,0,0,${strength * power})`);
       g.addColorStop(0.6, `rgba(0,0,0,${strength * power * 0.75})`);
@@ -255,7 +261,7 @@ export default class Lighting {
     const view = {
       x: camera.worldView.x - margin,
       y: camera.worldView.y - margin,
-      scale: camera.zoom * RESOLUTION,
+      scale: camera.zoom * this.resolution,
     };
     this.image.setPosition(view.x, view.y);
     const ctx = this.texture.context;
@@ -298,7 +304,7 @@ export default class Lighting {
     this.pulses = this.pulses.filter((p) => time - p.born < p.ms);
     this.pulses.forEach((p) => this.punch(ctx, view, p.x, p.y, p.radius, 1 - (time - p.born) / p.ms));
 
-    if (player && !this.blackout) {
+    if (player && !this.blackout && !this.lowPerf) {
       ctx.globalCompositeOperation = 'source-over';
       const cx = (player.x - view.x) * view.scale;
       const cy = (player.y - view.y) * view.scale;

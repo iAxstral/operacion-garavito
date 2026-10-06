@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   screenShake: true,
   tips: true,
   typeShapes: false,
+  lowPerf: false,
 });
 
 function sanitize(raw) {
@@ -35,6 +36,7 @@ function sanitize(raw) {
     screenShake: typeof raw?.screenShake === 'boolean' ? raw.screenShake : DEFAULT_SETTINGS.screenShake,
     tips: typeof raw?.tips === 'boolean' ? raw.tips : DEFAULT_SETTINGS.tips,
     typeShapes: typeof raw?.typeShapes === 'boolean' ? raw.typeShapes : DEFAULT_SETTINGS.typeShapes,
+    lowPerf: typeof raw?.lowPerf === 'boolean' ? raw.lowPerf : DEFAULT_SETTINGS.lowPerf,
   };
 }
 

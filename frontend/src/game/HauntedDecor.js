@@ -16,6 +16,7 @@ const BLOOD_KEYS = ['hw_blood_0', 'hw_blood_1', 'hw_blood_2', 'hw_blood_3'];
 
 // Las manchas del piso se quedan, pero con tope: las mas viejas se desvanecen.
 const MAX_DECALS = 90;
+const LOW_PERF_DECALS = 30;
 const DEPTH_DECAL = 1.5;
 const DEPTH_DUST = 4995;
 
@@ -290,9 +291,11 @@ export function startDust(scene, target) {
  * casquillos. Una instancia por escena.
  */
 export class GoreFx {
-  constructor(scene) {
+  constructor(scene, { lowPerf = false } = {}) {
     this.scene = scene;
     this.decals = [];
+    this.maxDecals = lowPerf ? LOW_PERF_DECALS : MAX_DECALS;
+    this.gibs = lowPerf ? 6 : 14;
   }
 
   blood(x, y, { big = false } = {}) {
@@ -304,7 +307,7 @@ export class GoreFx {
       .setAlpha(0.9);
     this.scene.tweens.add({ targets: decal, scale: (big ? 1.1 : 0.55) * (0.85 + Math.random() * 0.3), duration: 140, ease: 'Quad.easeOut' });
     this.decals.push(decal);
-    if (this.decals.length > MAX_DECALS) {
+    if (this.decals.length > this.maxDecals) {
       const old = this.decals.shift();
       this.scene.tweens.add({ targets: old, alpha: 0, duration: 800, onComplete: () => old.destroy() });
     }
@@ -334,7 +337,7 @@ export class GoreFx {
   // Muerte: estallido de pedazos que caen y una mancha grande.
   burst(x, y, tint = 0x6e0b0b) {
     this.blood(x, y, { big: true });
-    for (let i = 0; i < 14; i += 1) {
+    for (let i = 0; i < this.gibs; i += 1) {
       const a = Math.random() * Math.PI * 2;
       const d = 18 + Math.random() * 42;
       const gib = this.scene.add.image(x, y - 12, GIB_KEY)
