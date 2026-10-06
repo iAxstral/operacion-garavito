@@ -903,3 +903,104 @@
 .results-candies .hw-icon {
   color: #ff8a2a;
 }
+
+/* ---------- Tienda de disfraces ---------- */
+
+.costume-panel {
+  width: min(640px, 100%);
+}
+
+.costume-bag {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--hw-bone-dim);
+}
+
+.costume-bag strong {
+  font-size: 18px;
+  color: #ffb347;
+}
+
+.costume-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.costume-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+  color: var(--hw-bone);
+  text-align: center;
+  background: rgba(40, 14, 16, 0.75);
+  border: 1px solid var(--hw-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.costume-card:hover {
+  border-color: var(--hw-gold);
+}
+
+.costume-card strong {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 18px;
+}
+
+.costume-card small {
+  font-size: 11px;
+  color: var(--hw-bone-dim);
+}
+
+.costume-preview {
+  width: 64px;
+  height: 64px;
+  background: radial-gradient(circle, rgba(255, 140, 40, 0.18), transparent 70%);
+}
+
+.costume-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #120708;
+  background: var(--hw-gold);
+  border-radius: 999px;
+}
+
+.costume-card--worn {
+  border-color: #ff8a2a;
+  box-shadow: 0 0 16px rgba(255, 138, 42, 0.45);
+}
+
+.costume-card--worn .costume-action {
+  background: #ff8a2a;
+}
+
+.costume-card--locked {
+  opacity: 0.55;
+}
+
+/* En celular los botones secundarios del inicio van de a dos para que quepan. */
+@media (max-width: 640px) {
+  .start-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .start-actions .start-btn--primary {
+    grid-column: span 2;
+  }
+
+  .start-actions .start-btn:not(.start-btn--primary) {
+    padding: 10px 8px;
+    font-size: 15px;
+  }
+}
