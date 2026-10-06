@@ -8,6 +8,8 @@ import { earnAchievements } from '../game/achievements';
 import { creditRun } from '../game/costumes';
 import Credits from './Credits';
 import { recordRun } from '../game/playerStats';
+import { startReplayRecorder, takeBestPlay } from '../game/replayRecorder';
+import ReplayViewer from './ReplayViewer';
 
 const OUTCOMES = {
   TEAM_WIPED: {
@@ -52,6 +54,10 @@ export default function GameOverScreen({ onExitToMenu }) {
   const [earned, setEarned] = useState([]);
   const [candies, setCandies] = useState(0);
   const [showCredits, setShowCredits] = useState(false);
+  const [bestPlay, setBestPlay] = useState(null);
+  const [showReplay, setShowReplay] = useState(false);
+
+  useEffect(() => startReplayRecorder(), []);
 
   useEffect(() => onGameEvent((event) => {
     if (!OUTCOMES[event.type]) return;
@@ -61,6 +67,7 @@ export default function GameOverScreen({ onExitToMenu }) {
     setSummary(runSummary);
     setEarned(earnAchievements(runSummary, getMyRole()));
     recordRun(runSummary, getMyRole());
+    setBestPlay(takeBestPlay());
     const mine = runSummary?.players?.find((p) => p.role === getMyRole());
     setCandies(runSummary ? creditRun(runSummary.id, mine?.candies ?? 0) : 0);
     setInputLocked(true);
@@ -168,6 +175,11 @@ export default function GameOverScreen({ onExitToMenu }) {
               Reintentar
             </button>
           )}
+          {bestPlay && (
+            <button type="button" className="game-over-btn" onClick={() => setShowReplay(true)} title={bestPlay.title}>
+              ⏪ Mejor jugada
+            </button>
+          )}
           {summary?.victory && (
             <button type="button" className="game-over-btn" onClick={() => setShowCredits(true)}>
               Créditos
@@ -186,6 +198,7 @@ export default function GameOverScreen({ onExitToMenu }) {
         </div>
       </div>
       {showRanking && <RankingPanel initialBuilding={summary?.building} onClose={() => setShowRanking(false)} />}
+      {showReplay && bestPlay && <ReplayViewer play={bestPlay} onClose={() => setShowReplay(false)} />}
     </div>
   );
 }

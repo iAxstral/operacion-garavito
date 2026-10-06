@@ -1094,3 +1094,21 @@ kbd {
 .waiting-mode.lobby-mode--hard { color: #ff6a5a; }
 .waiting-mode.lobby-mode--daily { color: #ffb347; }
 .ranking-mode-tabs { margin-top: 6px; }
+
+/* Repeticion de la mejor jugada */
+.replay-panel { max-width: 920px; width: calc(100vw - 32px); }
+.replay-screen { position: relative; border: 2px solid #3a2a2a; border-radius: 8px; overflow: hidden; background: #000; }
+.replay-screen canvas { display: block; width: 100%; height: auto; image-rendering: auto; }
+.replay-rec {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  color: #ff3a2a;
+  font: bold 0.85rem monospace;
+  letter-spacing: 0.1em;
+  animation: replay-blink 1s steps(2) infinite;
+}
+@keyframes replay-blink { 50% { opacity: 0; } }
+.replay-bar { height: 4px; margin-top: 6px; background: #2a1414; border-radius: 2px; overflow: hidden; }
+.replay-bar div { height: 100%; background: #ff8a1a; }
+.replay-controls { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
