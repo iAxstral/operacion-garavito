@@ -293,6 +293,12 @@ class GameSessionZombieTest {
         registerKills(0);
         now += 66;
         session.tick(now, 0.066);
+        assertTrue(session.waveState().escaping(), "vencido el jefe, a correr a la salida");
+        assertFalse(session.consumeVictory());
+
+        player.reportPosition(1, GameSession.EXIT_X, GameSession.EXIT_Y);
+        now += 66;
+        session.tick(now, 0.066);
         assertTrue(session.waveState().victory());
         assertTrue(session.consumeVictory());
         assertFalse(session.consumeVictory());
