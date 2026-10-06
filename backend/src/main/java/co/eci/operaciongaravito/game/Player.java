@@ -79,6 +79,9 @@ public class Player {
     public static final java.util.Set<String> COSTUMES = java.util.Set.of(
             "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA");
 
+    /** Llego a la salida en el escape final: ya no lo ven ni lo dañan. */
+    private volatile boolean escaped = false;
+
     /** Mejoras elegidas en la corrida y las tres que se le ofrecen ahora (o ninguna). */
     private final java.util.EnumSet<Perk> perks = java.util.EnumSet.noneOf(Perk.class);
     private List<Perk> perkOffer = List.of();
@@ -290,8 +293,28 @@ public class Player {
         this.y = y;
     }
 
+    public boolean isEscaped() {
+        return escaped;
+    }
+
+    public synchronized void escape() {
+        if (lifeState == PlayerLifeState.ALIVE) {
+            escaped = true;
+            hidingIn = null;
+        }
+    }
+
+    /** Se acabo el tiempo del escape sin salir: la horda lo alcanza. */
+    public synchronized void collapse() {
+        if (lifeState == PlayerLifeState.ALIVE && !escaped) {
+            health = 0;
+            lifeState = PlayerLifeState.DOWNED;
+            statDowns++;
+        }
+    }
+
     public synchronized boolean takeDamage(int amount) {
-        if (lifeState == PlayerLifeState.DOWNED || invulnerable || hidingIn != null) {
+        if (lifeState == PlayerLifeState.DOWNED || invulnerable || hidingIn != null || escaped) {
             return false;
         }
         int before = health;
@@ -611,6 +634,7 @@ public class Player {
     }
 
     public synchronized void resetStats() {
+        escaped = false;
         perks.clear();
         perkOffer = List.of();
         statCandies = 0;
@@ -645,6 +669,7 @@ public class Player {
     }
 
     public synchronized void reset() {
+        escaped = false;
         perks.clear();
         perkOffer = List.of();
         health = 100;
