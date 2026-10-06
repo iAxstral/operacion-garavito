@@ -3,6 +3,7 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLay
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
+import HauntLayer from './HauntLayer';
 import { setStamina } from './stamina';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
@@ -545,6 +546,13 @@ export default class MainScene extends Phaser.Scene {
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
     this.pingLayer = new PingLayer(this);
+    this.hauntLayer = new HauntLayer(this, {
+      rooms: missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor),
+      floor: this.floor,
+      lighting: this.lighting,
+      doors: this.doors,
+      getListener: () => this.focusSprite(),
+    });
     preloadSamples();
     setOcclusion((x1, y1, x2, y2) => this.wallBetween(x1, y1, x2, y2));
     // El servidor rechazo una posicion (movimiento imposible): se vuelve a la suya.
@@ -993,6 +1001,7 @@ export default class MainScene extends Phaser.Scene {
     if (ear) setListener(ear.x, ear.y, this.floor);
     this.syncPuddles();
     this.pingLayer?.update(time);
+    this.hauntLayer?.update(time);
     this.checkDamageTaken();
     this.drawReviveProgress();
     if (this.updateSpectate(delta)) return;
