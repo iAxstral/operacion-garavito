@@ -843,3 +843,33 @@
     margin-left: 26px;
   }
 }
+
+/* ---------- Escondido en un armario: se ve por las rejillas ---------- */
+
+.hud-hidden {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(180deg, rgba(5, 4, 6, 0.96) 0 22px, rgba(5, 4, 6, 0.55) 22px 30px),
+    radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.9) 80%);
+  animation: hw-fade-in 0.25s ease-out;
+}
+
+.hud-hidden span {
+  padding: 6px 14px;
+  font-size: 14px;
+  color: var(--hw-bone);
+  background: rgba(10, 6, 8, 0.85);
+  border: 1px solid rgba(232, 182, 74, 0.5);
+  border-radius: 999px;
+}
+
+.hud-hidden strong {
+  color: var(--hw-gold);
+}

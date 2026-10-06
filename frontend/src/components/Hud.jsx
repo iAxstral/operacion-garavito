@@ -17,6 +17,7 @@ import {
   getNearBarricade,
   getBarricades,
   getNearEvent,
+  getNearHide,
   isTouchDevice,
   isInputLocked,
   purchaseItem,
@@ -368,7 +369,8 @@ export default function Hud() {
         return;
       }
       if ((event.key === 'e' || event.key === 'E' || event.key === 'i' || event.key === 'I')
-        && !getNearMission() && !getNearStairs() && !getNearDowned() && !getNearBarricade() && !getNearEvent()) {
+        && !getNearMission() && !getNearStairs() && !getNearDowned() && !getNearBarricade() && !getNearEvent()
+        && !getNearHide()) {
         event.preventDefault();
         setInventoryOpen((open) => !open);
         return;
@@ -633,6 +635,20 @@ export default function Hud() {
       {getNearEvent() && state.event && (
         <div className="hud-interact-hint">
           {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {state.event.type === 'BLACKOUT' ? 'Restablecer la luz' : 'Recoger los suministros'}
+        </div>
+      )}
+
+      {me?.hidingIn && (
+        <div className="hud-hidden" aria-live="polite">
+          <span>
+            Escondido — {Math.ceil((me.hiddenMs ?? 0) / 1000)}s · {touch ? 'Toca' : 'Presiona'} <strong>E</strong> para salir
+          </span>
+        </div>
+      )}
+
+      {!me?.hidingIn && getNearHide()?.id && (
+        <div className="hud-interact-hint">
+          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — Esconderte en el armario
         </div>
       )}
 
