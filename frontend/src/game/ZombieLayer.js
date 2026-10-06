@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SHADOW_KEY } from './HauntedDecor';
 import { bakeZombieSheets, ZOMBIE_FRAMES } from './zombieArt';
+import { getSettings, onSettingsChange } from './settings';
 
 const TEXTURE = 'zombie';
 const TOUGH_TEXTURE = 'zombie-teso';
@@ -26,6 +27,28 @@ const LUNGE_PX = 16;
 const OUTLINE_COLORS = { RUNNER: 0x3fd8ff, SPITTER: 0x9dff3a, TOUGH: 0xff3a2a };
 const OUTLINE_SCALE = 1.14;
 const RISE_MS = 520;
+// Opcion para daltonismo: una forma blanca sobre la cabeza ademas del color.
+const SHAPE_KEY = 'zombie-type-shapes';
+const SHAPES = { TOUGH: 0, RUNNER: 1, SPITTER: 2 };
+
+function bakeTypeShapes(scene) {
+  if (scene.textures.exists(SHAPE_KEY)) return;
+  const size = 18;
+  const g = scene.make.graphics({ x: 0, y: 0, add: false });
+  g.lineStyle(3, 0x0d0608, 1);
+  g.fillStyle(0xffffff, 1);
+  // Cuadrado (resistente)
+  g.fillRect(3, 3, 12, 12).strokeRect(3, 3, 12, 12);
+  // Triangulo (corredor)
+  g.fillTriangle(size + 9, 2, size + 16, 16, size + 2, 16).strokeTriangle(size + 9, 2, size + 16, 16, size + 2, 16);
+  // Gota (escupidor)
+  g.fillCircle(2 * size + 9, 11, 6).strokeCircle(2 * size + 9, 11, 6);
+  g.fillTriangle(2 * size + 4, 9, 2 * size + 14, 9, 2 * size + 9, 1);
+  g.generateTexture(SHAPE_KEY, size * 3, size);
+  g.destroy();
+  const texture = scene.textures.get(SHAPE_KEY);
+  [0, 1, 2].forEach((i) => texture.add(i, 0, i * size, 0, size, size));
+}
 // Lo que el cuerpo de un zombi que cayo entero se queda en el piso.
 const CORPSE_MS = 6000;
 
@@ -52,6 +75,11 @@ export default class ZombieLayer {
     this.findTarget = findTarget;
 
     bakeZombieSheets(scene);
+    bakeTypeShapes(scene);
+    this.showShapes = getSettings().typeShapes;
+    this.offSettings = onSettingsChange((settings) => {
+      this.showShapes = settings.typeShapes;
+    });
   }
 
   sync(zombieStates) {
@@ -136,7 +164,12 @@ export default class ZombieLayer {
       ring: null,
       rise: 1,
       walkMs: Math.random() * 1000,
+      shape: null,
     };
+    const shapeFrame = SHAPES[tough ? 'TOUGH' : kind];
+    if (shapeFrame !== undefined) {
+      entry.shape = this.scene.add.image(state.x, state.y, SHAPE_KEY, shapeFrame).setVisible(false);
+    }
     this.riseFromFloor(entry);
     return entry;
   }
@@ -277,6 +310,8 @@ export default class ZombieLayer {
   // rato en el piso.
   kill(entry) {
     this.clearWarning(entry);
+    entry.shape?.destroy();
+    entry.shape = null;
     entry.deathStyle = entry.kind === 'SPITTER' || Math.random() < 0.45 ? 'burst' : 'corpse';
     this.hooks.onDeath?.(entry);
     this.scene.tweens.killTweensOf(entry.offset);
@@ -356,6 +391,12 @@ export default class ZombieLayer {
       if (Math.abs(entry.targetX - previousX) > 0.5) sprite.setFlipX(entry.targetX < previousX);
       entry.shadow.setPosition(entry.x, entry.y + (entry.tough ? 20 : 16));
 
+      if (entry.shape) {
+        entry.shape
+          .setVisible(this.showShapes && sprite.alpha > 0.5)
+          .setPosition(sprite.x, sprite.getTopCenter().y + 4)
+          .setDepth(sprite.depth + 0.6);
+      }
       if (entry.warning) {
         entry.warning.setPosition(sprite.x, sprite.getTopCenter().y + 14).setDepth(sprite.depth + 1);
       }
@@ -378,7 +419,9 @@ export default class ZombieLayer {
       entry.sprite.destroy();
       entry.shadow.destroy();
       entry.outline?.destroy();
+      entry.shape?.destroy();
     });
     this.sprites.clear();
+    this.offSettings?.();
   }
 }

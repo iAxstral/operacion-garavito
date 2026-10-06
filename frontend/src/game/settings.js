@@ -19,6 +19,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   vibration: true,
   screenShake: true,
   tips: true,
+  typeShapes: false,
 });
 
 function sanitize(raw) {
@@ -33,6 +34,7 @@ function sanitize(raw) {
     vibration: typeof raw?.vibration === 'boolean' ? raw.vibration : DEFAULT_SETTINGS.vibration,
     screenShake: typeof raw?.screenShake === 'boolean' ? raw.screenShake : DEFAULT_SETTINGS.screenShake,
     tips: typeof raw?.tips === 'boolean' ? raw.tips : DEFAULT_SETTINGS.tips,
+    typeShapes: typeof raw?.typeShapes === 'boolean' ? raw.typeShapes : DEFAULT_SETTINGS.typeShapes,
   };
 }
 

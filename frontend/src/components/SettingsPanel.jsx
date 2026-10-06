@@ -171,6 +171,12 @@ export default function SettingsPanel({ onClose, inGame = false }) {
             checked={settings.screenShake}
             onChange={(screenShake) => updateSettings({ screenShake })}
           />
+          <Toggle
+            label="Formas según el tipo de zombi"
+            hint="Para daltonismo: cuadrado el resistente, triángulo el corredor, gota el escupidor"
+            checked={settings.typeShapes}
+            onChange={(typeShapes) => updateSettings({ typeShapes })}
+          />
           {canVibrate() && (
             <Toggle
               label="Vibración"
