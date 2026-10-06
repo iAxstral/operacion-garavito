@@ -6,7 +6,11 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Director de los 5 Kinders de un edificio: respiro → Kinder activo → … → victoria.
+ * Director de los 5 Kinders de un edificio: respiro → Kinder activo → … → escape → victoria.
+ *
+ * Al caer el jefe del Kinder 5 empieza el escape: la horda sigue llegando y el equipo
+ * tiene {@link #ESCAPE_MS} para correr a la salida (la entrada del piso 1). GameSession
+ * decide quien escapo y llama {@link #win()}.
  *
  * Un Kinder se pasa matando su cuota de zombis, no limpiando todo el mapa: asi un
  * zombi varado en un piso vacio nunca traba la partida. Mientras el Kinder esta
@@ -19,7 +23,12 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class WaveDirector {
 
-    private enum Phase { RESTING, ACTIVE, VICTORY }
+    private enum Phase { RESTING, ACTIVE, ESCAPE, VICTORY }
+
+    /** Tiempo para llegar a la salida tras vencer al jefe. */
+    public static final long ESCAPE_MS = 75_000;
+    /** Respiro corto antes de que la horda vuelva a llegar en el escape. */
+    static final long ESCAPE_GRACE_MS = 2_500;
 
     /** Un zombi nunca aparece mas cerca que esto de un jugador vivo de su piso. */
     static final double MIN_SPAWN_DISTANCE_PX = 320;
@@ -39,6 +48,7 @@ public class WaveDirector {
     private boolean bossDefeated;
     /** Se cumplio la cuota (o cayo el jefe) pero faltan misiones: la horda sigue llegando. */
     private boolean waitingForMissions;
+    private long escapeEndsAt;
 
     public WaveDirector(long now, long startDelayMs, List<FloorGrid> floors) {
         this.nextEventAt = now + startDelayMs;
@@ -51,7 +61,8 @@ public class WaveDirector {
         int remaining = phase == Phase.ACTIVE && !bossStage ? Math.max(0, quota - kills) : 0;
         return new WaveState(kinder, WaveCurve.KINDER_COUNT, kills, quota, remaining,
                 restingSeconds(now), bossStage, phase == Phase.VICTORY,
-                phase == Phase.ACTIVE && waitingForMissions, 0, 0);
+                phase == Phase.ACTIVE && waitingForMissions, 0, 0,
+                phase == Phase.ESCAPE, escapeSecondsLeft(now));
     }
 
     /** True si hay un Kinder en curso (no respiro ni victoria). */
@@ -71,8 +82,30 @@ public class WaveDirector {
         return switch (phase) {
             case RESTING -> Math.min(kinder + 1, WaveCurve.KINDER_COUNT);
             case ACTIVE -> kinder;
-            case VICTORY -> 0;
+            case ESCAPE, VICTORY -> 0;
         };
+    }
+
+    public synchronized boolean isEscaping() {
+        return phase == Phase.ESCAPE;
+    }
+
+    public synchronized int escapeSecondsLeft(long now) {
+        if (phase != Phase.ESCAPE) {
+            return 0;
+        }
+        return (int) Math.max(0, Math.ceil((escapeEndsAt - now) / 1000.0));
+    }
+
+    public synchronized boolean escapeTimedOut(long now) {
+        return phase == Phase.ESCAPE && now >= escapeEndsAt;
+    }
+
+    /** El equipo escapo: se gana la corrida. */
+    public synchronized void win() {
+        if (phase == Phase.ESCAPE) {
+            phase = Phase.VICTORY;
+        }
     }
 
     public synchronized boolean isVictory() {
@@ -114,6 +147,13 @@ public class WaveDirector {
                 }
                 if (now >= nextEventAt) {
                     nextEventAt = now + blueprint.spawnIntervalMs();
+                    return spawnBurst(alive, players);
+                }
+            }
+            case ESCAPE -> {
+                // La horda no para mientras corren a la salida (sin cuota que cumplir).
+                if (now >= nextEventAt) {
+                    nextEventAt = now + Math.max(400, blueprint.spawnIntervalMs() * 6 / 10);
                     return spawnBurst(alive, players);
                 }
             }
@@ -180,7 +220,9 @@ public class WaveDirector {
     private void finishKinder(long now) {
         justCleared = true;
         if (kinder >= WaveCurve.KINDER_COUNT) {
-            phase = Phase.VICTORY;
+            phase = Phase.ESCAPE;
+            escapeEndsAt = now + ESCAPE_MS;
+            nextEventAt = now + ESCAPE_GRACE_MS;
             return;
         }
         phase = Phase.RESTING;
