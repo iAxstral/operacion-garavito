@@ -1,6 +1,10 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLayout';
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
+import { displayName } from './profile';
+import PingLayer from './PingLayer';
+import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
+import { PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
@@ -12,6 +16,7 @@ import {
   getMyRole,
   getBoss,
   getProjectiles,
+  getPuddles,
   getZombies,
   isInputLocked,
   onStateChange,
@@ -51,6 +56,7 @@ import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
 import Lighting from './Lighting';
+import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY } from './HauntedDecor';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
 const DASH_SPEED = 420;
@@ -118,7 +124,9 @@ export function cameraZoomFor(width, height) {
 }
 
 const WALK_WOBBLE_HZ = 3;
-const WALK_WOBBLE_DEG = 2.5;
+// Letra gotica del tema (GameCanvas espera a que cargue antes de crear la escena).
+const GOTHIC_FONT = '"Pirata One", Georgia, serif';
+const WALK_WOBBLE_DEG = 1.5;
 
 const TILE_TEXTURE_FILES = {
   v2_floor_terrazo: 'v2_floor_terrazo_64.png',
@@ -287,7 +295,18 @@ export default class MainScene extends Phaser.Scene {
         if (volume > 0.01) this.sound.play('zombie_attack', { volume });
       },
       onStagger: (entry) => playSfx('stagger', this.hearing(entry.x, entry.y)),
-      onHit: (entry) => playSfx('hit', this.hearing(entry.x, entry.y)),
+      onHit: (entry, amount) => {
+        playSfx('hit', this.hearing(entry.x, entry.y));
+        const from = this.nearestPlayerTo(entry.x, entry.y) ?? { x: entry.x, y: entry.y - 1 };
+        this.gore.splatter(entry.x, entry.y, from.x, from.y);
+        this.gore.blood(entry.x, entry.y);
+        // La vida de los zombis es de pocos puntos: se muestra por 10 para que se sienta.
+        if (amount > 0) this.gore.damageNumber(entry.x, entry.y - 34, amount * 10, { crit: amount >= 3 });
+      },
+      onDeath: (entry) => {
+        if (entry.deathStyle === 'corpse') this.gore.blood(entry.x, entry.y + 4, { big: true });
+        else this.gore.burst(entry.x, entry.y + 6, entry.kind === 'SPITTER' ? 0x7fdc2a : 0x6e0b0b);
+      },
     };
   }
 
@@ -368,10 +387,13 @@ export default class MainScene extends Phaser.Scene {
     this.createMap(layout);
 
     const spawn = this.spawnOverride ?? layout.spawn;
+    bakeAllWalkFrames(this, ROLE_CATALOG.map((entry) => entry.spritePrefix));
     this.player = this.physics.add.sprite(spawn.x, spawn.y, this.roleTexture('down'));
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
+    this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
+    startDust(this, this.player);
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
@@ -435,9 +457,12 @@ export default class MainScene extends Phaser.Scene {
     this.reviveGfx = this.add.graphics().setDepth(5500);
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
+    this.pingLayer = new PingLayer(this);
     // El servidor rechazo una posicion (movimiento imposible): se vuelve a la suya.
+    // Los avisos del equipo de este piso se marcan en el mapa.
     const offCorrection = onGameEvent((event) => {
       if (event.type === 'POSITION_CORRECTED' && event.playerId === getMyRole()) this.applyServerPosition();
+      if (event.type === 'PING') this.showPing(event);
     });
     this.events.once('shutdown', () => {
       offCorrection();
@@ -459,12 +484,12 @@ export default class MainScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const banner = this.add
       .text(width / 2, height / 2 + (BANNER_TOP_PX - height / 2) / zoom, name, {
-        fontFamily: 'sans-serif',
-        fontSize: '30px',
-        fontStyle: 'bold',
-        color: '#f2fbe2',
-        stroke: '#0b120b',
-        strokeThickness: 6,
+        fontFamily: GOTHIC_FONT,
+        fontSize: '40px',
+        color: '#ecdfcc',
+        stroke: '#3a0505',
+        strokeThickness: 7,
+        shadow: { offsetX: 0, offsetY: 0, color: '#e8321f', blur: 14, fill: true, stroke: true },
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -498,12 +523,14 @@ export default class MainScene extends Phaser.Scene {
       const info = missionType(mission.type);
       const text = this.add
         .text(mission.x, mission.y, `${info.icon}\nMisión`, {
-          fontFamily: 'sans-serif',
-          fontSize: '13px',
-          color: '#ffffff',
+          fontFamily: GOTHIC_FONT,
+          fontSize: '16px',
+          color: '#e8b64a',
           align: 'center',
-          backgroundColor: '#5b3fa0',
-          padding: { x: 5, y: 3 },
+          backgroundColor: 'rgba(30, 8, 10, 0.9)',
+          padding: { x: 7, y: 4 },
+          stroke: '#120406',
+          strokeThickness: 2,
         })
         .setOrigin(0.5)
         .setDepth(4)
@@ -572,7 +599,7 @@ export default class MainScene extends Phaser.Scene {
       if (!entry) {
         const sprite = this.add.sprite(state.x, state.y, `${prefix}_down`).setDepth(9);
         const label = this.add
-          .text(state.x, state.y, roleInfo(state.role).name, {
+          .text(state.x, state.y, displayName(state), {
             fontFamily: 'sans-serif',
             fontSize: '11px',
             color: '#ffffff',
@@ -581,16 +608,21 @@ export default class MainScene extends Phaser.Scene {
           })
           .setOrigin(0.5, 1)
           .setDepth(11);
-        entry = { sprite, label, prefix, aim: Math.PI / 2, shotSeq: state.shotSeq ?? 0, weaponSeen: false };
+        const shadow = this.add.image(state.x, state.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
+        entry = { sprite, shadow, label, prefix, aim: Math.PI / 2, shotSeq: state.shotSeq ?? 0, weaponSeen: false };
         this.remotePlayers.set(state.playerId, entry);
       }
 
       const dx = state.x - entry.sprite.x;
       const dy = state.y - entry.sprite.y;
       if (Math.hypot(dx, dy) > 3) {
-        const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-        entry.sprite.setTexture(`${entry.prefix}_${direction}`);
+        entry.direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
         entry.aim = Math.atan2(dy, dx);
+        entry.walkMs = (entry.walkMs ?? 0) + delta;
+        entry.sprite.setTexture(walkKey(entry.prefix, entry.direction, walkFrameAt(entry.walkMs)));
+      } else if (entry.walkMs) {
+        entry.walkMs = 0;
+        entry.sprite.setTexture(`${entry.prefix}_${entry.direction ?? 'down'}`);
       }
       if ((state.shotSeq ?? 0) > entry.shotSeq) {
         // Un compañero disparo: se dibuja su bala con la direccion que reporto el servidor.
@@ -610,7 +642,8 @@ export default class MainScene extends Phaser.Scene {
       else entry.sprite.clearTint();
       entry.downed = downed;
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
-      const labelText = state.connected === false ? `${roleInfo(state.role).name} (desconectado)` : roleInfo(state.role).name;
+      entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.sprite.displayHeight / 2 - 5);
+      const labelText = state.connected === false ? `${displayName(state)} (desconectado)` : displayName(state);
       if (entry.label.text !== labelText) entry.label.setText(labelText);
       entry.sprite.setAlpha(state.connected === false ? 0.45 : entry.sprite.alpha);
       this.weaponLayer.update(state.playerId, {
@@ -627,6 +660,7 @@ export default class MainScene extends Phaser.Scene {
     this.remotePlayers.forEach((entry, id) => {
       if (seen.has(id)) return;
       entry.sprite.destroy();
+      entry.shadow.destroy();
       entry.label.destroy();
       this.weaponLayer.remove(id);
       this.remotePlayers.delete(id);
@@ -800,6 +834,45 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
+  showPing(event) {
+    const [floor, x, y] = String(event.reason ?? '').split(',').map(Number);
+    if (floor !== this.floor || !Number.isFinite(x)) return;
+    const who = displayName(getLatestState().players.find((p) => p.playerId === event.playerId) ?? { role: event.playerId });
+    this.pingLayer.add({ kind: event.itemId, x, y, label: `${who}: ${PING_KINDS[event.itemId]?.label ?? '¡Aquí!'}` });
+  }
+
+  // Charcos de acido de los escupidores muertos: verdes, burbujean y se secan.
+  syncPuddles() {
+    if (!this.puddleSprites) this.puddleSprites = new Map();
+    const seen = new Set();
+    getPuddles().filter((p) => p.floor === this.floor).forEach((p) => {
+      seen.add(p.id);
+      let entry = this.puddleSprites.get(p.id);
+      if (!entry) {
+        const pool = this.add.ellipse(p.x, p.y + 10, 20, 9, 0x7fdc2a, 0.7).setDepth(1.55);
+        const glow = this.add.ellipse(p.x, p.y + 10, 90, 40, 0x9dff3a, 0.18).setDepth(1.56).setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({ targets: pool, width: 76, height: 32, duration: 260, ease: 'Quad.easeOut' });
+        entry = { pool, glow, x: p.x, y: p.y + 10 };
+        this.puddleSprites.set(p.id, entry);
+      }
+      const life = Math.min(1, p.remainingMs / 1500);
+      entry.pool.setAlpha(0.7 * life);
+      entry.glow.setAlpha((0.14 + Math.sin(this.time.now / 180) * 0.05) * life);
+      if (Math.random() < 0.12) {
+        const bubble = this.add.circle(entry.x + (Math.random() - 0.5) * 50, entry.y + (Math.random() - 0.5) * 18, 2 + Math.random() * 2, 0xc8ff7a, 0.8).setDepth(1.57);
+        this.tweens.add({ targets: bubble, scale: 1.8, alpha: 0, duration: 380, onComplete: () => bubble.destroy() });
+      }
+    });
+    this.puddleSprites.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      this.tweens.add({ targets: [entry.pool, entry.glow], alpha: 0, duration: 400, onComplete: () => {
+        entry.pool.destroy();
+        entry.glow.destroy();
+      } });
+      this.puddleSprites.delete(id);
+    });
+  }
+
   // El jefe solo se dibuja si esta en el piso de este jugador.
   syncBoss(delta) {
     this.syncProjectiles(delta);
@@ -813,7 +886,12 @@ export default class MainScene extends Phaser.Scene {
   update(time, delta) {
     if (!this.player) return;
     this.syncRemotePlayers(delta);
+    this.playerShadow
+      .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)
+      .setVisible(this.player.visible);
     this.lighting.update(time, this.focusSprite(), this.remotePlayers);
+    this.syncPuddles();
+    this.pingLayer?.update(time);
     this.checkDamageTaken();
     this.drawReviveProgress();
     if (this.updateSpectate(delta)) return;
@@ -884,7 +962,9 @@ export default class MainScene extends Phaser.Scene {
       const quarter = Math.round(Phaser.Math.Angle.Wrap(this.aimAngle) / (Math.PI / 2));
       this.currentDirection = AIM_DIRECTIONS[(quarter + 4) % 4];
     }
-    this.player.setTexture(this.roleTexture(this.currentDirection));
+    this.player.setTexture(direction
+      ? walkKey(this.spritePrefix, this.currentDirection, walkFrameAt(this.walkWobblePhaseMs))
+      : this.roleTexture(this.currentDirection));
     this.syncLocalWeapon();
     if (direction) {
       this.walkWobblePhaseMs += delta;
@@ -1026,7 +1106,7 @@ export default class MainScene extends Phaser.Scene {
       const distance = Math.hypot(p.x - this.player.x, p.y - this.player.y);
       if (distance <= best) {
         best = distance;
-        near = { playerId: p.playerId, role: p.role, name: roleInfo(p.role).name };
+        near = { playerId: p.playerId, role: p.role, name: displayName(p) };
       }
     });
     setNearDowned(near);
@@ -1352,12 +1432,15 @@ export default class MainScene extends Phaser.Scene {
 
     this.layoutGrid = layout.grid;
     this.lighting = new Lighting(this);
+    bakeHauntedTextures(this);
+    this.gore = new GoreFx(this);
     renderOutside(this, layout.grid, this.lighting, getMyBuilding());
     this.renderGridTiles(layout.grid);
     this.renderDecorations(layout.decorations);
     this.renderFurniture(layout.furniture);
     this.renderLabels(layout.labels);
     this.addInteriorLights(layout);
+    decorateFloor(this, layout.grid, this.lighting, { building: getMyBuilding(), floor: this.floor });
 
     [
       { kind: 'up', stairs: layout.upStairs },
@@ -1375,9 +1458,10 @@ export default class MainScene extends Phaser.Scene {
             {
               fontFamily: 'sans-serif',
               fontSize: '13px',
-              color: '#ffffff',
-              backgroundColor: '#1f6f43',
-              padding: { x: 6, y: 3 },
+              fontStyle: 'bold',
+              color: '#ecdfcc',
+              backgroundColor: 'rgba(40, 10, 12, 0.92)',
+              padding: { x: 7, y: 4 },
             },
           )
           .setDepth(20)
@@ -1392,12 +1476,12 @@ export default class MainScene extends Phaser.Scene {
     const modes = ['flicker', 'steady', 'broken'];
     layout.decorations
       .filter((deco) => deco.type === 'column')
-      .filter((deco, i) => i % 2 === 0)
+      .filter((deco, i) => i % 3 === 0)
       .forEach((deco, i) => {
         this.lighting.addLight({
           x: deco.x * TILE + TILE / 2,
           y: (deco.y + 2.5) * TILE,
-          radius: 260,
+          radius: 220,
           mode: modes[i % modes.length],
         });
       });
@@ -1405,8 +1489,12 @@ export default class MainScene extends Phaser.Scene {
     VENDORS.filter((vendor) => vendor.floor === this.floor).forEach((vendor) => {
       this.lighting.addLight({ x: vendor.x, y: vendor.y, radius: 150, mode: 'steady', bulb: false });
     });
-    missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor).forEach((site) => {
-      this.lighting.addLight({ x: site.x, y: site.y, radius: 130, mode: 'steady', bulb: false });
+    // Salones: en algunos el bombillo esta fallando (parpadea o se va por ratos).
+    const roomModes = ['broken', null, 'flicker', null, 'broken', 'flicker'];
+    missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor).forEach((site, i) => {
+      const mode = roomModes[i % roomModes.length];
+      if (mode) this.lighting.addLight({ x: site.x, y: site.y - TILE, radius: 230, mode });
+      else this.lighting.addLight({ x: site.x, y: site.y, radius: 130, mode: 'steady', bulb: false });
     });
 
     // Luces fluorescentes del techo del corredor porticado: parejas, sin foco visible.
@@ -1578,11 +1666,11 @@ export default class MainScene extends Phaser.Scene {
     labels.forEach((label) => {
       this.add
         .text(label.x, label.y, label.text, {
-          fontFamily: 'sans-serif',
-          fontSize: '13px',
-          color: '#3a2f22',
-          backgroundColor: '#e8e2d4',
-          padding: { x: 4, y: 2 },
+          fontFamily: GOTHIC_FONT,
+          fontSize: '16px',
+          color: '#e8d9b8',
+          backgroundColor: 'rgba(26, 12, 10, 0.82)',
+          padding: { x: 6, y: 2 },
         })
         .setDepth(15);
     });

@@ -6,7 +6,7 @@ import {
   setSpectateTarget,
   spectatableTeammates,
 } from '../game/gameSync';
-import { roleInfo } from '../game/roleCatalog';
+import { displayName } from '../game/profile';
 import { playSfx } from '../game/sfx';
 
 const REVIVER_ROLE = 'SALUD';
@@ -60,7 +60,7 @@ export default function SpectatorPanel() {
         <strong>Estás caído</strong>
         <span>
           {beingRevived
-            ? `¡${roleInfo(beingRevived.role).name} te está levantando! ${Math.round(beingRevived.reviveProgress * 100)}%`
+            ? `¡${displayName(beingRevived)} te está levantando! ${Math.round(beingRevived.reviveProgress * 100)}%`
             : medicCanHelp
               ? 'Biomédica puede revivirte: pídele que venga'
               : 'Volverás a levantarte cuando termine el Kinder'}
@@ -72,7 +72,7 @@ export default function SpectatorPanel() {
           <button type="button" className="spectator-arrow" aria-label="Compañero anterior" onClick={() => cycle(-1)}>◀</button>
           <div className="spectator-current">
             <span className="spectator-label">Viendo a</span>
-            <strong>{watching ? `${roleInfo(watching.role).name} · Piso ${watching.floor}` : '—'}</strong>
+            <strong>{watching ? `${displayName(watching)} · Piso ${watching.floor}` : '—'}</strong>
             <div className="spectator-chips">
               {teammates.map((p) => (
                 <button
@@ -84,7 +84,7 @@ export default function SpectatorPanel() {
                     playSfx('click');
                   }}
                 >
-                  {roleInfo(p.role).name}
+                  {displayName(p)}
                   <span className="spectator-chip-hp">{p.health}</span>
                 </button>
               ))}

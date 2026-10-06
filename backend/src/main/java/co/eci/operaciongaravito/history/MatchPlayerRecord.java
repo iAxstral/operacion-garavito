@@ -43,7 +43,16 @@ public class MatchPlayerRecord {
     @Column(nullable = false)
     private int downs;
 
+    @Column(name = "player_name", length = 24)
+    private String playerName;
+
     protected MatchPlayerRecord() {
+    }
+
+    public MatchPlayerRecord(String role, int kills, int missions, int garavitosEarned, int damageTaken,
+                             int revives, int downs, String playerName) {
+        this(role, kills, missions, garavitosEarned, damageTaken, revives, downs);
+        this.playerName = playerName;
     }
 
     public MatchPlayerRecord(String role, int kills, int missions, int garavitosEarned, int damageTaken,
@@ -63,6 +72,10 @@ public class MatchPlayerRecord {
 
     public String getRole() {
         return role;
+    }
+
+    public String getPlayerName() {
+        return playerName;
     }
 
     public int getKills() {

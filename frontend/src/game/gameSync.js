@@ -1,5 +1,6 @@
 
 import { socketService } from '../services/socketService';
+import { getNickname } from './profile';
 
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -197,7 +198,7 @@ export async function joinAs(role) {
   const token = newToken();
   const reply = awaitEvent((event) => (event.type === 'JOIN_OK' && event.itemId === CLIENT_ID)
     || (event.type === 'JOIN_REJECTED' && event.playerId === CLIENT_ID));
-  socketService.publish(`/app/game/${gameId}/join`, { role, clientId: CLIENT_ID, token });
+  socketService.publish(`/app/game/${gameId}/join`, { role, clientId: CLIENT_ID, token, name: getNickname() || null });
 
   const event = await reply;
   if (event.type === 'JOIN_REJECTED') throw new Error(event.reason);
@@ -209,7 +210,9 @@ export async function joinAs(role) {
 }
 
 function sendRejoin() {
-  socketService.publish(`/app/game/${gameId}/rejoin`, { role: myRole, clientId: CLIENT_ID, token: seatToken });
+  socketService.publish(`/app/game/${gameId}/rejoin`, {
+    role: myRole, clientId: CLIENT_ID, token: seatToken, name: getNickname() || null,
+  });
 }
 
 // Al reconectarse el socket (corte de Wi-Fi, celular que se bloqueo) la suscripcion
@@ -467,6 +470,17 @@ export function getProjectiles() {
   return latestState.projectiles ?? [];
 }
 
+/** Charcos de acido que dejan los escupidores al morir ({ id, floor, x, y, remainingMs }). */
+export function getPuddles() {
+  return latestState.puddles ?? [];
+}
+
+/** Aviso al equipo: ZOMBIES, HELP, REVIVE, GO o AMMO. El servidor le pone la posicion. */
+export function requestPing(kind) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/ping`, { playerId: myRole, kind });
+}
+
 export function getWave() {
   return latestState.wave ?? null;
 }
@@ -596,5 +610,8 @@ if (import.meta.env.DEV) {
     getZombies,
     getBoss,
     getWave,
+    // Solo para revisar pantallas a mano o en pruebas: dispara un evento como si
+    // viniera del servidor (p. ej. { type: 'TEAM_WIPED' }).
+    emitEventForTest: (event) => eventListeners.forEach((callback) => callback(event)),
   };
 }

@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { getLatestState, getMyRole, onGameEvent, setInputLocked } from '../game/gameSync';
-import { roleInfo } from '../game/roleCatalog';
+import { nameWithRole } from '../game/profile';
 import { playSfx } from '../game/sfx';
 import RankingPanel from './RankingPanel';
+import Icon from './Icon';
+import { earnAchievements } from '../game/achievements';
 
 const OUTCOMES = {
   TEAM_WIPED: {
@@ -19,19 +21,19 @@ const OUTCOMES = {
 
 // Reconocimientos: quien mas hizo cada cosa (solo si hizo algo).
 const AWARDS = [
-  { key: 'kills', label: '🧟 Exterminador' },
-  { key: 'missions', label: '📋 Cumplidor' },
-  { key: 'revives', label: '✚ Salvavidas' },
-  { key: 'garavitosEarned', label: '💰 Proveedor' },
+  { key: 'kills', icon: 'zombie', label: 'Exterminador' },
+  { key: 'missions', icon: 'scroll', label: 'Cumplidor' },
+  { key: 'revives', icon: 'cross', label: 'Salvavidas' },
+  { key: 'garavitosEarned', icon: 'coin', label: 'Proveedor' },
 ];
 
 function awardsFor(players) {
   const awards = new Map();
-  AWARDS.forEach(({ key, label }) => {
-    const best = Math.max(0, ...players.map((p) => p[key]));
+  AWARDS.forEach((award) => {
+    const best = Math.max(0, ...players.map((p) => p[award.key]));
     if (best <= 0) return;
-    players.filter((p) => p[key] === best).forEach((p) => {
-      awards.set(p.role, [...(awards.get(p.role) ?? []), label]);
+    players.filter((p) => p[award.key] === best).forEach((p) => {
+      awards.set(p.role, [...(awards.get(p.role) ?? []), award]);
     });
   });
   return awards;
@@ -44,12 +46,15 @@ export default function GameOverScreen({ onExitToMenu }) {
   const [outcome, setOutcome] = useState(null);
   const [summary, setSummary] = useState(null);
   const [showRanking, setShowRanking] = useState(false);
+  const [earned, setEarned] = useState([]);
 
   useEffect(() => onGameEvent((event) => {
     if (!OUTCOMES[event.type]) return;
     setOutcome(OUTCOMES[event.type]);
     // El resumen viaja en el mismo mensaje que el evento.
-    setSummary(getLatestState().summary ?? null);
+    const runSummary = getLatestState().summary ?? null;
+    setSummary(runSummary);
+    setEarned(earnAchievements(runSummary, getMyRole()));
     setInputLocked(true);
     playSfx(event.type === 'VICTORY' ? 'coins' : 'breakWood');
   }), []);
@@ -89,20 +94,26 @@ export default function GameOverScreen({ onExitToMenu }) {
               <thead>
                 <tr>
                   <th scope="col">Rol</th>
-                  <th scope="col" title="Zombis eliminados">🧟</th>
-                  <th scope="col" title="Misiones completadas">📋</th>
-                  <th scope="col" title="Garavitos ganados">💰</th>
-                  <th scope="col" title="Compañeros revividos">✚</th>
-                  <th scope="col" title="Daño recibido">❤</th>
-                  <th scope="col" title="Veces que cayó">☠</th>
+                  <th scope="col"><Icon name="zombie" title="Zombis eliminados" /></th>
+                  <th scope="col"><Icon name="scroll" title="Misiones completadas" /></th>
+                  <th scope="col"><Icon name="coin" title="Garavitos ganados" /></th>
+                  <th scope="col"><Icon name="cross" title="Compañeros revividos" /></th>
+                  <th scope="col"><Icon name="heart" title="Daño recibido" /></th>
+                  <th scope="col"><Icon name="skull" title="Veces que cayó" /></th>
                 </tr>
               </thead>
               <tbody>
                 {players.map((p) => (
                   <tr key={p.role} className={p.role === getMyRole() ? 'results-me' : undefined}>
                     <th scope="row">
-                      {roleInfo(p.role).name}{p.role === getMyRole() ? ' (tú)' : ''}
-                      {awards.get(p.role) && <span className="results-awards">{awards.get(p.role).join(' ')}</span>}
+                      {nameWithRole(p)}{p.role === getMyRole() ? ' (tú)' : ''}
+                      {awards.get(p.role) && (
+                        <span className="results-awards">
+                          {awards.get(p.role).map((award) => (
+                            <span key={award.key}><Icon name={award.icon} /> {award.label} </span>
+                          ))}
+                        </span>
+                      )}
                     </th>
                     <td>{p.kills}</td>
                     <td>{p.missions}</td>
@@ -117,6 +128,24 @@ export default function GameOverScreen({ onExitToMenu }) {
           </div>
         )}
 
+        {earned.length > 0 && (
+          <div className="results-achievements">
+            <h3>Logros</h3>
+            <div className="achievement-list">
+              {earned.map((a) => (
+                <div key={a.id} className={`achievement${a.isNew ? ' achievement--new' : ''}`}>
+                  <Icon name={a.icon} />
+                  <span>
+                    <strong>{a.name}</strong>
+                    <small>{a.description}</small>
+                  </span>
+                  {a.isNew && <em>¡Nuevo!</em>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="game-over-actions">
           {outcome.canRetry && (
             <button type="button" className="game-over-btn game-over-btn--primary" onClick={handleRetry}>
@@ -124,7 +153,7 @@ export default function GameOverScreen({ onExitToMenu }) {
             </button>
           )}
           <button type="button" className="game-over-btn" onClick={() => setShowRanking(true)}>
-            🏆 Ranking
+            <Icon name="trophy" /> Ranking
           </button>
           <button
             type="button"

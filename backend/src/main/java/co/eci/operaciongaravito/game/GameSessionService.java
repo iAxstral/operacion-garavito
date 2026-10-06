@@ -157,7 +157,8 @@ public class GameSessionService {
                 session.projectileStates(),
                 session.barricadeStates(),
                 session.lastSummary(),
-                session.kinderEvent()
+                session.kinderEvent(),
+                session.puddleStates()
         );
     }
 

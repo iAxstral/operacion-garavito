@@ -11,9 +11,18 @@ import CodeMission from './components/CodeMission';
 import VaccineMission from './components/VaccineMission';
 import CashMission from './components/CashMission';
 import FuseMission from './components/FuseMission';
+import RondaMission from './components/RondaMission';
+import SensoresMission from './components/SensoresMission';
+import PulsoMission from './components/PulsoMission';
+import MedicamentosMission from './components/MedicamentosMission';
+import PresupuestoMission from './components/PresupuestoMission';
+import FacturasMission from './components/FacturasMission';
+import TuberiasMission from './components/TuberiasMission';
+import NivelMission from './components/NivelMission';
 import TouchControls from './components/TouchControls';
 import SpectatorPanel from './components/SpectatorPanel';
 import TutorialHints from './components/TutorialHints';
+import PingControls from './components/PingControls';
 import PhonePanel from './components/PhonePanel';
 import TreasuryPanel from './components/TreasuryPanel';
 import GameOverScreen from './components/GameOverScreen';
@@ -24,7 +33,10 @@ import RoleSelect from './components/RoleSelect';
 import LobbyEntry from './components/LobbyEntry';
 import WaitingRoom from './components/WaitingRoom';
 import { leaveGame, resumeSession } from './game/gameSync';
+import { startAmbience } from './game/ambience';
 import './App.css';
+import './halloween.css';
+import './minigames.css';
 
 function App() {
   const [view, setView] = useState('menu');
@@ -41,17 +53,25 @@ function App() {
     };
   }, []);
 
+  // Cada pantalla entra con un fundido desde negro (la clave reinicia la animacion).
+  const fade = (screen) => <div key={view} className="hw-screen">{screen}</div>;
+
+  // Viento, crujidos y gemidos: claros en las pantallas de afuera, apagados en la partida.
+  useEffect(() => {
+    startAmbience(view === 'playing' ? 'indoor' : 'outdoor');
+  }, [view]);
+
   const handleExitToMenu = () => {
     leaveGame();
     setView('menu');
   };
 
   if (view === 'menu') {
-    return <MainMenu onPlay={() => setView('buildings')} />;
+    return fade(<MainMenu onPlay={() => setView('buildings')} />);
   }
 
   if (view === 'buildings') {
-    return (
+    return fade(
       <BuildingSelect
         onSelect={(id) => {
           setBuilding(id);
@@ -63,7 +83,7 @@ function App() {
   }
 
   if (view === 'lobby') {
-    return (
+    return fade(
       <LobbyEntry
         building={building}
         onEntered={() => setView('roles')}
@@ -73,7 +93,7 @@ function App() {
   }
 
   if (view === 'roles') {
-    return (
+    return fade(
       <RoleSelect
         onJoined={() => setView('waiting')}
         onBack={() => {
@@ -85,7 +105,7 @@ function App() {
   }
 
   if (view === 'waiting') {
-    return (
+    return fade(
       <WaitingRoom
         onStarted={() => setView('playing')}
         onLeave={() => {
@@ -97,7 +117,7 @@ function App() {
   }
 
   return (
-    <div id="game-root">
+    <div id="game-root" className="hw-screen">
       <div className="game-stage">
         <Suspense fallback={<div className="game-loading">Cargando el edificio…</div>}>
           <GameCanvas />
@@ -111,9 +131,18 @@ function App() {
         <VaccineMission />
         <CashMission />
         <FuseMission />
+        <RondaMission />
+        <SensoresMission />
+        <PulsoMission />
+        <MedicamentosMission />
+        <PresupuestoMission />
+        <FacturasMission />
+        <TuberiasMission />
+        <NivelMission />
         <TouchControls />
         <SpectatorPanel />
         <TutorialHints />
+        <PingControls />
         <PhonePanel />
         <TreasuryPanel />
         <GameOverScreen onExitToMenu={handleExitToMenu} />

@@ -21,6 +21,7 @@ public record MatchSummary(
             int garavitosEarned,
             int damageTaken,
             int revives,
-            int downs) {
+            int downs,
+            String name) {
     }
 }

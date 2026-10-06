@@ -23,6 +23,7 @@ import {
   setInputLocked,
 } from '../game/gameSync';
 import SettingsPanel from './SettingsPanel';
+import Icon, { Glyph } from './Icon';
 import { playSfx } from '../game/sfx';
 import { MISSIONS_PER_KINDER, missionType } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
@@ -30,6 +31,7 @@ import { CAFETERIA_MENU, WEAPON_MACHINE_MENU } from '../game/shopCatalog';
 import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog';
 import { abilityFor, BARRICADE_COOLDOWN_MS, MAX_BARRICADES, priceFor } from '../game/abilityCatalog';
 import { roleInfo } from '../game/roleCatalog';
+import { displayName, nameWithRole } from '../game/profile';
 import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
 
 const MAP_CELL_PX = 12;
@@ -113,10 +115,28 @@ function nextMission(me) {
   return here[0] ?? pending[0] ?? null;
 }
 
+// Siempre sangre: mas oscura y apagada a medida que se acaba la vida.
 function healthColor(health) {
-  if (health > 60) return '#4caf50';
-  if (health > 30) return '#e0a13a';
-  return '#c0392b';
+  if (health > 60) return 'linear-gradient(180deg, #e8412c 0%, #a3140c 55%, #6a0606 100%)';
+  if (health > 30) return 'linear-gradient(180deg, #d0581f 0%, #8f2a0a 55%, #561405 100%)';
+  return 'linear-gradient(180deg, #a01010 0%, #5c0505 60%, #300202 100%)';
+}
+
+/** Balas del cargador dibujadas: llenas las que quedan, huecas las gastadas. */
+function AmmoPips({ loaded, size }) {
+  if (!size) return null;
+  return (
+    <span className="hud-ammo-pips" aria-hidden="true">
+      {Array.from({ length: size }, (_, i) => (
+        <span key={i} className={`hud-ammo-pip${i < loaded ? ' hud-ammo-pip--full' : ''}`} />
+      ))}
+    </span>
+  );
+}
+
+// Apodo (o rol) de un jugador por su id, con el ultimo estado del servidor.
+function nameOf(playerId) {
+  return displayName(getLatestState().players.find((p) => p.playerId === playerId) ?? { role: playerId });
 }
 
 // Texto del aviso para un evento del servidor (o null si a este jugador no le toca).
@@ -137,13 +157,13 @@ function toastFor(event) {
   }
   if (event.type === 'TRANSFER' && (event.playerId === getMyRole() || event.itemId === getMyRole())) {
     message = event.playerId === getMyRole()
-      ? `Enviaste ${event.reason} Garavitos a ${roleInfo(event.itemId).name}`
+      ? `Enviaste ${event.reason} Garavitos a ${nameOf(event.itemId)}`
       : `¡Economía te envió +${event.reason} Garavitos!`;
     return { message, ms: 2500 };
   }
   if (event.type === 'REVIVED') {
-    const revived = roleInfo(event.playerId).name;
-    const reviver = roleInfo(event.itemId).name;
+    const revived = nameOf(event.playerId);
+    const reviver = nameOf(event.itemId);
     message = event.playerId === getMyRole() ? `¡${reviver} te levantó! Vuelves con 50 de vida`
       : event.itemId === getMyRole() ? `¡Levantaste a ${revived}!`
         : `${revived} volvió a la pelea`;
@@ -383,9 +403,10 @@ export default function Hud() {
 
     announcedWaveRef.current = kinderNumber;
     setWaveBanner(bossStage
-      ? `¡Kinder ${kinderNumber}! El Ingeniero de Sistemas viene por ustedes`
-      : `¡Kinder ${kinderNumber}! Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno`);
-    const timeout = setTimeout(() => setWaveBanner(null), 3200);
+      ? { boss: true, title: `Kinder ${kinderNumber}`, big: 'El Ingeniero de Sistemas', sub: 'viene por ustedes' }
+      : { boss: false, title: `Kinder ${kinderNumber}`, big: `Kinder ${kinderNumber}`, sub: `Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno` });
+    playSfx(bossStage ? 'bossStinger' : 'kinderStinger');
+    const timeout = setTimeout(() => setWaveBanner(null), 3600);
     return () => clearTimeout(timeout);
   }, [kinderNumber, kinderActive, kinderQuota, bossStage]);
 
@@ -451,15 +472,19 @@ export default function Hud() {
   return (
     <div className={`hud${touch ? ' hud--touch' : ''}`}>
       {hurtKey > 0 && <div key={hurtKey} className={`hud-hurt-vignette${health <= 30 ? ' hud-hurt-vignette--critical' : ''}`} />}
+      {health > 0 && health <= 30 && me?.lifeState !== 'DOWNED' && <div className="hud-low-health" aria-hidden="true" />}
 
       <div className="hud-top-left">
-        <div className="hud-health-bar">
-          <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
-          <span className="hud-health-label">{health} / 100</span>
+        <div className={`hud-health${health <= 30 ? ' hud-health--low' : ''}`}>
+          <Icon name="heart" className="hud-health-heart" />
+          <div className="hud-health-bar">
+            <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
+            <span className="hud-health-label">{health} / 100</span>
+          </div>
         </div>
 
         <div className="hud-stats-row">
-          <div className="hud-garavitos">{garavitos} Garavitos</div>
+          <div className="hud-garavitos"><Icon name="coin" /> {garavitos} Garavitos</div>
           <div className="hud-floor">{role.name} — Piso {floor}</div>
         </div>
 
@@ -479,12 +504,12 @@ export default function Hud() {
         <div className={`hud-weapon${weapon.ranged && me?.magazine === 0 ? ' hud-weapon--empty' : ''}`}>
           {weapon.icon
             ? <img src={weapon.icon} alt="" className="hud-weapon-icon" />
-            : <span className="hud-weapon-glyph" aria-hidden="true">{weapon.glyph}</span>}
+            : <span className="hud-weapon-glyph" aria-hidden="true"><Glyph value={weapon.glyph} /></span>}
           <span className="hud-weapon-name">{weapon.name}</span>
           {weapon.ranged && (
             <span className="hud-weapon-ammo">
-              {reloadingMs > 0 ? 'Recargando…' : `${me?.magazine ?? 0}/${weapon.magazineSize}`}
-              <small> · {me?.reserveAmmo ?? 0}</small>
+              {reloadingMs > 0 ? 'Recargando…' : <AmmoPips loaded={me?.magazine ?? 0} size={weapon.magazineSize} />}
+              <small>{me?.magazine ?? 0}/{weapon.magazineSize} · {me?.reserveAmmo ?? 0}</small>
             </span>
           )}
           {!touch && <span className="hud-weapon-keys">1-4{weapon.ranged ? ' · R' : ''}</span>}
@@ -493,7 +518,7 @@ export default function Hud() {
 
         <div className={`hud-ability-chip${abilityCooling ? ' hud-ability-chip--cooling' : ''}`} title={ability.hint}>
           {!touch && <span className="hud-ability-key">F</span>}
-          <span aria-hidden="true">{ability.icon}</span>
+          <Glyph value={ability.icon} />
           <span>{ability.name}</span>
           {me?.role === 'INFRAESTRUCTURA' && (
             <small>{myBarricades}/{MAX_BARRICADES}{abilityCooling ? ` · ${Math.ceil(me.abilityReadyInMs / 1000)}s` : ''}</small>
@@ -508,7 +533,7 @@ export default function Hud() {
             </div>
             {missions.map((mission) => (
               <div key={mission.missionId} className={`hud-mission${mission.done ? ' hud-mission--done' : ''}`}>
-                <span aria-hidden="true">{mission.done ? '✓' : missionType(mission.type).icon}</span>
+                <Glyph value={mission.done ? '✓' : missionType(mission.type).icon} />
                 <span className="hud-mission-room">{mission.room}</span>
                 <span className="hud-mission-floor">P{mission.floor}</span>
               </div>
@@ -529,7 +554,7 @@ export default function Hud() {
                 setMapOpen((open) => !open);
               }}
             >
-              🗺
+              <Icon name="map" />
             </button>
           )}
           <button
@@ -542,7 +567,7 @@ export default function Hud() {
               openSettings();
             }}
           >
-            ⚙
+            <Icon name="gear" />
           </button>
         </div>
 
@@ -588,9 +613,10 @@ export default function Hud() {
 
       {state.event && (
         <div className={`hud-kinder-event hud-kinder-event--${state.event.type.toLowerCase()}`}>
+          <Icon name={state.event.type === 'BLACKOUT' ? 'bolt' : 'box'} />{' '}
           {state.event.type === 'BLACKOUT'
-            ? `⚡ Apagón — tablero en ${state.event.room} (piso ${state.event.floor})`
-            : `📦 Suministros en ${state.event.room} (piso ${state.event.floor})`}
+            ? `Apagón — tablero en ${state.event.room} (piso ${state.event.floor})`
+            : `Suministros en ${state.event.room} (piso ${state.event.floor})`}
           <strong> {Math.ceil(state.event.endsInMs / 1000)}s</strong>
         </div>
       )}
@@ -614,7 +640,15 @@ export default function Hud() {
       )}
 
       {toast && <div className="hud-toast">{toast}</div>}
-      {waveBanner && <div className="hud-wave-banner">{waveBanner}</div>}
+      {waveBanner && (
+        <div className={`hud-wave-banner${waveBanner.boss ? ' hud-wave-banner--boss' : ''}`} role="status">
+          <span className="hud-wave-banner-bar" aria-hidden="true" />
+          {waveBanner.boss && <span className="hud-wave-banner-kicker">{waveBanner.title}</span>}
+          <strong className="hud-wave-banner-title">{waveBanner.big}</strong>
+          <span className="hud-wave-banner-sub">{waveBanner.sub}</span>
+          <span className="hud-wave-banner-bar hud-wave-banner-bar--bottom" aria-hidden="true" />
+        </div>
+      )}
 
       {mapOpen && (
         <div className="map-modal map-modal--overview">
@@ -650,7 +684,7 @@ export default function Hud() {
               {others.length === 0 && <p className="team-panel-empty">Nadie más conectado todavía.</p>}
               {others.map((p) => (
                 <div key={p.playerId} className="team-panel-row">
-                  <strong>{roleInfo(p.role).name}</strong> — {p.health} / 100
+                  <strong>{nameWithRole(p)}</strong> — {p.health} / 100
                   <div className="hud-health-bar hud-health-bar--small">
                     <div className="hud-health-fill" style={{ width: `${p.health}%`, background: healthColor(p.health) }} />
                   </div>

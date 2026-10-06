@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { isTouchDevice } from '../game/gameSync';
-import { ROLE_CATALOG, missionSummary } from '../game/roleCatalog';
+import { ROLE_CATALOG } from '../game/roleCatalog';
+import MissionSummary from './MissionSummary';
 import { abilityFor } from '../game/abilityCatalog';
 import { playSfx } from '../game/sfx';
+import { Glyph } from './Icon';
 
 const TABS = [
   { id: 'goal', label: 'Objetivo' },
@@ -22,6 +24,7 @@ const KEYBOARD = [
   ['F', 'Habilidad de tu rol'],
   ['E', 'Interactuar: misiones, tienda, puertas, escaleras, inventario'],
   ['M / Tab', 'Mapa y equipo'],
+  ['Z / X / V / G / B', 'Avisar al equipo: zombis, ayuda, revívanme, vamos, munición'],
   ['Esc', 'Configuración'],
 ];
 
@@ -34,6 +37,7 @@ const TOUCH = [
   ['E', 'Interactuar (mantén para revivir)'],
   ['🔫 / ⟳', 'Cambiar de arma / recargar'],
   ['🗺 / ⚙', 'Mapa / configuración'],
+  ['📣', 'Avisar al equipo (se escucha con la voz de tu rol)'],
 ];
 
 export default function HowToPlay({ onClose }) {
@@ -94,7 +98,11 @@ export default function HowToPlay({ onClose }) {
               <tbody>
                 {(isTouchDevice() ? TOUCH : KEYBOARD).map(([key, action]) => (
                   <tr key={key}>
-                    <th scope="row"><kbd>{key}</kbd></th>
+                    <th scope="row">
+                      {key.split(' / ').map((part, i) => (
+                        <span key={part}>{i > 0 && ' / '}<kbd><Glyph value={part} /></kbd></span>
+                      ))}
+                    </th>
                     <td>{action}</td>
                   </tr>
                 ))}
@@ -112,8 +120,8 @@ export default function HowToPlay({ onClose }) {
                   <img src={entry.portrait} alt="" />
                   <div>
                     <h3>{entry.name}</h3>
-                    <p><strong>{ability.icon} {ability.name}:</strong> {ability.hint}.</p>
-                    <p className="howto-muted">Misiones: {missionSummary(entry.role)}</p>
+                    <p><strong><Glyph value={ability.icon} /> {ability.name}:</strong> {ability.hint}.</p>
+                    <p className="howto-muted">Misiones: <MissionSummary role={entry.role} /></p>
                   </div>
                 </article>
               );

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getMyPlayerState, isTouchDevice, onStateChange, touchInput } from '../game/gameSync';
 import { ownedWeapons, weaponById } from '../game/weaponCatalog';
 import { abilityFor } from '../game/abilityCatalog';
+import Icon, { Glyph } from './Icon';
 
 const CHARGED_COOLDOWN_MS = 6000;
 
@@ -119,15 +120,15 @@ export default function TouchControls() {
       </div>
 
       <div className="touch-buttons">
-        <HoldButton label="⚔" ariaLabel="Ataque básico" className="touch-btn--attack" field="attack" />
+        <HoldButton label={<Icon name="sword" />} ariaLabel="Ataque básico" className="touch-btn--attack" field="attack" />
         <HoldButton
-          label="💥"
+          label={<Icon name="burst" />}
           ariaLabel={chargedReady ? 'Ataque cargado' : `Ataque cargado (${chargedPct}%)`}
           className={`touch-btn--charged${chargedReady ? ' touch-btn--ready' : ''}`}
           style={{ '--cooldown': `${chargedPct}%` }}
           field="charged"
         />
-        <HoldButton label="»" ariaLabel="Dash" className="touch-btn--dash" field="dash" />
+        <HoldButton label={<Icon name="dash" />} ariaLabel="Dash" className="touch-btn--dash" field="dash" />
         {arms.count > 1 && (
           <button
             type="button"
@@ -138,7 +139,7 @@ export default function TouchControls() {
               touchInput.cycleWeapon = true;
             }}
           >
-            {arms.weapon.icon ? <img src={arms.weapon.icon} alt="" /> : arms.weapon.glyph}
+            {arms.weapon.icon ? <img src={arms.weapon.icon} alt="" /> : <Glyph value={arms.weapon.glyph} />}
           </button>
         )}
         {downed ? null : (
@@ -151,7 +152,7 @@ export default function TouchControls() {
               touchInput.ability = true;
             }}
           >
-            {abilityFor(getMyPlayerState()?.role).icon}
+            <Glyph value={abilityFor(getMyPlayerState()?.role).icon} />
           </button>
         )}
         {arms.canReload && (
@@ -164,7 +165,7 @@ export default function TouchControls() {
               touchInput.reload = true;
             }}
           >
-            ⟳
+            <Icon name="reload" />
           </button>
         )}
         <button

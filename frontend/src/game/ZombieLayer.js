@@ -1,4 +1,7 @@
 import Phaser from 'phaser';
+import { SHADOW_KEY } from './HauntedDecor';
+import { bakeZombieSheets, ZOMBIE_FRAMES } from './zombieArt';
+import { getSettings, onSettingsChange } from './settings';
 
 const TEXTURE = 'zombie';
 const TOUGH_TEXTURE = 'zombie-teso';
@@ -20,43 +23,34 @@ const SPIT_TINT = 0xb6ff5a;
 const STAGGER_TINT = 0xb9c4ff;
 const LUNGE_PX = 16;
 
-function bakeTexture(scene, key, { body, rot, w, h }) {
-  if (scene.textures.exists(key)) return;
+// Contorno de color para reconocer el tipo de un vistazo (el caminante normal no lleva).
+const OUTLINE_COLORS = { RUNNER: 0x3fd8ff, SPITTER: 0x9dff3a, TOUGH: 0xff3a2a };
+const OUTLINE_SCALE = 1.14;
+const RISE_MS = 520;
+// Opcion para daltonismo: una forma blanca sobre la cabeza ademas del color.
+const SHAPE_KEY = 'zombie-type-shapes';
+const SHAPES = { TOUGH: 0, RUNNER: 1, SPITTER: 2 };
+
+function bakeTypeShapes(scene) {
+  if (scene.textures.exists(SHAPE_KEY)) return;
+  const size = 18;
   const g = scene.make.graphics({ x: 0, y: 0, add: false });
-
-  g.fillStyle(0x2f3a26, 1);
-  g.fillRoundedRect(w * 0.18, h * 0.3, w * 0.64, h * 0.62, 5);
-  g.fillStyle(body, 1);
-  g.fillRoundedRect(w * 0.18, h * 0.3, w * 0.42, h * 0.62, 5);
-  g.fillStyle(rot, 1);
-  g.fillCircle(w / 2, h * 0.24, w * 0.26);
-  g.fillStyle(0x1d2417, 1);
-  g.fillCircle(w * 0.42, h * 0.22, 2.2);
-  g.fillCircle(w * 0.58, h * 0.22, 2.2);
-
-  g.fillStyle(rot, 1);
-  g.fillRect(w * 0.06, h * 0.42, w * 0.16, h * 0.12);
-  g.fillRect(w * 0.78, h * 0.42, w * 0.16, h * 0.12);
-
-  g.generateTexture(key, w, h);
+  g.lineStyle(3, 0x0d0608, 1);
+  g.fillStyle(0xffffff, 1);
+  // Cuadrado (resistente)
+  g.fillRect(3, 3, 12, 12).strokeRect(3, 3, 12, 12);
+  // Triangulo (corredor)
+  g.fillTriangle(size + 9, 2, size + 16, 16, size + 2, 16).strokeTriangle(size + 9, 2, size + 16, 16, size + 2, 16);
+  // Gota (escupidor)
+  g.fillCircle(2 * size + 9, 11, 6).strokeCircle(2 * size + 9, 11, 6);
+  g.fillTriangle(2 * size + 4, 9, 2 * size + 14, 9, 2 * size + 9, 1);
+  g.generateTexture(SHAPE_KEY, size * 3, size);
   g.destroy();
+  const texture = scene.textures.get(SHAPE_KEY);
+  [0, 1, 2].forEach((i) => texture.add(i, 0, i * size, 0, size, size));
 }
-
-// Escupidor: cuerpo hinchado con una bolsa de acido en la garganta.
-function bakeSpitter(scene) {
-  if (scene.textures.exists(SPITTER_TEXTURE)) return;
-  const w = 38;
-  const h = 46;
-  const g = scene.make.graphics({ x: 0, y: 0, add: false });
-  g.fillStyle(0x3d4a1c, 1).fillEllipse(w / 2, h * 0.64, w * 0.86, h * 0.62);
-  g.fillStyle(0x6f8526, 1).fillEllipse(w * 0.44, h * 0.62, w * 0.6, h * 0.5);
-  g.fillStyle(0xc7e05a, 1).fillCircle(w * 0.5, h * 0.44, w * 0.18);
-  g.fillStyle(0xa5b95a, 1).fillCircle(w / 2, h * 0.2, w * 0.2);
-  g.fillStyle(0x1d2417, 1).fillCircle(w * 0.43, h * 0.18, 2).fillCircle(w * 0.57, h * 0.18, 2);
-  g.fillStyle(0x2a3510, 1).fillRect(w * 0.42, h * 0.27, w * 0.16, 3);
-  g.generateTexture(SPITTER_TEXTURE, w, h);
-  g.destroy();
-}
+// Lo que el cuerpo de un zombi que cayo entero se queda en el piso.
+const CORPSE_MS = 6000;
 
 function textureFor(state, tough) {
   if (state.kind === 'RUNNER') return RUNNER_TEXTURE;
@@ -80,10 +74,12 @@ export default class ZombieLayer {
     this.hooks = hooks;
     this.findTarget = findTarget;
 
-    bakeTexture(scene, TEXTURE, { body: 0x4a6b38, rot: 0x86a86a, w: 28, h: 40 });
-    bakeTexture(scene, TOUGH_TEXTURE, { body: 0x6b3838, rot: 0xa86a6a, w: 34, h: 48 });
-    bakeTexture(scene, RUNNER_TEXTURE, { body: 0x3d4f5c, rot: 0x8fa3b0, w: 22, h: 38 });
-    bakeSpitter(scene);
+    bakeZombieSheets(scene);
+    bakeTypeShapes(scene);
+    this.showShapes = getSettings().typeShapes;
+    this.offSettings = onSettingsChange((settings) => {
+      this.showShapes = settings.typeShapes;
+    });
   }
 
   sync(zombieStates) {
@@ -103,7 +99,7 @@ export default class ZombieLayer {
 
       if (state.health < entry.health) {
         this.flash(entry);
-        this.hooks.onHit?.(entry);
+        this.hooks.onHit?.(entry, entry.health - state.health);
       }
       entry.health = state.health;
 
@@ -123,26 +119,36 @@ export default class ZombieLayer {
   spawn(state) {
     const kind = state.kind ?? 'WALKER';
     const tough = kind === 'WALKER' && (state.tough || state.health >= TOUGH_HEALTH);
-    const sprite = this.scene.add.sprite(state.x, state.y, textureFor(state, tough));
+    const sprite = this.scene.add.sprite(state.x, state.y, textureFor(state, tough), 0);
+    // Los pies quedan sobre la sombra: el punto del zombi esta a FOOT px de sus pies.
+    const foot = tough ? 22 : 18;
+    sprite.setOrigin(0.5, (sprite.height - 2 - foot) / sprite.height);
     sprite.setDepth(state.y);
 
-    const shadow = this.scene.add.ellipse(state.x, state.y + 16, tough ? 28 : 22, 9, 0x000000, 0.28);
-    shadow.setDepth(1);
+    const shadow = this.scene.add.image(state.x, state.y + 16, SHADOW_KEY)
+      .setDisplaySize(tough ? 54 : 42, tough ? 18 : 14)
+      .setDepth(1.6);
+
+    const outlineColor = OUTLINE_COLORS[tough ? 'TOUGH' : kind];
+    const outline = outlineColor
+      ? this.scene.add.sprite(state.x, state.y, sprite.texture.key, 0).setOrigin(sprite.originX, sprite.originY)
+        .setTint(outlineColor)
+        .setTintMode(Phaser.TintModes.FILL)
+        .setAlpha(0.85)
+      : null;
 
     const sway = this.scene.tweens.add({
       targets: sprite,
-      angle: { from: -6, to: 6 },
+      angle: { from: -3, to: 3 },
       duration: 320 + Math.random() * 180,
       yoyo: true,
       repeat: -1,
       ease: 'Sine.easeInOut',
     });
-    sprite.setScale(0.5);
-    this.scene.tweens.add({ targets: sprite, scale: 1, duration: 220, ease: 'Back.easeOut' });
-
-    return {
+    const entry = {
       sprite,
       shadow,
+      outline,
       sway,
       x: state.x,
       y: state.y,
@@ -156,7 +162,47 @@ export default class ZombieLayer {
       phase: 'CHASE',
       warning: null,
       ring: null,
+      rise: 1,
+      walkMs: Math.random() * 1000,
+      shape: null,
     };
+    const shapeFrame = SHAPES[tough ? 'TOUGH' : kind];
+    if (shapeFrame !== undefined) {
+      entry.shape = this.scene.add.image(state.x, state.y, SHAPE_KEY, shapeFrame).setVisible(false);
+    }
+    this.riseFromFloor(entry);
+    return entry;
+  }
+
+  // Sale del piso: un hoyo oscuro se abre, el zombi sube estirandose y salta tierra.
+  riseFromFloor(entry) {
+    const { x, y } = entry;
+    const footY = y + (entry.tough ? 20 : 16);
+    const hole = this.scene.add.ellipse(x, footY, 6, 3, 0x0d0705, 0.9).setDepth(1.7);
+    this.scene.tweens.add({
+      targets: hole,
+      width: 40,
+      height: 14,
+      duration: 180,
+      ease: 'Quad.easeOut',
+      onComplete: () => this.scene.tweens.add({ targets: hole, alpha: 0, delay: RISE_MS, duration: 400, onComplete: () => hole.destroy() }),
+    });
+    entry.rise = 0;
+    this.scene.tweens.add({ targets: entry, rise: 1, duration: RISE_MS, delay: 120, ease: 'Back.easeOut' });
+    for (let i = 0; i < 8; i += 1) {
+      const a = Math.PI + Math.random() * Math.PI;
+      const d = 12 + Math.random() * 22;
+      const clod = this.scene.add.rectangle(x, footY, 3 + Math.random() * 3, 3, i % 2 ? 0x4a3020 : 0x2c1d12).setDepth(footY + 1);
+      this.scene.tweens.add({
+        targets: clod,
+        x: x + Math.cos(a) * d,
+        y: { value: footY + Math.sin(a) * d * 0.4 + 6, ease: 'Bounce.easeOut' },
+        alpha: 0,
+        delay: 120,
+        duration: 520,
+        onComplete: () => clod.destroy(),
+      });
+    }
   }
 
   changePhase(entry, phase) {
@@ -227,7 +273,7 @@ export default class ZombieLayer {
       entry.sprite.setScale(1);
       entry.sway = this.scene.tweens.add({
         targets: entry.sprite,
-        angle: { from: -6, to: 6 },
+        angle: { from: -3, to: 3 },
         duration: 320 + Math.random() * 180,
         yoyo: true,
         repeat: -1,
@@ -259,20 +305,50 @@ export default class ZombieLayer {
     this.scene.time.delayedCall(70, () => this.applyPhaseTint(entry));
   }
 
+  // Muertes variadas: el escupidor siempre revienta (y deja su charco, que pone el
+  // servidor); los demas a veces revientan y a veces caen enteros y el cuerpo queda un
+  // rato en el piso.
   kill(entry) {
     this.clearWarning(entry);
+    entry.shape?.destroy();
+    entry.shape = null;
+    entry.deathStyle = entry.kind === 'SPITTER' || Math.random() < 0.45 ? 'burst' : 'corpse';
     this.hooks.onDeath?.(entry);
     this.scene.tweens.killTweensOf(entry.offset);
-    this.scene.add.ellipse(entry.sprite.x, entry.sprite.y + 12, 26, 12, 0x5a1f1f, 0.5).setDepth(1);
+    entry.outline?.destroy();
+    entry.outline = null;
+    this.scene.tweens.add({ targets: entry.shadow, alpha: 0, duration: 260, onComplete: () => entry.shadow.destroy() });
+
+    if (entry.deathStyle === 'corpse') {
+      const side = entry.sprite.flipX ? -1 : 1;
+      entry.sprite.setTintMode(Phaser.TintModes.MULTIPLY).setTint(0x8a7a7a);
+      this.scene.tweens.add({
+        targets: entry.sprite,
+        angle: 90 * side,
+        y: entry.sprite.y + 10,
+        duration: 320,
+        ease: 'Bounce.easeOut',
+        onComplete: () => {
+          entry.sprite.setDepth(1.58);
+          this.scene.tweens.add({
+            targets: entry.sprite,
+            alpha: 0,
+            delay: CORPSE_MS,
+            duration: 900,
+            onComplete: () => entry.sprite.destroy(),
+          });
+        },
+      });
+      return;
+    }
+
     this.scene.tweens.add({
-      targets: [entry.sprite, entry.shadow],
+      targets: entry.sprite,
       alpha: 0,
       scaleY: 0.4,
-      duration: 220,
-      onComplete: () => {
-        entry.sprite.destroy();
-        entry.shadow.destroy();
-      },
+      angle: entry.sprite.flipX ? -80 : 80,
+      duration: 200,
+      onComplete: () => entry.sprite.destroy(),
     });
   }
 
@@ -284,14 +360,45 @@ export default class ZombieLayer {
       const previousX = entry.x;
       entry.x += (entry.targetX - entry.x) * t;
       entry.y += (entry.targetY - entry.y) * t;
-      sprite.setPosition(entry.x + entry.offset.x, entry.y + entry.offset.y);
+      // Mientras sale del piso: hundido, aplastado y transparente.
+      const sink = (1 - entry.rise) * 22;
+      sprite.setPosition(entry.x + entry.offset.x, entry.y + entry.offset.y + sink);
+      if (entry.rise < 1) {
+        sprite.setAlpha(Math.min(1, 0.2 + entry.rise)).setScale(1, Math.max(0.05, entry.rise));
+      } else if (!entry.risen) {
+        entry.risen = true;
+        sprite.setAlpha(1).setScale(1);
+      }
 
       sprite.setDepth(sprite.y);
+      // Cuadro: brazos arriba al preparar la mordida, zarpazo al morder; si no, camina
+      // (los corredores mas rapido).
+      entry.walkMs += delta * (entry.kind === 'RUNNER' ? 1.7 : 1);
+      const frame = entry.phase === 'WINDUP' ? ZOMBIE_FRAMES.windup
+        : entry.phase === 'STRIKE' ? ZOMBIE_FRAMES.strike
+          : ZOMBIE_FRAMES.walk[Math.floor(entry.walkMs / 150) % ZOMBIE_FRAMES.walk.length];
+      if (sprite.frame.name !== frame) sprite.setFrame(frame);
+      if (entry.outline) {
+        if (entry.outline.frame.name !== frame) entry.outline.setFrame(frame);
+        entry.outline
+          .setPosition(sprite.x, sprite.y)
+          .setAngle(sprite.angle)
+          .setFlipX(sprite.flipX)
+          .setScale(sprite.scaleX * OUTLINE_SCALE, sprite.scaleY * OUTLINE_SCALE)
+          .setAlpha(0.85 * sprite.alpha)
+          .setDepth(sprite.depth - 0.5);
+      }
       if (Math.abs(entry.targetX - previousX) > 0.5) sprite.setFlipX(entry.targetX < previousX);
       entry.shadow.setPosition(entry.x, entry.y + (entry.tough ? 20 : 16));
 
+      if (entry.shape) {
+        entry.shape
+          .setVisible(this.showShapes && sprite.alpha > 0.5)
+          .setPosition(sprite.x, sprite.getTopCenter().y + 4)
+          .setDepth(sprite.depth + 0.6);
+      }
       if (entry.warning) {
-        entry.warning.setPosition(sprite.x, sprite.y - sprite.height / 2 - 2).setDepth(sprite.depth + 1);
+        entry.warning.setPosition(sprite.x, sprite.getTopCenter().y + 14).setDepth(sprite.depth + 1);
       }
       if (entry.ring) {
         const ring = entry.ring;
@@ -311,7 +418,10 @@ export default class ZombieLayer {
       entry.ring?.destroy();
       entry.sprite.destroy();
       entry.shadow.destroy();
+      entry.outline?.destroy();
+      entry.shape?.destroy();
     });
     this.sprites.clear();
+    this.offSettings?.();
   }
 }

@@ -59,7 +59,7 @@ class TickCostBenchmarkTest {
                 long t1 = System.nanoTime();
                 GameStateMessage message = new GameStateMessage(s.playerStates(), s.claimedItemIdsSnapshot(), null,
                         s.zombieStates(), s.waveState(), s.doorStates(), s.lobbyState(), s.bossView(),
-                        s.projectileStates(), s.barricadeStates(), s.lastSummary(), s.kinderEvent());
+                        s.projectileStates(), s.barricadeStates(), s.lastSummary(), s.kinderEvent(), s.puddleStates());
                 byte[] payload = json.writeValueAsBytes(message);
                 long t2 = System.nanoTime();
                 tickNanos[index] = t1 - t0;

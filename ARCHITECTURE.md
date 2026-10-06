@@ -202,7 +202,7 @@ Los caídos no traban la barrera (`allDone` solo mira a los vivos): si no, sin
 Biomédica para revivir, la partida quedaría bloqueada.
 
 **Reparto**: al empezar el respiro de cada Kinder se reparten 3 misiones por
-jugador — los dos minijuegos de su rol más uno al azar, en salas distintas
+jugador — tres minijuegos distintos de los cuatro de su rol (primero el que no le tocó el Kinder anterior), en salas distintas
 (`MissionCatalog`, 12 en el Edificio F y 8 en el C), evitando las del Kinder
 anterior. La recompensa sube con el Kinder (25, 30, 35…).
 

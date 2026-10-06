@@ -92,9 +92,9 @@ export default function WiresMission() {
                 onPointerUp={handleEnd}
                 onPointerCancel={handleEnd}
               >
-                <rect x="0" y="0" width={WIDTH} height={HEIGHT} rx="10" fill="#1b2128" />
-                <rect x="14" y="14" width="34" height={HEIGHT - 28} rx="6" fill="#3a434d" />
-                <rect x={WIDTH - 48} y="14" width="34" height={HEIGHT - 28} rx="6" fill="#3a434d" />
+                <rect x="0" y="0" width={WIDTH} height={HEIGHT} rx="10" fill="#1c1012" />
+                <rect x="14" y="14" width="34" height={HEIGHT - 28} rx="6" fill="#3a2626" />
+                <rect x={WIDTH - 48} y="14" width="34" height={HEIGHT - 28} rx="6" fill="#3a2626" />
 
                 {layout.left.map((color, index) => {
                   const done = connected.includes(color);

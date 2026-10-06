@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ROLE_CATALOG, roleInfo } from '../game/roleCatalog';
 import { getLobbyCode, getMyRole, onStateChange, startGame } from '../game/gameSync';
+import HalloweenCreatures from './HalloweenCreatures';
 
 export default function WaitingRoom({ onStarted, onLeave }) {
   const [state, setState] = useState({ players: [], lobby: null });
@@ -18,6 +19,7 @@ export default function WaitingRoom({ onStarted, onLeave }) {
   return (
     <div className="role-select">
       <div className="main-menu-vignette" />
+      <HalloweenCreatures bats={4} spiders={2} />
       <div className="role-select-content">
         <p className="main-menu-kicker">Código de la sala</p>
         <h2 className="waiting-code">{getLobbyCode()}</h2>
@@ -26,10 +28,12 @@ export default function WaitingRoom({ onStarted, onLeave }) {
         <div className="waiting-players">
           {ROLE_CATALOG.map((entry) => {
             const present = joinedRoles.includes(entry.role);
+            const player = state.players.find((p) => p.role === entry.role);
             return (
               <div key={entry.role} className={`waiting-slot${present ? ' waiting-slot--present' : ''}`}>
                 <img src={entry.portrait} alt="" className="waiting-slot-portrait" />
                 <span className="waiting-slot-name">{entry.name}</span>
+                {player?.name && <span className="waiting-slot-nick">{player.name}</span>}
                 <span className="waiting-slot-tag">
                   {present
                     ? `${entry.role === state.lobby?.host ? 'Anfitrión' : 'Listo'}${entry.role === getMyRole() ? ' (tú)' : ''}`

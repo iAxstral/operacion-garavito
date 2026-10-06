@@ -6,18 +6,20 @@ const STORAGE_KEY = 'garavito.settings.v1';
 export const VOLUME_CHANNELS = [
   { id: 'master', label: 'Volumen general', hint: 'Afecta a todos los sonidos del juego', icon: '🔊' },
   { id: 'music', label: 'Música', hint: 'Música del menú y de la partida', icon: '🎵' },
-  { id: 'ambient', label: 'Ambiente', hint: 'Lluvia y atmósfera del campus', icon: '🌧️' },
+  { id: 'ambient', label: 'Ambiente', hint: 'Viento, lluvia, crujidos y gemidos lejanos', icon: '🌧️' },
   { id: 'zombies', label: 'Zombis', hint: 'Gruñidos, rugidos y mordidas', icon: '🧟' },
   { id: 'combat', label: 'Combate', hint: 'Tus golpes, impactos y el daño que recibes', icon: '⚔️' },
   { id: 'ui', label: 'Interfaz', hint: 'Botones y menús', icon: '🖱️' },
+  { id: 'voices', label: 'Voces del equipo', hint: 'Los avisos hablados de tus compañeros', icon: '📣' },
 ];
 
 export const DEFAULT_SETTINGS = Object.freeze({
-  volumes: Object.freeze({ master: 0.8, music: 0.5, ambient: 0.6, zombies: 0.9, combat: 0.8, ui: 0.6 }),
+  volumes: Object.freeze({ master: 0.8, music: 0.5, ambient: 0.6, zombies: 0.9, combat: 0.8, ui: 0.6, voices: 0.9 }),
   muted: false,
   vibration: true,
   screenShake: true,
   tips: true,
+  typeShapes: false,
 });
 
 function sanitize(raw) {
@@ -32,6 +34,7 @@ function sanitize(raw) {
     vibration: typeof raw?.vibration === 'boolean' ? raw.vibration : DEFAULT_SETTINGS.vibration,
     screenShake: typeof raw?.screenShake === 'boolean' ? raw.screenShake : DEFAULT_SETTINGS.screenShake,
     tips: typeof raw?.tips === 'boolean' ? raw.tips : DEFAULT_SETTINGS.tips,
+    typeShapes: typeof raw?.typeShapes === 'boolean' ? raw.typeShapes : DEFAULT_SETTINGS.typeShapes,
   };
 }
 

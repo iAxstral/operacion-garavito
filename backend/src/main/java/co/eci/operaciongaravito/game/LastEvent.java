@@ -114,6 +114,11 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("USE_SUCCESS", playerId, itemId, null);
     }
 
+    /** Aviso al equipo: {@code itemId} es el tipo y {@code reason} "piso,x,y" donde estaba. */
+    public static LastEvent ping(String playerId, String kind, int floor, long x, long y) {
+        return new LastEvent("PING", playerId, kind, floor + "," + x + "," + y);
+    }
+
     public static LastEvent useRejected(String playerId, String itemId, String reason) {
         return new LastEvent("USE_REJECTED", playerId, itemId, reason);
     }

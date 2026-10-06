@@ -1,0 +1,810 @@
+/*
+ * Minijuegos de mision con el tema de Halloween: los cuatro nuevos por rol y los
+ * detalles de los anteriores (aviso, progreso, botones). Va despues de halloween.css.
+ */
+
+.mission-modal {
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  overflow: auto;
+  box-sizing: border-box;
+}
+
+.mission-modal p {
+  color: var(--hw-bone-dim);
+}
+
+.mission-hint {
+  color: var(--hw-bone);
+  background: rgba(20, 6, 8, 0.85);
+  border-color: rgba(232, 182, 74, 0.6);
+}
+
+.mission-hint strong {
+  color: var(--hw-gold);
+}
+
+.mission-progress {
+  color: var(--hw-gold);
+}
+
+.mission-success {
+  font-family: var(--hw-title-font);
+  font-size: 22px;
+  color: var(--hw-ghost);
+  text-shadow: 0 0 12px rgba(110, 255, 80, 0.5);
+}
+
+.mission-cancel-btn {
+  margin: 12px 4px 0;
+  color: var(--hw-bone);
+  background: rgba(40, 10, 12, 0.7);
+  border: 1px solid var(--hw-border);
+}
+
+.mission-cancel-btn:hover:not(:disabled) {
+  background: rgba(110, 14, 10, 0.75);
+}
+
+.mission-cancel-btn:disabled {
+  opacity: 0.45;
+}
+
+.math-option {
+  color: var(--hw-bone);
+  background: linear-gradient(180deg, #3a1214, #1e0809);
+  border: 1px solid var(--hw-border);
+}
+
+.math-option:hover {
+  background: linear-gradient(180deg, #5a1a1a, #2a0a0b);
+}
+
+.fuse {
+  border-color: #5a2a24;
+}
+
+/* Ronda de vigilancia: monitores de camara. */
+.ronda-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 76px);
+  gap: 8px;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.ronda-grid--wrong {
+  animation: building-notice-shake 0.35s ease;
+}
+
+.ronda-cam {
+  height: 58px;
+  font: bold 11px 'Courier New', monospace;
+  color: rgba(157, 255, 138, 0.5);
+  background:
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.25) 0 2px, transparent 2px 4px),
+    #0b140c;
+  border: 2px solid #26331f;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.1s ease, box-shadow 0.1s ease;
+}
+
+.ronda-cam--lit {
+  color: #0b140c;
+  background: #9dff8a;
+  box-shadow: 0 0 22px rgba(110, 255, 80, 0.8);
+}
+
+.ronda-cam--done {
+  border-color: var(--hw-ghost);
+}
+
+/* Sensores: deslizadores con la franja objetivo. */
+.sensor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(340px, 78vw);
+  margin: 8px auto;
+  text-align: left;
+}
+
+.sensor-name {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: bold;
+}
+
+.sensor--ok .sensor-name {
+  color: var(--hw-ghost);
+}
+
+.sensor-track {
+  position: relative;
+  display: block;
+  height: 26px;
+  background: #0d0707;
+  border: 1px solid var(--hw-border);
+  border-radius: 6px;
+}
+
+.sensor-target {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(110, 255, 80, 0.3);
+  border-left: 2px solid var(--hw-ghost);
+  border-right: 2px solid var(--hw-ghost);
+}
+
+.sensor-track input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  background: transparent;
+  -webkit-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.sensor-track input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 10px;
+  height: 26px;
+  background: var(--hw-gold);
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(232, 182, 74, 0.8);
+}
+
+.sensor-track input::-moz-range-thumb {
+  width: 10px;
+  height: 24px;
+  background: var(--hw-gold);
+  border: none;
+  border-radius: 3px;
+}
+
+/* Pulso: monitor cardiaco. */
+.pulse-monitor {
+  position: relative;
+  width: min(360px, 80vw);
+  height: 90px;
+  margin: 8px auto;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(110, 255, 80, 0.06) 1px, transparent 1px) 0 0 / 100% 15px,
+    linear-gradient(90deg, rgba(110, 255, 80, 0.06) 1px, transparent 1px) 0 0 / 15px 100%,
+    #050b06;
+  border: 2px solid #26331f;
+  border-radius: 8px;
+}
+
+.pulse-monitor--ok {
+  box-shadow: 0 0 20px rgba(110, 255, 80, 0.7);
+}
+
+.pulse-monitor--miss {
+  box-shadow: 0 0 20px rgba(232, 50, 31, 0.8);
+}
+
+.pulse-wave {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.pulse-wave polyline {
+  fill: none;
+  stroke: var(--hw-ghost);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  filter: drop-shadow(0 0 3px rgba(110, 255, 80, 0.9));
+}
+
+.pulse-zone {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(110, 255, 80, 0.14);
+}
+
+.pulse-marker {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  margin-left: -1px;
+  background: #fff1ec;
+  box-shadow: 0 0 10px #fff;
+}
+
+.pulse-mark {
+  padding: 10px 40px;
+}
+
+/* Medicamentos: frascos con su dosis. */
+.meds-tray {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  margin: 10px 0;
+}
+
+.meds-tray--wrong {
+  animation: building-notice-shake 0.35s ease;
+}
+
+.med-bottle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 54px;
+  height: 92px;
+  padding: 0;
+  background: linear-gradient(90deg, #6b3a12, #a8641e 45%, #6b3a12);
+  border: none;
+  border-radius: 8px 8px 12px 12px;
+  cursor: pointer;
+  box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.5);
+}
+
+.med-cap {
+  width: 70%;
+  height: 16px;
+  margin-top: -6px;
+  background: var(--cap);
+  border-radius: 4px;
+}
+
+.med-label {
+  margin-top: 14px;
+  padding: 6px 2px;
+  width: 86%;
+  font: bold 15px sans-serif;
+  color: #1b0f05;
+  background: #efe3cc;
+  border-radius: 3px;
+}
+
+.med-label small {
+  font-size: 9px;
+}
+
+.med-bottle--picked {
+  opacity: 0.55;
+}
+
+.med-order {
+  position: absolute;
+  bottom: 6px;
+  font: bold 16px sans-serif;
+  color: var(--hw-ghost);
+  text-shadow: 0 0 6px #000;
+}
+
+/* Presupuesto. */
+.budget-total {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  margin: 6px 0 10px;
+  font-size: 14px;
+}
+
+.budget-total strong {
+  font-size: 22px;
+  color: var(--hw-gold);
+}
+
+.budget-total--over span:last-child strong {
+  color: var(--hw-blood-bright);
+}
+
+.budget-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 8px;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.budget-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: var(--hw-bone);
+  background: rgba(30, 12, 14, 0.9);
+  border: 1px solid var(--hw-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.budget-item--on {
+  background: rgba(232, 182, 74, 0.18);
+  border-color: var(--hw-gold);
+}
+
+/* Facturas. */
+.invoices {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+
+.invoice {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 128px;
+  padding: 10px;
+  font: 12px 'Courier New', monospace;
+  color: #2a1a0c;
+  background: #efe3cc;
+  border: none;
+  border-bottom: 4px dashed #c9b897;
+  border-radius: 3px;
+  cursor: pointer;
+  transform: rotate(-1.5deg);
+}
+
+.invoice:nth-child(2) {
+  transform: rotate(1.2deg);
+}
+
+.invoice:hover {
+  box-shadow: 0 0 0 2px var(--hw-gold);
+}
+
+.invoice--miss {
+  box-shadow: 0 0 0 3px var(--hw-blood-bright);
+}
+
+.invoice-line,
+.invoice-total {
+  display: flex;
+  justify-content: space-between;
+}
+
+.invoice-total {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid #8a7a5c;
+  font-weight: bold;
+}
+
+/* Tuberias. */
+.pipe-board {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0;
+}
+
+.pipe-grid {
+  display: grid;
+  gap: 3px;
+  width: min(260px, 64vw);
+}
+
+.pipe-cell {
+  aspect-ratio: 1;
+  padding: 0;
+  background: #1a1210;
+  border: 1px solid #3a2a22;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.pipe-cell--empty {
+  background: #0d0908;
+  cursor: default;
+}
+
+.pipe-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: transform 0.15s ease;
+}
+
+.pipe-line {
+  fill: none;
+  stroke: #8a8f96;
+  stroke-width: 9;
+}
+
+.pipe-line--full {
+  stroke: #3fa8ff;
+  filter: drop-shadow(0 0 4px rgba(63, 168, 255, 0.8));
+}
+
+.pipe-inlet,
+.pipe-outlet {
+  width: 14px;
+  height: 14px;
+  background: #3fa8ff;
+  border-radius: 3px;
+  box-shadow: 0 0 8px rgba(63, 168, 255, 0.7);
+}
+
+/* Nivel. */
+.level-tube {
+  position: relative;
+  width: min(340px, 80vw);
+  height: 34px;
+  margin: 12px auto;
+  background: linear-gradient(180deg, #c9e86a, #7fa02a);
+  border: 3px solid #3a2a18;
+  border-radius: 17px;
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.4);
+}
+
+.level-center {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px solid #1b1a0a;
+  border-right: 2px solid #1b1a0a;
+}
+
+.level-bubble {
+  position: absolute;
+  top: 5px;
+  width: 34px;
+  height: 18px;
+  margin-left: -17px;
+  background: radial-gradient(ellipse at 35% 35%, #ffffff, #e9f5c0 60%, #b7d26a);
+  border-radius: 50%;
+}
+
+.level-tube--ok {
+  box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.4), 0 0 16px rgba(110, 255, 80, 0.6);
+}
+
+.level-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.level-btn {
+  width: 56px;
+  height: 48px;
+  font-size: 20px;
+  color: var(--hw-bone);
+  background: rgba(40, 10, 12, 0.85);
+  border: 1px solid var(--hw-border);
+  border-radius: 10px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.level-weld {
+  width: min(180px, 40vw);
+  height: 12px;
+  overflow: hidden;
+  background: #120607;
+  border: 1px solid var(--hw-border);
+  border-radius: 6px;
+}
+
+.level-weld div {
+  height: 100%;
+  background: linear-gradient(90deg, #ff7a1a, #ffe08a);
+  box-shadow: 0 0 10px #ff7a1a;
+}
+
+@media (max-width: 640px) {
+  .ronda-grid {
+    grid-template-columns: repeat(3, 64px);
+  }
+
+  .med-bottle {
+    width: 46px;
+    height: 80px;
+  }
+
+  .invoice {
+    width: 104px;
+    font-size: 11px;
+  }
+}
+
+/* ---------- Avisos al equipo (PingControls) ---------- */
+
+.ping-controls {
+  position: absolute;
+  left: calc(12px + env(safe-area-inset-left));
+  bottom: calc(14px + env(safe-area-inset-bottom));
+  z-index: 18;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: flex-start;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+/* En celular el joystick ocupa abajo a la izquierda: el boton va a media altura. */
+.ping-controls--touch {
+  top: 42%;
+  bottom: auto;
+  flex-direction: column;
+}
+
+.ping-toggle {
+  width: 44px;
+  height: 44px;
+}
+
+.ping-toggle .hw-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.ping-toggle--open {
+  border-color: var(--hw-gold);
+  box-shadow: 0 0 14px rgba(232, 182, 74, 0.6);
+}
+
+.ping-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px;
+  background: linear-gradient(180deg, rgba(30, 12, 14, 0.95), rgba(10, 5, 7, 0.95));
+  border: 1px solid var(--hw-border);
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+}
+
+.ping-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 190px;
+  padding: 8px 10px;
+  font: bold 14px sans-serif;
+  text-align: left;
+  color: var(--hw-bone);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
+  border-left: 4px solid var(--ping);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.ping-option:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--ping);
+}
+
+.ping-option:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.ping-option .hw-icon {
+  color: var(--ping);
+}
+
+.ping-option span {
+  flex: 1;
+}
+
+.ping-option kbd {
+  font-size: 11px;
+}
+
+.ping-option--zombies,
+.ping-feed-item--zombies { --ping: #ff3a2a; }
+.ping-option--help,
+.ping-feed-item--help { --ping: #ff9a2a; }
+.ping-option--revive,
+.ping-feed-item--revive { --ping: #6dff7a; }
+.ping-option--go,
+.ping-feed-item--go { --ping: #3fd8ff; }
+.ping-option--ammo,
+.ping-feed-item--ammo { --ping: #ffd23a; }
+
+.ping-feed {
+  position: absolute;
+  top: calc(100px + env(safe-area-inset-top));
+  left: 50%;
+  z-index: 17;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.ping-feed-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+  padding: 5px 12px;
+  font: 14px sans-serif;
+  color: var(--hw-bone);
+  background: rgba(14, 5, 7, 0.88);
+  border: 1px solid var(--ping);
+  border-radius: 999px;
+  box-shadow: 0 0 12px color-mix(in srgb, var(--ping) 45%, transparent);
+  animation: ping-in 0.25s ease-out;
+}
+
+.ping-feed-item .hw-icon {
+  color: var(--ping);
+}
+
+.ping-feed-item small {
+  opacity: 0.75;
+}
+
+@keyframes ping-in {
+  from { transform: translateY(-8px) scale(0.92); opacity: 0; }
+}
+
+/* ---------- Apodo ---------- */
+
+.nickname-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: var(--hw-title-font);
+  font-size: 20px;
+  color: var(--hw-bone);
+}
+
+.nickname-field input {
+  width: min(300px, 60vw);
+  padding: 8px 12px;
+  font: 16px sans-serif;
+  color: var(--hw-bone);
+  background: rgba(20, 8, 10, 0.85);
+  border: 1px solid var(--hw-border);
+  border-radius: 8px;
+}
+
+.nickname-field input:focus {
+  outline: none;
+  border-color: var(--hw-gold);
+  box-shadow: 0 0 10px rgba(232, 182, 74, 0.4);
+}
+
+.waiting-slot-nick {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: 12px;
+  font-weight: bold;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--hw-gold);
+}
+
+@media (max-width: 640px) {
+  .nickname-field {
+    flex-direction: column;
+    gap: 4px;
+    font-size: 17px;
+  }
+
+  .ping-option {
+    min-width: 170px;
+    padding: 10px;
+  }
+}
+
+/* ---------- Logros ---------- */
+
+.achievements-panel {
+  width: min(560px, 100%);
+}
+
+.achievements-count {
+  margin: 0 0 10px;
+  color: var(--hw-gold);
+}
+
+.achievement-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+}
+
+.achievement {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  text-align: left;
+  background: rgba(40, 14, 16, 0.75);
+  border: 1px solid rgba(232, 182, 74, 0.45);
+  border-radius: 8px;
+}
+
+.achievement .hw-icon {
+  width: 26px;
+  height: 26px;
+  color: var(--hw-gold);
+}
+
+.achievement span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.achievement strong {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 17px;
+  color: var(--hw-bone);
+}
+
+.achievement small {
+  font-size: 11px;
+  color: var(--hw-bone-dim);
+}
+
+.achievement time {
+  margin-left: auto;
+  font-size: 10px;
+  white-space: nowrap;
+  color: var(--hw-bone-dim);
+}
+
+.achievement--locked {
+  opacity: 0.5;
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.achievement--locked .hw-icon {
+  color: var(--hw-bone-dim);
+}
+
+.achievement--new {
+  border-color: var(--hw-gold);
+  box-shadow: 0 0 16px rgba(232, 182, 74, 0.4);
+  animation: achievement-in 0.6s cubic-bezier(0.2, 1.5, 0.4, 1) both;
+}
+
+.achievement em {
+  margin-left: auto;
+  font-style: normal;
+  font-weight: bold;
+  font-size: 11px;
+  color: #120708;
+  background: var(--hw-gold);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+@keyframes achievement-in {
+  from { transform: scale(0.8); opacity: 0; }
+}
+
+.results-achievements {
+  width: 100%;
+}
+
+.results-achievements h3 {
+  margin: 4px 0 8px;
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 22px;
+  color: var(--hw-gold);
+}

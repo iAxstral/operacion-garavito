@@ -8,7 +8,8 @@ test('la pantalla de inicio muestra el video, Jugar y Configuracion', async ({ p
   await expect(page.getByRole('button', { name: /Jugar/ })).toBeVisible();
   await page.getByRole('button', { name: /Configuración/ }).click();
   await expect(page.getByRole('dialog', { name: 'Configuración' })).toBeVisible();
-  await expect(page.locator('input[type=range]')).toHaveCount(6);
+  // Un control por canal: general, música, ambiente, zombis, combate, interfaz y voces.
+  await expect(page.locator('input[type=range]')).toHaveCount(7);
 });
 
 test('una partida arranca con 3 misiones y se puede caminar sin correcciones', async ({ page }) => {
@@ -61,7 +62,7 @@ test('dos jugadores en la misma sala se ven y comparten el avance de misiones', 
   await host.locator('.role-card', { hasText: 'Biomédica' }).click();
 
   await openLobbyScreen(guest, 'F');
-  await guest.locator('.lobby-code-input').fill(code);
+  await guest.getByLabel('Código de la sala').fill(code);
   await guest.getByRole('button', { name: 'Entrar' }).click();
   await guest.locator('.role-card', { hasText: 'Infraestructura' }).click();
 

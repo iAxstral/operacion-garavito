@@ -52,6 +52,7 @@ public class MissionBoard {
     private final RandomGenerator random;
     private final Map<String, List<Assignment>> byPlayer = new HashMap<>();
     private final Map<String, Set<String>> previousSites = new HashMap<>();
+    private final Map<String, Set<MissionType>> previousTypes = new HashMap<>();
     private int kinder;
     private long sequence;
 
@@ -68,8 +69,12 @@ public class MissionBoard {
     /** Reparte misiones nuevas a todos para el Kinder indicado. */
     public synchronized void deal(int kinder, Collection<Player> players) {
         this.kinder = kinder;
-        byPlayer.forEach((playerId, list) -> previousSites.put(playerId,
-                list.stream().map(a -> a.site.siteId()).collect(java.util.stream.Collectors.toSet())));
+        byPlayer.forEach((playerId, list) -> {
+            previousSites.put(playerId,
+                    list.stream().map(a -> a.site.siteId()).collect(java.util.stream.Collectors.toSet()));
+            previousTypes.put(playerId,
+                    list.stream().map(a -> a.type).collect(java.util.stream.Collectors.toSet()));
+        });
         byPlayer.clear();
         players.forEach(this::dealTo);
     }
@@ -84,22 +89,26 @@ public class MissionBoard {
     public synchronized void remove(String playerId) {
         byPlayer.remove(playerId);
         previousSites.remove(playerId);
+        previousTypes.remove(playerId);
     }
 
     public synchronized void reset() {
         byPlayer.clear();
         previousSites.clear();
+        previousTypes.clear();
         kinder = 0;
     }
 
     private void dealTo(Player player) {
         Role role = Role.valueOf(player.getRole());
+        // Tres minijuegos distintos del rol; primero los que no le tocaron en el Kinder
+        // anterior, para que no se repitan siempre los mismos.
+        Set<MissionType> lastTime = previousTypes.getOrDefault(player.getPlayerId(), Set.of());
         List<MissionType> types = new ArrayList<>(MissionType.forRole(role));
         Collections.shuffle(types, asRandom());
-        // Los dos tipos del rol siempre aparecen; el tercero se sortea.
+        types.sort(java.util.Comparator.comparingInt(type -> lastTime.contains(type) ? 1 : 0));
         while (types.size() < MISSIONS_PER_KINDER) {
-            List<MissionType> roleTypes = MissionType.forRole(role);
-            types.add(roleTypes.get(random.nextInt(roleTypes.size())));
+            types.add(types.get(random.nextInt(types.size())));
         }
 
         List<MissionSite> sites = pickSites(player.getPlayerId());

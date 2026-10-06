@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { FLASH_KEY } from './HauntedDecor';
 
 // Texturas de las armas en la mano, dibujadas apuntando a la derecha (+x) con el
 // origen en la empuñadura: asi basta rotarlas al angulo de apuntado.
@@ -161,8 +162,14 @@ export default class WeaponLayer {
     entry.pose.recoil = heavy ? 9 : 6;
     entry.recoilTween = this.scene.tweens.add({ targets: entry.pose, recoil: 0, duration: heavy ? 220 : 140, ease: 'Quad.easeOut' });
 
-    const flash = this.scene.add.circle(from.x, from.y, heavy ? 9 : 7, 0xffe28a, 1).setDepth(depth).setBlendMode(Phaser.BlendModes.ADD);
-    this.scene.tweens.add({ targets: flash, scale: 0.2, alpha: 0, duration: 70, onComplete: () => flash.destroy() });
+    const angle = entry.sprite?.rotation ?? Math.atan2(to.y - from.y, to.x - from.x);
+    const flash = this.scene.add.image(from.x, from.y, FLASH_KEY)
+      .setRotation(angle + Math.random() * 0.6)
+      .setScale(heavy ? 1.3 : 0.95)
+      .setDepth(depth)
+      .setBlendMode(Phaser.BlendModes.ADD);
+    this.scene.tweens.add({ targets: flash, scale: 0.3, alpha: 0, duration: heavy ? 90 : 70, onComplete: () => flash.destroy() });
+    this.scene.lighting?.pulse(from.x, from.y, heavy ? 220 : 170, heavy ? 110 : 80);
 
     const tracer = this.scene.add.graphics().setDepth(depth);
     tracer.lineStyle(heavy ? 3 : 2, 0xfff4c2, 0.95);
@@ -171,19 +178,20 @@ export default class WeaponLayer {
 
     const spark = this.scene.add.circle(to.x, to.y, 4, 0xffd27a, 0.9).setDepth(depth);
     this.scene.tweens.add({ targets: spark, scale: 2.2, alpha: 0, duration: 120, onComplete: () => spark.destroy() });
+    // Chispas donde pega la bala, rebotando hacia atras.
+    const back = angle + Math.PI;
+    for (let i = 0; i < (heavy ? 6 : 4); i += 1) {
+      const a = back + (Math.random() - 0.5) * 1.6;
+      const d = 10 + Math.random() * 18;
+      const bit = this.scene.add.rectangle(to.x, to.y, 3, 1.5, 0xffe08a).setRotation(a).setDepth(depth).setBlendMode(Phaser.BlendModes.ADD);
+      this.scene.tweens.add({
+        targets: bit, x: to.x + Math.cos(a) * d, y: to.y + Math.sin(a) * d, alpha: 0, duration: 160 + Math.random() * 80,
+        onComplete: () => bit.destroy(),
+      });
+    }
 
-    // Casquillo: sale hacia un costado y cae al piso.
-    const side = (entry.sprite?.rotation ?? 0) - Math.PI / 2;
-    const casing = this.scene.add.rectangle(entry.x, entry.y + HAND_DROP_Y, 3, 2, 0xd9b34a).setDepth(depth - 2);
-    this.scene.tweens.add({
-      targets: casing,
-      x: entry.x + Math.cos(side) * 18 + Phaser.Math.Between(-4, 4),
-      y: entry.y + HAND_DROP_Y + 16,
-      angle: Phaser.Math.Between(180, 540),
-      duration: 260,
-      ease: 'Quad.easeIn',
-      onComplete: () => this.scene.tweens.add({ targets: casing, alpha: 0, delay: 500, duration: 300, onComplete: () => casing.destroy() }),
-    });
+    // Casquillo: sale hacia un costado, rebota y se queda un rato en el piso.
+    this.scene.gore?.shell(entry.x, entry.y + HAND_DROP_Y, angle);
   }
 
   /** Tajo del hacha (o del arma cuerpo a cuerpo que tenga en la mano). */

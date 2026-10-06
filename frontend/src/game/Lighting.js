@@ -6,7 +6,8 @@ const DARK_KEY = 'darkness_layer';
 const GLOW_KEY = 'light_glow';
 const FOG_KEY = 'fog_puffs';
 const BULB_KEY = 'bulb_fixture';
-const DARKNESS_COLOR = 'rgba(6, 12, 20, 0.58)';
+// Noche de Halloween: penumbra mas cerrada y algo violeta.
+const DARKNESS_COLOR = 'rgba(8, 5, 16, 0.72)';
 const RESOLUTION = 0.5;
 
 const PLAYER_RADIUS = 340;
@@ -23,11 +24,15 @@ const FOG_SIZE = 256;
 // en el mundo con la vista del cuadro anterior y asi no se ven bordes al mover la camara.
 const OVERSCAN = 64;
 
-// Neblina leve, solo fuera del edificio: cuatro franjas alrededor del mapa, en coordenadas del mundo.
+// Neblina leve fuera del edificio (cuatro franjas alrededor del mapa) y una mas tenue
+// que se arrastra por los pasillos de adentro.
 const FOG_LAYERS = [
   { speed: 0.012, alpha: 0.09, scale: 2.2 },
   { speed: -0.007, alpha: 0.06, scale: 3.4 },
 ];
+const INDOOR_FOG = { speed: 0.009, alpha: 0.07, scale: 2.8 };
+// Vineta: lejos de la linterna todo se oscurece un poco mas, aunque haya luz.
+const VIGNETTE_ALPHA = 0.68;
 
 // Penumbra con neblina y luz alrededor del jugador (estilo Among Us), mas algunos bombillos
 // que parpadean. La capa de oscuridad es un canvas a media resolucion al que se le "perforan"
@@ -36,6 +41,7 @@ export default class Lighting {
   constructor(scene) {
     this.scene = scene;
     this.lights = [];
+    this.pulses = [];
     this.fog = [];
     this.makeGlowTexture();
     this.makeFogTexture();
@@ -115,6 +121,16 @@ export default class Lighting {
       [-m, 0, m, h],
       [w, 0, m, h],
     ];
+    const indoor = this.scene.add
+      .tileSprite(0, 0, w, h, FOG_KEY)
+      .setOrigin(0, 0)
+      .setDepth(DEPTH_FOG)
+      .setAlpha(INDOOR_FOG.alpha)
+      .setTint(0xa898c0)
+      .setTileScale(INDOOR_FOG.scale);
+    indoor.fogLayer = INDOOR_FOG;
+    this.fog.push(indoor);
+
     FOG_LAYERS.forEach((layer) => {
       strips.forEach(([x, y, sw, sh]) => {
         const sprite = this.scene.add
@@ -168,6 +184,11 @@ export default class Lighting {
     const halo = bulb ? additive(0xffb860) : null;
     const fixture = bulb ? this.scene.add.image(x, y - 2, BULB_KEY).setScale(1.6).setDepth(DEPTH_GLOW + 1) : null;
     this.lights.push({ x, y, radius, mode, glow, halo, fixture, phase: Math.random() * 100 });
+  }
+
+  /** Luz breve (fogonazo, explosion): se apaga sola en `ms`. */
+  pulse(x, y, radius = 160, ms = 90) {
+    this.pulses.push({ x, y, radius, ms, born: this.scene.time.now });
   }
 
   intensity(light, time) {
@@ -232,6 +253,21 @@ export default class Lighting {
     });
     remotePlayers?.forEach((entry) => this.punch(ctx, view, entry.sprite.x, entry.sprite.y, REMOTE_RADIUS, 0.85));
     if (player) this.punch(ctx, view, player.x, player.y - 8, this.blackout ? BLACKOUT_PLAYER_RADIUS : PLAYER_RADIUS, 1);
+    this.pulses = this.pulses.filter((p) => time - p.born < p.ms);
+    this.pulses.forEach((p) => this.punch(ctx, view, p.x, p.y, p.radius, 1 - (time - p.born) / p.ms));
+
+    if (player && !this.blackout) {
+      ctx.globalCompositeOperation = 'source-over';
+      const cx = (player.x - view.x) * view.scale;
+      const cy = (player.y - view.y) * view.scale;
+      const inner = PLAYER_RADIUS * 0.55 * view.scale;
+      const outer = Math.max(width, height) * 0.75;
+      const g = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, `rgba(0,0,0,${VIGNETTE_ALPHA})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, width, height);
+    }
 
     this.texture.refresh();
   }
