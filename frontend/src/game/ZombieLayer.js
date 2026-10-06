@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { SHADOW_KEY } from './HauntedDecor';
+import { bakeZombieSheets, ZOMBIE_FRAMES } from './zombieArt';
 
 const TEXTURE = 'zombie';
 const TOUGH_TEXTURE = 'zombie-teso';
@@ -28,44 +29,6 @@ const RISE_MS = 520;
 // Lo que el cuerpo de un zombi que cayo entero se queda en el piso.
 const CORPSE_MS = 6000;
 
-function bakeTexture(scene, key, { body, rot, w, h }) {
-  if (scene.textures.exists(key)) return;
-  const g = scene.make.graphics({ x: 0, y: 0, add: false });
-
-  g.fillStyle(0x2f3a26, 1);
-  g.fillRoundedRect(w * 0.18, h * 0.3, w * 0.64, h * 0.62, 5);
-  g.fillStyle(body, 1);
-  g.fillRoundedRect(w * 0.18, h * 0.3, w * 0.42, h * 0.62, 5);
-  g.fillStyle(rot, 1);
-  g.fillCircle(w / 2, h * 0.24, w * 0.26);
-  g.fillStyle(0x1d2417, 1);
-  g.fillCircle(w * 0.42, h * 0.22, 2.2);
-  g.fillCircle(w * 0.58, h * 0.22, 2.2);
-
-  g.fillStyle(rot, 1);
-  g.fillRect(w * 0.06, h * 0.42, w * 0.16, h * 0.12);
-  g.fillRect(w * 0.78, h * 0.42, w * 0.16, h * 0.12);
-
-  g.generateTexture(key, w, h);
-  g.destroy();
-}
-
-// Escupidor: cuerpo hinchado con una bolsa de acido en la garganta.
-function bakeSpitter(scene) {
-  if (scene.textures.exists(SPITTER_TEXTURE)) return;
-  const w = 38;
-  const h = 46;
-  const g = scene.make.graphics({ x: 0, y: 0, add: false });
-  g.fillStyle(0x3d4a1c, 1).fillEllipse(w / 2, h * 0.64, w * 0.86, h * 0.62);
-  g.fillStyle(0x6f8526, 1).fillEllipse(w * 0.44, h * 0.62, w * 0.6, h * 0.5);
-  g.fillStyle(0xc7e05a, 1).fillCircle(w * 0.5, h * 0.44, w * 0.18);
-  g.fillStyle(0xa5b95a, 1).fillCircle(w / 2, h * 0.2, w * 0.2);
-  g.fillStyle(0x1d2417, 1).fillCircle(w * 0.43, h * 0.18, 2).fillCircle(w * 0.57, h * 0.18, 2);
-  g.fillStyle(0x2a3510, 1).fillRect(w * 0.42, h * 0.27, w * 0.16, 3);
-  g.generateTexture(SPITTER_TEXTURE, w, h);
-  g.destroy();
-}
-
 function textureFor(state, tough) {
   if (state.kind === 'RUNNER') return RUNNER_TEXTURE;
   if (state.kind === 'SPITTER') return SPITTER_TEXTURE;
@@ -88,10 +51,7 @@ export default class ZombieLayer {
     this.hooks = hooks;
     this.findTarget = findTarget;
 
-    bakeTexture(scene, TEXTURE, { body: 0x4a6b38, rot: 0x86a86a, w: 28, h: 40 });
-    bakeTexture(scene, TOUGH_TEXTURE, { body: 0x6b3838, rot: 0xa86a6a, w: 34, h: 48 });
-    bakeTexture(scene, RUNNER_TEXTURE, { body: 0x3d4f5c, rot: 0x8fa3b0, w: 22, h: 38 });
-    bakeSpitter(scene);
+    bakeZombieSheets(scene);
   }
 
   sync(zombieStates) {
@@ -131,16 +91,19 @@ export default class ZombieLayer {
   spawn(state) {
     const kind = state.kind ?? 'WALKER';
     const tough = kind === 'WALKER' && (state.tough || state.health >= TOUGH_HEALTH);
-    const sprite = this.scene.add.sprite(state.x, state.y, textureFor(state, tough));
+    const sprite = this.scene.add.sprite(state.x, state.y, textureFor(state, tough), 0);
+    // Los pies quedan sobre la sombra: el punto del zombi esta a FOOT px de sus pies.
+    const foot = tough ? 22 : 18;
+    sprite.setOrigin(0.5, (sprite.height - 2 - foot) / sprite.height);
     sprite.setDepth(state.y);
 
     const shadow = this.scene.add.image(state.x, state.y + 16, SHADOW_KEY)
-      .setDisplaySize(tough ? 40 : 32, tough ? 15 : 12)
+      .setDisplaySize(tough ? 54 : 42, tough ? 18 : 14)
       .setDepth(1.6);
 
     const outlineColor = OUTLINE_COLORS[tough ? 'TOUGH' : kind];
     const outline = outlineColor
-      ? this.scene.add.sprite(state.x, state.y, sprite.texture.key)
+      ? this.scene.add.sprite(state.x, state.y, sprite.texture.key, 0).setOrigin(sprite.originX, sprite.originY)
         .setTint(outlineColor)
         .setTintMode(Phaser.TintModes.FILL)
         .setAlpha(0.85)
@@ -148,7 +111,7 @@ export default class ZombieLayer {
 
     const sway = this.scene.tweens.add({
       targets: sprite,
-      angle: { from: -6, to: 6 },
+      angle: { from: -3, to: 3 },
       duration: 320 + Math.random() * 180,
       yoyo: true,
       repeat: -1,
@@ -172,6 +135,7 @@ export default class ZombieLayer {
       warning: null,
       ring: null,
       rise: 1,
+      walkMs: Math.random() * 1000,
     };
     this.riseFromFloor(entry);
     return entry;
@@ -276,7 +240,7 @@ export default class ZombieLayer {
       entry.sprite.setScale(1);
       entry.sway = this.scene.tweens.add({
         targets: entry.sprite,
-        angle: { from: -6, to: 6 },
+        angle: { from: -3, to: 3 },
         duration: 320 + Math.random() * 180,
         yoyo: true,
         repeat: -1,
@@ -364,10 +328,23 @@ export default class ZombieLayer {
       // Mientras sale del piso: hundido, aplastado y transparente.
       const sink = (1 - entry.rise) * 22;
       sprite.setPosition(entry.x + entry.offset.x, entry.y + entry.offset.y + sink);
-      if (entry.rise < 1) sprite.setAlpha(Math.min(1, 0.2 + entry.rise)).setScale(1, Math.max(0.05, entry.rise));
+      if (entry.rise < 1) {
+        sprite.setAlpha(Math.min(1, 0.2 + entry.rise)).setScale(1, Math.max(0.05, entry.rise));
+      } else if (!entry.risen) {
+        entry.risen = true;
+        sprite.setAlpha(1).setScale(1);
+      }
 
       sprite.setDepth(sprite.y);
+      // Cuadro: brazos arriba al preparar la mordida, zarpazo al morder; si no, camina
+      // (los corredores mas rapido).
+      entry.walkMs += delta * (entry.kind === 'RUNNER' ? 1.7 : 1);
+      const frame = entry.phase === 'WINDUP' ? ZOMBIE_FRAMES.windup
+        : entry.phase === 'STRIKE' ? ZOMBIE_FRAMES.strike
+          : ZOMBIE_FRAMES.walk[Math.floor(entry.walkMs / 150) % ZOMBIE_FRAMES.walk.length];
+      if (sprite.frame.name !== frame) sprite.setFrame(frame);
       if (entry.outline) {
+        if (entry.outline.frame.name !== frame) entry.outline.setFrame(frame);
         entry.outline
           .setPosition(sprite.x, sprite.y)
           .setAngle(sprite.angle)
@@ -380,7 +357,7 @@ export default class ZombieLayer {
       entry.shadow.setPosition(entry.x, entry.y + (entry.tough ? 20 : 16));
 
       if (entry.warning) {
-        entry.warning.setPosition(sprite.x, sprite.y - sprite.height / 2 - 2).setDepth(sprite.depth + 1);
+        entry.warning.setPosition(sprite.x, sprite.getTopCenter().y + 14).setDepth(sprite.depth + 1);
       }
       if (entry.ring) {
         const ring = entry.ring;
