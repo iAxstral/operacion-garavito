@@ -8,7 +8,8 @@ test('la pantalla de inicio muestra el video, Jugar y Configuracion', async ({ p
   await expect(page.getByRole('button', { name: /Jugar/ })).toBeVisible();
   await page.getByRole('button', { name: /Configuración/ }).click();
   await expect(page.getByRole('dialog', { name: 'Configuración' })).toBeVisible();
-  await expect(page.locator('input[type=range]')).toHaveCount(6);
+  // Un control por canal: general, música, ambiente, zombis, combate, interfaz y voces.
+  await expect(page.locator('input[type=range]')).toHaveCount(7);
 });
 
 test('una partida arranca con 3 misiones y se puede caminar sin correcciones', async ({ page }) => {
