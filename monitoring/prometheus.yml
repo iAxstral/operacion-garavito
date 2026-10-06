@@ -9,3 +9,8 @@ scrape_configs:
       - targets: ["host.docker.internal:8080"]
         labels:
           node: local
+      # Con docker-compose.cluster.yml (dos nodos en 8081 y 8082):
+      # - targets: ["host.docker.internal:8081"]
+      #   labels: { node: nodo-1 }
+      # - targets: ["host.docker.internal:8082"]
+      #   labels: { node: nodo-2 }
