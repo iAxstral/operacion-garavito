@@ -166,7 +166,12 @@ public class GameSession {
     private static final long FIRST_WAVE_PREP_MS = 45_000;
 
     public GameSession(String gameId, Building building, BossConfig bossConfig) {
+        this(gameId, building, bossConfig, Difficulty.NORMAL);
+    }
+
+    public GameSession(String gameId, Building building, BossConfig bossConfig, Difficulty difficulty) {
         this.gameId = gameId;
+        this.difficulty = difficulty;
         this.building = building;
         this.bossConfig = bossConfig;
         this.floors = java.util.stream.IntStream.rangeClosed(1, building.floorCount())
@@ -174,7 +179,14 @@ public class GameSession {
                 .toList();
 
         this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, floors);
+        this.waveDirector.setDifficulty(difficulty);
         this.missionBoard = new MissionBoard(building, java.util.random.RandomGenerator.getDefault());
+    }
+
+    private final Difficulty difficulty;
+
+    public Difficulty getDifficulty() {
+        return difficulty;
     }
 
     public Building getBuilding() {
@@ -284,7 +296,7 @@ public class GameSession {
     }
 
     public LobbyState lobbyState() {
-        return new LobbyState(started, host, building);
+        return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule());
     }
 
     public PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
@@ -764,7 +776,7 @@ public class GameSession {
                 .sorted(java.util.Comparator.comparing(MatchSummary.PlayerSummary::role))
                 .toList();
         MatchSummary summary = new MatchSummary(++summarySequence, building, victory, kinderReached,
-                Math.max(0, (now - runStartedAt) / 1000), stats);
+                Math.max(0, (now - runStartedAt) / 1000), stats, difficulty.mode());
         lastSummary = summary;
         summariesToSave.add(summary);
         players.values().forEach(Player::resetStats);

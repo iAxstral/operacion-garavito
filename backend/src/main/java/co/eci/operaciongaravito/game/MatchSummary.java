@@ -12,7 +12,13 @@ public record MatchSummary(
         boolean victory,
         int kinderReached,
         long durationSeconds,
-        List<PlayerSummary> players) {
+        List<PlayerSummary> players,
+        GameMode mode) {
+
+    public MatchSummary(long id, Building building, boolean victory, int kinderReached, long durationSeconds,
+                        List<PlayerSummary> players) {
+        this(id, building, victory, kinderReached, durationSeconds, players, GameMode.NORMAL);
+    }
 
     public record PlayerSummary(
             String role,

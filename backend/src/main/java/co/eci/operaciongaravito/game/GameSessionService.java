@@ -114,6 +114,10 @@ public class GameSessionService {
     }
 
     public GameSession create(String gameId, Building building) {
+        return create(gameId, building, GameMode.NORMAL);
+    }
+
+    public GameSession create(String gameId, Building building, GameMode mode) {
         if (!isValidCode(gameId)) {
             return null;
         }
@@ -124,7 +128,7 @@ public class GameSessionService {
         boolean[] created = { false };
         GameSession session = sessions.computeIfAbsent(gameId, id -> {
             created[0] = true;
-            GameSession fresh = new GameSession(id, building, bossConfig);
+            GameSession fresh = new GameSession(id, building, bossConfig, Difficulty.forMode(mode));
             startTicking(id);
             return fresh;
         });
