@@ -985,7 +985,10 @@ export default class MainScene extends Phaser.Scene {
     this.playerShadow
       .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)
       .setVisible(this.player.visible);
-    this.lighting.update(time, this.focusSprite(), this.remotePlayers);
+    // La linterna apunta hacia donde mira el jugador (o el compañero que se espectea).
+    const watched = this.spectating ? this.remotePlayers.get(getSpectateTarget()) : null;
+    const flashlightAim = this.spectating ? (watched?.aim ?? null) : this.aimAngle;
+    this.lighting.update(time, this.focusSprite(), this.remotePlayers, flashlightAim);
     const ear = this.focusSprite();
     if (ear) setListener(ear.x, ear.y, this.floor);
     this.syncPuddles();

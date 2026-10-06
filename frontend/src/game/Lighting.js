@@ -11,6 +11,13 @@ const DARKNESS_COLOR = 'rgba(8, 5, 16, 0.72)';
 const RESOLUTION = 0.5;
 
 const PLAYER_RADIUS = 340;
+// Linterna: halo corto alrededor del jugador y un cono largo hacia donde apunta. Lo
+// que queda a la espalda se ve poco: los zombis aparecen de la oscuridad.
+const HALO_RADIUS = 150;
+const CONE_LENGTH = 470;
+const CONE_HALF_ANGLE = 0.5;
+const REMOTE_CONE_LENGTH = 300;
+const BLACKOUT_CONE_LENGTH = 260;
 // Apagon: casi negro, solo una linterna corta alrededor de cada jugador.
 const BLACKOUT_COLOR = 'rgba(2, 4, 8, 0.94)';
 const BLACKOUT_PLAYER_RADIUS = 170;
@@ -217,7 +224,26 @@ export default class Lighting {
     ctx.fill();
   }
 
-  update(time, player, remotePlayers) {
+  // Cono de luz: un sector con degradado (dos pasadas, ancha y suave, angosta y fuerte).
+  punchCone(ctx, view, x, y, angle, length, strength) {
+    const sx = (x - view.x) * view.scale;
+    const sy = (y - view.y) * view.scale;
+    const r = length * view.scale;
+    [[CONE_HALF_ANGLE * 1.35, 0.45], [CONE_HALF_ANGLE, 1]].forEach(([half, power]) => {
+      const g = ctx.createRadialGradient(sx, sy, r * 0.05, sx, sy, r);
+      g.addColorStop(0, `rgba(0,0,0,${strength * power})`);
+      g.addColorStop(0.6, `rgba(0,0,0,${strength * power * 0.75})`);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.arc(sx, sy, r, angle - half, angle + half);
+      ctx.closePath();
+      ctx.fill();
+    });
+  }
+
+  update(time, player, remotePlayers, aimAngle = null) {
     const camera = this.scene.cameras.main;
     if (this.builtFor !== `${camera.width}x${camera.height}@${camera.zoom}`) this.build();
     const margin = OVERSCAN / camera.zoom;
@@ -251,8 +277,18 @@ export default class Lighting {
       }
       this.punch(ctx, view, light.x, light.y, light.radius * (0.85 + 0.15 * level), 0.9 * level);
     });
-    remotePlayers?.forEach((entry) => this.punch(ctx, view, entry.sprite.x, entry.sprite.y, REMOTE_RADIUS, 0.85));
-    if (player) this.punch(ctx, view, player.x, player.y - 8, this.blackout ? BLACKOUT_PLAYER_RADIUS : PLAYER_RADIUS, 1);
+    remotePlayers?.forEach((entry) => {
+      this.punch(ctx, view, entry.sprite.x, entry.sprite.y, REMOTE_RADIUS * 0.75, 0.85);
+      if (entry.aim != null && !entry.downed) {
+        this.punchCone(ctx, view, entry.sprite.x, entry.sprite.y - 8, entry.aim, REMOTE_CONE_LENGTH, 0.8);
+      }
+    });
+    if (player && aimAngle == null) {
+      this.punch(ctx, view, player.x, player.y - 8, this.blackout ? BLACKOUT_PLAYER_RADIUS : PLAYER_RADIUS, 1);
+    } else if (player) {
+      this.punch(ctx, view, player.x, player.y - 8, this.blackout ? HALO_RADIUS * 0.7 : HALO_RADIUS, 1);
+      this.punchCone(ctx, view, player.x, player.y - 8, aimAngle, this.blackout ? BLACKOUT_CONE_LENGTH : CONE_LENGTH, 1);
+    }
     this.pulses = this.pulses.filter((p) => time - p.born < p.ms);
     this.pulses.forEach((p) => this.punch(ctx, view, p.x, p.y, p.radius, 1 - (time - p.born) / p.ms));
 
