@@ -10,7 +10,7 @@ import { setStamina } from './stamina';
 import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
-import { PING_KINDS } from './voice';
+import { CHAT_PHRASES, EMOTES, PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
@@ -639,6 +639,7 @@ export default class MainScene extends Phaser.Scene {
     const offCorrection = onGameEvent((event) => {
       if (event.type === 'POSITION_CORRECTED' && event.playerId === getMyRole()) this.applyServerPosition();
       if (event.type === 'PING') this.showPing(event);
+      if (event.type === 'CHAT') this.showChat(event);
     });
     this.events.once('shutdown', () => {
       offCorrection();
@@ -1021,6 +1022,33 @@ export default class MainScene extends Phaser.Scene {
       entry.ball.destroy();
       entry.glow.destroy();
       this.acidSprites.delete(id);
+    });
+  }
+
+  // Emote o frase del chat rapido sobre la cabeza de quien la mando (si esta a la vista).
+  showChat(event) {
+    const mine = event.playerId === getMyRole();
+    const sprite = mine ? this.player : this.remotePlayers.get(event.playerId)?.sprite;
+    if (!sprite?.visible) return;
+    const emote = event.reason === 'EMOTE';
+    const text = emote ? EMOTES[event.itemId] : CHAT_PHRASES[event.itemId];
+    if (!text) return;
+    const bubble = this.add.text(sprite.x, sprite.y - sprite.displayHeight / 2 - 26, text, emote
+      ? { fontSize: '30px' }
+      : { fontFamily: 'Georgia, serif', fontSize: '15px', color: '#1a0d08', backgroundColor: '#f3e6d8', padding: { x: 6, y: 3 } })
+      .setOrigin(0.5).setDepth(6000);
+    const follow = () => bubble.setPosition(sprite.x, bubble.y);
+    this.events.on('update', follow);
+    this.tweens.add({
+      targets: bubble,
+      y: bubble.y - 22,
+      alpha: { from: 1, to: 0 },
+      ease: 'Quad.easeIn',
+      duration: emote ? 2200 : 2800,
+      onComplete: () => {
+        this.events.off('update', follow);
+        bubble.destroy();
+      },
     });
   }
 
