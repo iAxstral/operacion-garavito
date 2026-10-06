@@ -3,6 +3,7 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLay
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
+import { setStamina } from './stamina';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { PING_KINDS } from './voice';
@@ -111,6 +112,20 @@ const PLAYER_BODY_FOOT_INSET = 6;
 const MAP_PIXEL_WIDTH = MAP_COLS * TILE;
 const MAP_PIXEL_HEIGHT = MAP_ROWS * TILE;
 const PLAYER_SPEED = 160;
+// Movimiento con inercia: cuanto se acerca por segundo a la velocidad pedida.
+const ACCEL_PER_S = 12;
+const DECEL_PER_S = 16;
+// Correr (Espacio, o el joystick al tope): mas rapido mientras haya energia. El
+// servidor acepta hasta 240 px/s, asi que 1,35x (216) no provoca correcciones.
+const SPRINT_FACTOR = 1.35;
+const STAMINA_DRAIN_PER_S = 0.34;
+const STAMINA_REGEN_PER_S = 0.24;
+const STAMINA_REGEN_DELAY_MS = 600;
+const STAMINA_RECOVERED = 0.35;
+const TOUCH_SPRINT = 0.95;
+// Ayuda en las esquinas: si choca con el borde de una pared, se le corre de lado.
+const CORNER_PROBE_PX = 14;
+const CORNER_NUDGE_SPEED = 110;
 
 // En pantallas chicas (celular) la camara se aleja para que se vea mas mapa alrededor:
 // con zoom 1 el personaje ocupaba casi la mitad del alto en horizontal.
@@ -260,6 +275,44 @@ export default class MainScene extends Phaser.Scene {
   }
 
   // 1 pegado al jugador, bajando hasta 0 a COMBAT_HEARING_PX.
+  // Energia: baja mientras corre, se recupera despues de un rato sin correr. Si se
+  // agota, no deja correr hasta recuperar un tercio.
+  updateStamina(time, delta, moving) {
+    const wants = this.sprintKey.isDown || Math.hypot(touchInput.moveX, touchInput.moveY) >= TOUCH_SPRINT;
+    const sprinting = wants && moving && !this.exhausted && this.stamina > 0;
+    if (sprinting) {
+      this.stamina = Math.max(0, this.stamina - (STAMINA_DRAIN_PER_S * delta) / 1000);
+      this.lastSprintAt = time;
+      if (this.stamina === 0) this.exhausted = true;
+    } else if (time - this.lastSprintAt > STAMINA_REGEN_DELAY_MS) {
+      this.stamina = Math.min(1, this.stamina + (STAMINA_REGEN_PER_S * delta) / 1000);
+      if (this.exhausted && this.stamina >= STAMINA_RECOVERED) this.exhausted = false;
+    }
+    setStamina(this.stamina, this.exhausted);
+    return sprinting;
+  }
+
+  // Si va derecho contra una pared pero un costado del cuerpo cabe por el hueco de al
+  // lado (una puerta, una esquina), lo corre hacia el hueco en vez de trabarlo.
+  cornerNudge(vx, vy) {
+    const body = this.player.body;
+    const nudge = { x: 0, y: 0 };
+    if (vx !== 0 && vy === 0 && (body.blocked.left || body.blocked.right)) {
+      const aheadX = vx > 0 ? body.right + 4 : body.left - 4;
+      const topOpen = this.isOpenAt(aheadX, body.top - CORNER_PROBE_PX);
+      const bottomOpen = this.isOpenAt(aheadX, body.bottom + CORNER_PROBE_PX);
+      if (topOpen && !bottomOpen) nudge.y = -CORNER_NUDGE_SPEED;
+      else if (bottomOpen && !topOpen) nudge.y = CORNER_NUDGE_SPEED;
+    } else if (vy !== 0 && vx === 0 && (body.blocked.up || body.blocked.down)) {
+      const aheadY = vy > 0 ? body.bottom + 4 : body.top - 4;
+      const leftOpen = this.isOpenAt(body.left - CORNER_PROBE_PX, aheadY);
+      const rightOpen = this.isOpenAt(body.right + CORNER_PROBE_PX, aheadY);
+      if (leftOpen && !rightOpen) nudge.x = -CORNER_NUDGE_SPEED;
+      else if (rightOpen && !leftOpen) nudge.x = CORNER_NUDGE_SPEED;
+    }
+    return nudge;
+  }
+
   // Superficie bajo los pies: escalera y descanso de madera, el resto baldosa/concreto.
   surfaceAt(x, y) {
     const cell = this.layoutGrid?.[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
@@ -441,6 +494,10 @@ export default class MainScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.dashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.sprintKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.stamina = 1;
+    this.exhausted = false;
+    this.lastSprintAt = -Infinity;
     this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.attackAltKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
     this.chargedKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
@@ -961,7 +1018,8 @@ export default class MainScene extends Phaser.Scene {
     else if (down) direction = direction ?? 'down';
 
     const magnitude = Math.hypot(vx, vy);
-    const speed = PLAYER_SPEED * (getAbilityPanel() === 'phone' ? PHONE_SPEED_FACTOR : 1);
+    const sprinting = this.updateStamina(time, delta, magnitude > 0);
+    const speed = PLAYER_SPEED * (getAbilityPanel() === 'phone' ? PHONE_SPEED_FACTOR : 1) * (sprinting ? SPRINT_FACTOR : 1);
     if (magnitude > 0) {
       vx = (vx / magnitude) * speed;
       vy = (vy / magnitude) * speed;
@@ -975,7 +1033,15 @@ export default class MainScene extends Phaser.Scene {
 
       this.player.setVelocity(this.dashVx, this.dashVy);
     } else {
-      this.player.setVelocity(vx, vy);
+      // Inercia: arranca y frena en un instante corto en vez de en seco.
+      const body = this.player.body.velocity;
+      const rate = Math.min(1, ((magnitude > 0 ? ACCEL_PER_S : DECEL_PER_S) * delta) / 1000);
+      let nextX = body.x + (vx - body.x) * rate;
+      let nextY = body.y + (vy - body.y) * rate;
+      if (Math.abs(nextX) < 4 && vx === 0) nextX = 0;
+      if (Math.abs(nextY) < 4 && vy === 0) nextY = 0;
+      const nudge = this.cornerNudge(vx, vy);
+      this.player.setVelocity(nextX + nudge.x, nextY + nudge.y);
 
       if ((this.dashKey.isDown || touchInput.dash) && time >= this.dashReadyAt) {
 
