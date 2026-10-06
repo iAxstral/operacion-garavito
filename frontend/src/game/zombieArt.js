@@ -28,6 +28,24 @@ const TYPES = {
     skin: '#7d8f2e', skinDark: '#56651c', shirt: '#5d6e22', shirtDark: '#3e4a14', pants: '#2f3318',
     eyes: '#d8ff5a', hair: '#2a2f14', blood: '#3d6a10', sac: '#c7f05a',
   },
+  // Explosivo: hinchado y rojizo, con la panza que brilla naranja y una mecha en la cabeza.
+  'zombie-explosivo': {
+    w: 19, h: 23, headW: 7, headH: 6, torsoW: 13, torsoH: 9, legW: 3, legH: 5,
+    skin: '#b0603a', skinDark: '#7a3a1e', shirt: '#4a2a1a', shirtDark: '#2e1a10', pants: '#2a1e18',
+    eyes: '#ffd23a', hair: '#1c1410', blood: '#6a1208', sac: '#ff9a2e', fuse: true,
+  },
+  // Griton: flaco y palido, con la boca siempre abierta.
+  'zombie-griton': {
+    w: 14, h: 22, headW: 7, headH: 7, torsoW: 8, torsoH: 7, legW: 2, legH: 6,
+    skin: '#c9b8d8', skinDark: '#9a88aa', shirt: '#3a2a4a', shirtDark: '#24182e', pants: '#2a2230',
+    eyes: '#e05aff', hair: '#e8e0f0', blood: '#5a0a3a', bigMouth: true,
+  },
+  // Ciego: gris, alto, con una venda sobre los ojos.
+  'zombie-ciego': {
+    w: 16, h: 24, headW: 7, headH: 6, torsoW: 10, torsoH: 8, legW: 3, legH: 6,
+    skin: '#8a8f8c', skinDark: '#5e6360', shirt: '#2a2c2e', shirtDark: '#18191a', pants: '#2e2a26',
+    eyes: '#e8e8e8', hair: '#3a3a3a', blood: '#5a0a0a', blindfold: true,
+  },
 };
 
 function painter(ctx, ox) {
@@ -123,11 +141,20 @@ function drawFrame(ctx, ox, t, frame) {
   px(headX + t.headW - 3, eyeY, 2, 1, '#120808');
   px(headX + 1, eyeY, 1, 1, t.eyes);
   px(headX + t.headW - 2, eyeY, 1, 1, t.eyes);
-  const open = frame === ZOMBIE_FRAMES.windup || frame === ZOMBIE_FRAMES.strike ? 2 : 1;
+  const open = t.bigMouth ? 3 : frame === ZOMBIE_FRAMES.windup || frame === ZOMBIE_FRAMES.strike ? 2 : 1;
   px(headX + 2, headTop + t.headH - 2 - (open - 1), t.headW - 4, open, '#2a0606');
   px(headX + 2, headTop + t.headH - 2 - (open - 1), 1, 1, '#e8e0c8');
   px(headX + t.headW - 3, headTop + t.headH - 2 - (open - 1), 1, 1, '#e8e0c8');
   px(headX + t.headW - 2, headTop + 3, 1, 2, t.blood);
+  if (t.blindfold) {
+    px(headX - 1, eyeY - 1, t.headW + 2, 3, '#d8d0c0');
+    px(headX + t.headW, eyeY, 2, 1, '#d8d0c0');
+  }
+  if (t.fuse) {
+    px(cx, headTop - 4, 1, 3, '#3a2a18');
+    px(cx, headTop - 5, 1, 1, '#ffd23a');
+    px(cx + 1, headTop - 6, 1, 1, '#ff6a1a');
+  }
 }
 
 /** Crea (una vez) la hoja de un tipo con su contorno y la registra con sus cuadros. */
