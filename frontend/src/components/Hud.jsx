@@ -94,6 +94,7 @@ function WeaponAction({ slot, equipped }) {
 
 function kinderStatus(wave, boss) {
   if (wave.victory) return `¡Edificio despejado! Superaron los ${wave.total} Kinders`;
+  if (wave.escaping) return `¡ESCAPEN! Corran a la salida del piso 1 — ${wave.escapeSeconds}s`;
   if (wave.bossStage) {
     const health = boss ? ` (${boss.health}/${boss.maxHealth})` : '';
     return `Kinder ${wave.number}/${wave.total} — ¡Derroten al Ingeniero de Sistemas!${health}`;
@@ -588,7 +589,7 @@ export default function Hud() {
         </div>
 
         {state.wave && (
-          <div className={`hud-wave${state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
+          <div className={`hud-wave${state.wave.escaping ? ' hud-wave--escape' : state.wave.restingSeconds > 0 || state.wave.victory ? ' hud-wave--resting' : ' hud-wave--active'}`}>
             {kinderStatus(state.wave, state.boss)}
           </div>
         )}
@@ -640,6 +641,12 @@ export default function Hud() {
       {getNearEvent() && state.event && (
         <div className="hud-interact-hint">
           {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — {state.event.type === 'BLACKOUT' ? 'Restablecer la luz' : 'Recoger los suministros'}
+        </div>
+      )}
+
+      {me?.escaped && !state.wave?.victory && (
+        <div className="hud-hidden hud-escaped" aria-live="polite">
+          <span>¡Escapaste! Esperando al resto del equipo…</span>
         </div>
       )}
 
