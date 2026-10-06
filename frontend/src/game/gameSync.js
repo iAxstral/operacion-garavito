@@ -15,7 +15,9 @@ const SEAT_KEY = 'garavito.seat';
 
 function saveSeat() {
   try {
-    sessionStorage.setItem(SEAT_KEY, JSON.stringify({ gameId, role: myRole, token: seatToken, building: myBuilding }));
+    sessionStorage.setItem(SEAT_KEY, JSON.stringify({
+      gameId, role: myRole, token: seatToken, building: myBuilding, node: socketService.url,
+    }));
   } catch {
     // Sin almacenamiento no se puede volver tras recargar, pero si tras un corte.
   }
@@ -171,14 +173,14 @@ export function generateLobbyCode() {
   return Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('');
 }
 
-export async function openLobby(code, create, building) {
+export async function openLobby(code, create, building, redirected = false) {
   await socketService.whenConnected();
   resetLocalState();
   gameId = code;
   topicSubscription = socketService.subscribe(`/topic/game/${code}`, handleMessage);
 
   const reply = awaitEvent((event) => event.playerId === CLIENT_ID
-    && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED'));
+    && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED' || event.type === 'LOBBY_REDIRECT'));
   socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building });
 
   let event;
@@ -187,6 +189,13 @@ export async function openLobby(code, create, building) {
   } catch (error) {
     closeTopic();
     throw error;
+  }
+  if (event.type === 'LOBBY_REDIRECT') {
+    // La sala esta en otro nodo: se pasa alla y se pide de nuevo (una sola vez).
+    closeTopic();
+    if (redirected) throw new Error('lobby_not_found');
+    await socketService.switchTo(event.reason);
+    return openLobby(code, create, building, true);
   }
   if (event.type === 'LOBBY_REJECTED') {
     closeTopic();
@@ -235,6 +244,8 @@ socketService.connect({ onConnect: handleReconnect });
 export async function resumeSession() {
   const seat = loadSeat();
   if (!seat?.gameId || !seat?.token) return null;
+  // Con varios nodos se vuelve al nodo donde estaba la sala.
+  if (seat.node && seat.node !== socketService.url) await socketService.switchTo(seat.node);
   await socketService.whenConnected();
   resetLocalState();
   gameId = seat.gameId;
