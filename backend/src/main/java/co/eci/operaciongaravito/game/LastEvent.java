@@ -128,6 +128,11 @@ public record LastEvent(String type, String playerId, String itemId, String reas
     }
 
     /** Aviso al equipo: {@code itemId} es el tipo y {@code reason} "piso,x,y" donde estaba. */
+    /** {@code reason}: EMOTE o CHAT. */
+    public static LastEvent chat(String playerId, String phrase, boolean emote) {
+        return new LastEvent("CHAT", playerId, phrase, emote ? "EMOTE" : "CHAT");
+    }
+
     public static LastEvent ping(String playerId, String kind, int floor, long x, long y) {
         return new LastEvent("PING", playerId, kind, floor + "," + x + "," + y);
     }

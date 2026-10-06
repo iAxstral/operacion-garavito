@@ -92,6 +92,18 @@ public class GameController {
         broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
     }
 
+    @MessageMapping("/game/{gameId}/chat")
+    public void chat(@DestinationVariable String gameId, ChatRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        LastEvent event = session.attemptChat(request.playerId(), request.phrase(), System.currentTimeMillis());
+        if (event != null) {
+            broadcast(gameId, session, event);
+        }
+    }
+
     @MessageMapping("/game/{gameId}/ping")
     public void ping(@DestinationVariable String gameId, PingRequest request) {
         GameSession session = sessionService.find(gameId);

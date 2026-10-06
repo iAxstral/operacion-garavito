@@ -230,6 +230,16 @@ public class Player {
     }
 
     /** true si ya paso el enfriamiento y registra este aviso. */
+    private long lastChatAt = 0;
+
+    public synchronized boolean tryChat(long now, long cooldownMs) {
+        if (now - lastChatAt < cooldownMs) {
+            return false;
+        }
+        lastChatAt = now;
+        return true;
+    }
+
     public synchronized boolean tryPing(long now, long cooldownMs) {
         if (now - lastPingAt < cooldownMs) {
             return false;

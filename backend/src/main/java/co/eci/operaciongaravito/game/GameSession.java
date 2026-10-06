@@ -582,6 +582,27 @@ public class GameSession {
      * servidor tiene del jugador. Devuelve null si el tipo no existe o si mando uno hace
      * muy poco.
      */
+    /** Frases del chat rapido (el cliente las muestra y las dice con la voz del rol). */
+    public static final java.util.Set<String> CHAT_PHRASES = java.util.Set.of(
+            "GRACIAS", "PERDON", "ESPERA", "SIGUEME", "CUBREME", "LISTO", "SI", "NO", "CORRAN", "BIEN_HECHO");
+    /** Emotes que aparecen sobre la cabeza del jugador. */
+    public static final java.util.Set<String> EMOTES = java.util.Set.of(
+            "SALUDO", "RISA", "MIEDO", "FIESTA", "CORAZON", "CALAVERA");
+    static final long CHAT_COOLDOWN_MS = 1_000;
+
+    /** Frase o emote del chat rapido; null si no existe o si escribe demasiado seguido. */
+    public LastEvent attemptChat(String playerId, String phrase, long now) {
+        Player player = players.get(playerId);
+        if (player == null || phrase == null) {
+            return null;
+        }
+        boolean emote = EMOTES.contains(phrase);
+        if ((!emote && !CHAT_PHRASES.contains(phrase)) || !player.tryChat(now, CHAT_COOLDOWN_MS)) {
+            return null;
+        }
+        return LastEvent.chat(playerId, phrase, emote);
+    }
+
     public LastEvent attemptPing(String playerId, String kind, long now) {
         Player player = players.get(playerId);
         if (player == null || kind == null || !PING_KINDS.contains(kind) || !player.tryPing(now, PING_COOLDOWN_MS)) {
