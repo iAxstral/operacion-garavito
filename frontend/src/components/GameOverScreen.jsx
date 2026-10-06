@@ -4,6 +4,7 @@ import { nameWithRole } from '../game/profile';
 import { playSfx } from '../game/sfx';
 import RankingPanel from './RankingPanel';
 import Icon from './Icon';
+import { earnAchievements } from '../game/achievements';
 
 const OUTCOMES = {
   TEAM_WIPED: {
@@ -45,12 +46,15 @@ export default function GameOverScreen({ onExitToMenu }) {
   const [outcome, setOutcome] = useState(null);
   const [summary, setSummary] = useState(null);
   const [showRanking, setShowRanking] = useState(false);
+  const [earned, setEarned] = useState([]);
 
   useEffect(() => onGameEvent((event) => {
     if (!OUTCOMES[event.type]) return;
     setOutcome(OUTCOMES[event.type]);
     // El resumen viaja en el mismo mensaje que el evento.
-    setSummary(getLatestState().summary ?? null);
+    const runSummary = getLatestState().summary ?? null;
+    setSummary(runSummary);
+    setEarned(earnAchievements(runSummary, getMyRole()));
     setInputLocked(true);
     playSfx(event.type === 'VICTORY' ? 'coins' : 'breakWood');
   }), []);
@@ -121,6 +125,24 @@ export default function GameOverScreen({ onExitToMenu }) {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {earned.length > 0 && (
+          <div className="results-achievements">
+            <h3>Logros</h3>
+            <div className="achievement-list">
+              {earned.map((a) => (
+                <div key={a.id} className={`achievement${a.isNew ? ' achievement--new' : ''}`}>
+                  <Icon name={a.icon} />
+                  <span>
+                    <strong>{a.name}</strong>
+                    <small>{a.description}</small>
+                  </span>
+                  {a.isNew && <em>¡Nuevo!</em>}
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
