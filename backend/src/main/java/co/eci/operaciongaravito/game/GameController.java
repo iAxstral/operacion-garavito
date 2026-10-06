@@ -51,6 +51,7 @@ public class GameController {
             return;
         }
         session.setPlayerName(request.role(), request.name());
+        session.setPlayerCostume(request.role(), request.costume());
         sessionService.registerSeat(headers.getSessionId(), gameId, request.role());
         sessionService.broadcast(gameId, session, LastEvent.joinOk(request.role(), request.clientId()));
     }
@@ -64,7 +65,18 @@ public class GameController {
             return;
         }
         session.setPlayerName(request.role(), request.name());
+        session.setPlayerCostume(request.role(), request.costume());
         sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
+    }
+
+    @MessageMapping("/game/{gameId}/hide")
+    public void hide(@DestinationVariable String gameId, PlayerRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptHide(request.playerId(), System.currentTimeMillis());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/ping")

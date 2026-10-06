@@ -3,6 +3,11 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLay
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
+import HauntLayer from './HauntLayer';
+import { pollGamepad } from './gamepad';
+import { bakeCostumes, costumeKey, COSTUME_LAYOUT, HEAD_Y, NECK_Y } from './costumeArt';
+import { setStamina } from './stamina';
+import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
@@ -16,6 +21,9 @@ import {
   getMyRole,
   getBoss,
   getProjectiles,
+  loadHideSpots,
+  setNearHide,
+  requestHide,
   getPuddles,
   getZombies,
   isInputLocked,
@@ -56,7 +64,7 @@ import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
 import Lighting from './Lighting';
-import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY } from './HauntedDecor';
+import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY, LOCKER_KEY } from './HauntedDecor';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
 const DASH_SPEED = 420;
@@ -110,6 +118,20 @@ const PLAYER_BODY_FOOT_INSET = 6;
 const MAP_PIXEL_WIDTH = MAP_COLS * TILE;
 const MAP_PIXEL_HEIGHT = MAP_ROWS * TILE;
 const PLAYER_SPEED = 160;
+// Movimiento con inercia: cuanto se acerca por segundo a la velocidad pedida.
+const ACCEL_PER_S = 12;
+const DECEL_PER_S = 16;
+// Correr (Espacio, o el joystick al tope): mas rapido mientras haya energia. El
+// servidor acepta hasta 240 px/s, asi que 1,35x (216) no provoca correcciones.
+const SPRINT_FACTOR = 1.35;
+const STAMINA_DRAIN_PER_S = 0.34;
+const STAMINA_REGEN_PER_S = 0.24;
+const STAMINA_REGEN_DELAY_MS = 600;
+const STAMINA_RECOVERED = 0.35;
+const TOUCH_SPRINT = 0.95;
+// Ayuda en las esquinas: si choca con el borde de una pared, se le corre de lado.
+const CORNER_PROBE_PX = 14;
+const CORNER_NUDGE_SPEED = 110;
 
 // En pantallas chicas (celular) la camara se aleja para que se vea mas mapa alrededor:
 // con zoom 1 el personaje ocupaba casi la mitad del alto en horizontal.
@@ -127,6 +149,8 @@ const WALK_WOBBLE_HZ = 3;
 // Letra gotica del tema (GameCanvas espera a que cargue antes de crear la escena).
 const GOTHIC_FONT = '"Pirata One", Georgia, serif';
 const WALK_WOBBLE_DEG = 1.5;
+// Cada cuanto suena un paso al caminar (dos por ciclo de cuatro cuadros).
+const STEP_MS = 230;
 
 const TILE_TEXTURE_FILES = {
   v2_floor_terrazo: 'v2_floor_terrazo_64.png',
@@ -250,13 +274,126 @@ export default class MainScene extends Phaser.Scene {
     this.sound.add('rain', { loop: true, volume: RAIN_MIN_VOLUME * channelVolume('ambient') }).play();
   }
 
-  playZombieSound(key, volume) {
+  playZombieSound(key, volume, pan = 0) {
     const sound = this.sound.get(key) ?? this.sound.add(key);
     if (sound.isPlaying) return;
-    sound.play({ volume: volume * channelVolume('zombies') });
+    sound.play({ volume: volume * channelVolume('zombies'), pan });
   }
 
   // 1 pegado al jugador, bajando hasta 0 a COMBAT_HEARING_PX.
+  // Energia: baja mientras corre, se recupera despues de un rato sin correr. Si se
+  // agota, no deja correr hasta recuperar un tercio.
+  updateStamina(time, delta, moving) {
+    const wants = this.sprintKey.isDown || touchInput.sprint || Math.hypot(touchInput.moveX, touchInput.moveY) >= TOUCH_SPRINT;
+    const sprinting = wants && moving && !this.exhausted && this.stamina > 0;
+    if (sprinting) {
+      this.stamina = Math.max(0, this.stamina - (STAMINA_DRAIN_PER_S * delta) / 1000);
+      this.lastSprintAt = time;
+      if (this.stamina === 0) this.exhausted = true;
+    } else if (time - this.lastSprintAt > STAMINA_REGEN_DELAY_MS) {
+      this.stamina = Math.min(1, this.stamina + (STAMINA_REGEN_PER_S * delta) / 1000);
+      if (this.exhausted && this.stamina >= STAMINA_RECOVERED) this.exhausted = false;
+    }
+    setStamina(this.stamina, this.exhausted);
+    return sprinting;
+  }
+
+  // Si va derecho contra una pared pero un costado del cuerpo cabe por el hueco de al
+  // lado (una puerta, una esquina), lo corre hacia el hueco en vez de trabarlo.
+  cornerNudge(vx, vy) {
+    const body = this.player.body;
+    const nudge = { x: 0, y: 0 };
+    if (vx !== 0 && vy === 0 && (body.blocked.left || body.blocked.right)) {
+      const aheadX = vx > 0 ? body.right + 4 : body.left - 4;
+      const topOpen = this.isOpenAt(aheadX, body.top - CORNER_PROBE_PX);
+      const bottomOpen = this.isOpenAt(aheadX, body.bottom + CORNER_PROBE_PX);
+      if (topOpen && !bottomOpen) nudge.y = -CORNER_NUDGE_SPEED;
+      else if (bottomOpen && !topOpen) nudge.y = CORNER_NUDGE_SPEED;
+    } else if (vy !== 0 && vx === 0 && (body.blocked.up || body.blocked.down)) {
+      const aheadY = vy > 0 ? body.bottom + 4 : body.top - 4;
+      const leftOpen = this.isOpenAt(body.left - CORNER_PROBE_PX, aheadY);
+      const rightOpen = this.isOpenAt(body.right + CORNER_PROBE_PX, aheadY);
+      if (leftOpen && !rightOpen) nudge.x = -CORNER_NUDGE_SPEED;
+      else if (rightOpen && !leftOpen) nudge.x = CORNER_NUDGE_SPEED;
+    }
+    return nudge;
+  }
+
+  // Armarios: E junto a uno libre para esconderse y E otra vez para salir. Mientras
+  // esta adentro el jugador no se mueve ni ataca. Devuelve true si esta escondido.
+  updateHide() {
+    const me = getMyPlayerState();
+    const hiddenIn = me?.hidingIn ?? null;
+    const occupied = new Set(getLatestState().players.map((p) => p.hidingIn).filter(Boolean));
+    let near = null;
+    if (!hiddenIn && !this.spectating) {
+      this.lockers.forEach((locker) => {
+        const distance = Math.hypot(this.player.x - locker.x, this.player.y - locker.y);
+        if (distance <= 70 && !occupied.has(locker.id) && (!near || distance < near.distance)) near = { ...locker, distance };
+      });
+    }
+    setNearHide(hiddenIn ? { hidden: true, ms: me.hiddenMs } : near && { id: near.id });
+    this.lockers.forEach((locker) => {
+      // El armario ocupado tiembla un poco de vez en cuando.
+      const shaking = occupied.has(locker.id) && Math.random() < 0.04;
+      locker.image.setX(locker.x + (shaking ? (Math.random() - 0.5) * 3 : 0));
+    });
+    if ((near || hiddenIn) && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      requestHide();
+      const locker = this.lockers.find((l) => l.id === (hiddenIn ?? near.id));
+      if (locker) playSample(hiddenIn ? 'doorOpen' : 'doorClose', { channel: 'ambient', volume: 0.6, rate: 1.4 });
+    }
+    this.player.setAlpha(hiddenIn ? 0.12 : 1);
+    this.playerShadow?.setVisible(!hiddenIn && this.player.visible);
+    return Boolean(hiddenIn);
+  }
+
+  // Disfraz encima del personaje (o la capa detras). `holder` guarda la imagen.
+  syncCostume(holder, sprite, id) {
+    const costume = id && COSTUME_LAYOUT[id] ? id : null;
+    if (holder.costumeId !== costume) {
+      holder.costumeImage?.destroy();
+      holder.costumeImage = costume ? this.add.image(sprite.x, sprite.y, costumeKey(costume)) : null;
+      holder.costumeId = costume;
+    }
+    const image = holder.costumeImage;
+    if (!image) return;
+    const layout = COSTUME_LAYOUT[costume];
+    const top = sprite.y - sprite.displayHeight / 2;
+    const y = layout.anchor === 'body' ? sprite.y + layout.dy : top + (layout.anchor === 'neck' ? NECK_Y : HEAD_Y) + layout.dy;
+    image
+      .setPosition(sprite.x, y)
+      .setScale(layout.scale)
+      .setAngle(sprite.angle)
+      .setFlipX(sprite.texture.key.includes('_left'))
+      .setVisible(sprite.visible)
+      .setAlpha(sprite.alpha)
+      .setDepth(sprite.depth + (layout.anchor === 'neck' ? -0.2 : 0.2));
+  }
+
+  // Superficie bajo los pies: escalera y descanso de madera, el resto baldosa/concreto.
+  surfaceAt(x, y) {
+    const cell = this.layoutGrid?.[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
+    if (cell?.type === 'stair' || cell?.type === 'landing') return 'stepWood';
+    return 'stepConcrete';
+  }
+
+  // Un paso cada vez que el ciclo de caminar cruza un apoyo (cada STEP_MS).
+  stepSounds(fromMs, toMs, x, y, volume, located = false) {
+    if (Math.floor(toMs / STEP_MS) === Math.floor(fromMs / STEP_MS)) return;
+    const at = located ? { x, y, floor: this.floor } : null;
+    playSample(this.surfaceAt(x, y + 40), { channel: 'ambient', volume, variance: 0.12, at });
+  }
+
+  // true si entre los dos puntos hay una pared o una puerta cerrada (cada 24 px).
+  wallBetween(x1, y1, x2, y2) {
+    const steps = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 24);
+    for (let i = 1; i < steps; i += 1) {
+      if (!this.isOpenAt(x1 + ((x2 - x1) * i) / steps, y1 + ((y2 - y1) * i) / steps)) return true;
+    }
+    return false;
+  }
+
   hearing(x, y) {
     if (!this.player) return 0;
     const distance = Math.hypot(this.player.x - x, this.player.y - y);
@@ -296,7 +433,7 @@ export default class MainScene extends Phaser.Scene {
       },
       onStagger: (entry) => playSfx('stagger', this.hearing(entry.x, entry.y)),
       onHit: (entry, amount) => {
-        playSfx('hit', this.hearing(entry.x, entry.y));
+        playSfx('hit', this.hearing(entry.x, entry.y), { x: entry.x, y: entry.y, floor: this.floor });
         const from = this.nearestPlayerTo(entry.x, entry.y) ?? { x: entry.x, y: entry.y - 1 };
         this.gore.splatter(entry.x, entry.y, from.x, from.y);
         this.gore.blood(entry.x, entry.y);
@@ -370,15 +507,19 @@ export default class MainScene extends Phaser.Scene {
       const range = zombie.tough ? ROAR_RANGE_PX : GROAN_RANGE_PX;
       if (distance > range) return;
       const closeness = 1 - distance / range;
-      if (!nearest || closeness > nearest.closeness) nearest = { closeness, tough: zombie.tough };
+      if (!nearest || closeness > nearest.closeness) {
+        const behindWall = this.wallBetween(this.player.x, this.player.y, zombie.x, zombie.y);
+        nearest = { closeness: behindWall ? closeness * 0.55 : closeness, tough: zombie.tough, dx: zombie.x - this.player.x };
+      }
     });
 
     if (!nearest || time < this.nextZombieSoundAt) return;
 
-    const { closeness, tough } = nearest;
+    const { closeness, tough, dx } = nearest;
     this.nextZombieSoundAt = time + FAR_COOLDOWN_MS - (FAR_COOLDOWN_MS - NEAR_COOLDOWN_MS) * closeness;
     const volume = (tough ? MAX_ROAR_VOLUME : MAX_GROAN_VOLUME) * (0.15 + 0.85 * closeness * closeness);
-    this.playZombieSound(tough ? 'zombie_roar' : 'zombie_groan', volume);
+    // Se oye del lado de donde viene el zombi.
+    this.playZombieSound(tough ? 'zombie_roar' : 'zombie_groan', volume, Math.max(-0.85, Math.min(0.85, dx / 520)));
   }
 
   create() {
@@ -388,12 +529,13 @@ export default class MainScene extends Phaser.Scene {
 
     const spawn = this.spawnOverride ?? layout.spawn;
     bakeAllWalkFrames(this, ROLE_CATALOG.map((entry) => entry.spritePrefix));
+    bakeCostumes(this);
     this.player = this.physics.add.sprite(spawn.x, spawn.y, this.roleTexture('down'));
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
     this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
-    startDust(this, this.player);
+    if (!getSettings().lowPerf) startDust(this, this.player);
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
@@ -411,6 +553,10 @@ export default class MainScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.dashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.sprintKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.stamina = 1;
+    this.exhausted = false;
+    this.lastSprintAt = -Infinity;
     this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.attackAltKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
     this.chargedKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
@@ -458,6 +604,23 @@ export default class MainScene extends Phaser.Scene {
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
     this.pingLayer = new PingLayer(this);
+    this.lockers = [];
+    loadHideSpots(getMyBuilding()).then((spots) => {
+      if (!this.sys.isActive()) return;
+      this.lockers = spots.filter((spot) => spot.floor === this.floor).map((spot) => ({
+        ...spot,
+        image: this.add.image(spot.x, spot.y - 6, LOCKER_KEY).setDepth(spot.y + 30),
+      }));
+    });
+    this.hauntLayer = new HauntLayer(this, {
+      rooms: missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor),
+      floor: this.floor,
+      lighting: this.lighting,
+      doors: this.doors,
+      getListener: () => this.focusSprite(),
+    });
+    preloadSamples();
+    setOcclusion((x1, y1, x2, y2) => this.wallBetween(x1, y1, x2, y2));
     // El servidor rechazo una posicion (movimiento imposible): se vuelve a la suya.
     // Los avisos del equipo de este piso se marcan en el mapa.
     const offCorrection = onGameEvent((event) => {
@@ -559,6 +722,11 @@ export default class MainScene extends Phaser.Scene {
         door.open = doorState.open;
         door.image.setTexture(doorState.open ? 'v2_door_madera_open' : 'v2_door_madera');
         door.image.body.enable = !doorState.open;
+        const at = { x: door.x, y: door.y, floor: this.floor };
+        playSample(doorState.open ? 'doorOpen' : 'doorClose', { channel: 'ambient', at });
+        if (doorState.open && Math.random() < 0.6) {
+          this.time.delayedCall(80, () => playSample('creak', { channel: 'ambient', volume: 0.7, at }));
+        }
       });
     });
   }
@@ -618,6 +786,7 @@ export default class MainScene extends Phaser.Scene {
       if (Math.hypot(dx, dy) > 3) {
         entry.direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
         entry.aim = Math.atan2(dy, dx);
+        this.stepSounds(entry.walkMs ?? 0, (entry.walkMs ?? 0) + delta, entry.sprite.x, entry.sprite.y, 0.35, true);
         entry.walkMs = (entry.walkMs ?? 0) + delta;
         entry.sprite.setTexture(walkKey(entry.prefix, entry.direction, walkFrameAt(entry.walkMs)));
       } else if (entry.walkMs) {
@@ -631,7 +800,8 @@ export default class MainScene extends Phaser.Scene {
         const weapon = weaponById(state.weapon);
         const end = this.traceShot(entry.sprite.x, entry.sprite.y, state.shotFacing, weapon);
         this.weaponLayer.fire(state.playerId, end, { heavy: weapon.id === 'RIFLE' });
-        playSfx(weapon.id === 'RIFLE' ? 'rifle' : 'pistol', 0.7 * this.hearing(entry.sprite.x, entry.sprite.y));
+        playSfx(weapon.id === 'RIFLE' ? 'rifle' : 'pistol', 0.7 * this.hearing(entry.sprite.x, entry.sprite.y),
+          { x: entry.sprite.x, y: entry.sprite.y, floor: this.floor });
       }
       const blend = Math.min(1, (delta / 1000) * REMOTE_LERP_PER_SECOND);
       entry.sprite.x += dx * blend;
@@ -641,6 +811,12 @@ export default class MainScene extends Phaser.Scene {
       if (downed) entry.sprite.setTint(0x9a9a9a);
       else entry.sprite.clearTint();
       entry.downed = downed;
+      // Un compañero escondido en un armario no se ve.
+      const hidden = Boolean(state.hidingIn);
+      entry.sprite.setVisible(!hidden);
+      entry.label.setVisible(!hidden);
+      entry.shadow.setVisible(!hidden);
+      this.syncCostume(entry, entry.sprite, state.costume);
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
       entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.sprite.displayHeight / 2 - 5);
       const labelText = state.connected === false ? `${displayName(state)} (desconectado)` : displayName(state);
@@ -661,6 +837,7 @@ export default class MainScene extends Phaser.Scene {
       if (seen.has(id)) return;
       entry.sprite.destroy();
       entry.shadow.destroy();
+      entry.costumeImage?.destroy();
       entry.label.destroy();
       this.weaponLayer.remove(id);
       this.remotePlayers.delete(id);
@@ -734,7 +911,7 @@ export default class MainScene extends Phaser.Scene {
         this.tweens.add({ targets: image, scale: 1, duration: 220, ease: 'Back.easeOut', onUpdate: () => image.refreshBody() });
         entry = { image, collider, bar, x, y, health: b.health };
         this.barricadeSprites.set(b.id, entry);
-        playSfx('build', this.hearing(x, y));
+        playSfx('build', this.hearing(x, y), { x, y, floor: this.floor });
       }
       if (b.health < entry.health) {
         this.tweens.add({ targets: entry.image, x: { from: entry.x - 3, to: entry.x + 3 }, duration: 50, yoyo: true, onComplete: () => entry.image.setX(entry.x) });
@@ -759,7 +936,7 @@ export default class MainScene extends Phaser.Scene {
           onComplete: () => plank.destroy(),
         });
       }
-      playSfx('breakWood', this.hearing(entry.x, entry.y));
+      playSfx('breakWood', this.hearing(entry.x, entry.y), { x: entry.x, y: entry.y, floor: this.floor });
       this.physics.world.removeCollider(entry.collider);
       entry.image.destroy();
       entry.bar.destroy();
@@ -889,15 +1066,24 @@ export default class MainScene extends Phaser.Scene {
     this.playerShadow
       .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)
       .setVisible(this.player.visible);
-    this.lighting.update(time, this.focusSprite(), this.remotePlayers);
+    this.syncCostume(this, this.player, getMyPlayerState()?.costume);
+    // La linterna apunta hacia donde mira el jugador (o el compañero que se espectea).
+    const watched = this.spectating ? this.remotePlayers.get(getSpectateTarget()) : null;
+    const flashlightAim = this.spectating ? (watched?.aim ?? null) : this.aimAngle;
+    this.lighting.update(time, this.focusSprite(), this.remotePlayers, flashlightAim);
+    const ear = this.focusSprite();
+    if (ear) setListener(ear.x, ear.y, this.floor);
     this.syncPuddles();
     this.pingLayer?.update(time);
+    this.hauntLayer?.update(time);
     this.checkDamageTaken();
     this.drawReviveProgress();
     if (this.updateSpectate(delta)) return;
     this.updateRevive();
 
-    if (isInputLocked()) {
+    // Control de consola: escribe en las mismas entradas que los botones tactiles.
+    this.padAim = pollGamepad();
+    if (this.updateHide() || isInputLocked()) {
       this.player.setVelocity(0, 0);
       this.zombieLayer.sync(this.zombiesOnFloor());
       this.zombieLayer.update(delta);
@@ -920,7 +1106,8 @@ export default class MainScene extends Phaser.Scene {
     else if (down) direction = direction ?? 'down';
 
     const magnitude = Math.hypot(vx, vy);
-    const speed = PLAYER_SPEED * (getAbilityPanel() === 'phone' ? PHONE_SPEED_FACTOR : 1);
+    const sprinting = this.updateStamina(time, delta, magnitude > 0);
+    const speed = PLAYER_SPEED * (getAbilityPanel() === 'phone' ? PHONE_SPEED_FACTOR : 1) * (sprinting ? SPRINT_FACTOR : 1);
     if (magnitude > 0) {
       vx = (vx / magnitude) * speed;
       vy = (vy / magnitude) * speed;
@@ -934,7 +1121,15 @@ export default class MainScene extends Phaser.Scene {
 
       this.player.setVelocity(this.dashVx, this.dashVy);
     } else {
-      this.player.setVelocity(vx, vy);
+      // Inercia: arranca y frena en un instante corto en vez de en seco.
+      const body = this.player.body.velocity;
+      const rate = Math.min(1, ((magnitude > 0 ? ACCEL_PER_S : DECEL_PER_S) * delta) / 1000);
+      let nextX = body.x + (vx - body.x) * rate;
+      let nextY = body.y + (vy - body.y) * rate;
+      if (Math.abs(nextX) < 4 && vx === 0) nextX = 0;
+      if (Math.abs(nextY) < 4 && vy === 0) nextY = 0;
+      const nudge = this.cornerNudge(vx, vy);
+      this.player.setVelocity(nextX + nudge.x, nextY + nudge.y);
 
       if ((this.dashKey.isDown || touchInput.dash) && time >= this.dashReadyAt) {
 
@@ -950,6 +1145,7 @@ export default class MainScene extends Phaser.Scene {
 
     reportPosition(Math.round(this.player.x), Math.round(this.player.y), time);
     this.updateAim(time);
+    if (this.padAim != null) this.aimAngle = this.padAim;
     this.updateWeaponSelection();
     this.updateAbility();
     this.updateAttack(time);
@@ -957,8 +1153,8 @@ export default class MainScene extends Phaser.Scene {
     this.zombieLayer.update(delta);
     this.syncBoss(delta);
 
-    if (time - this.mouseAimAt < MOUSE_AIM_MS) {
-      // Con el mouse el personaje mira hacia donde apunta.
+    if (time - this.mouseAimAt < MOUSE_AIM_MS || this.padAim != null) {
+      // Con el mouse (o la palanca derecha) el personaje mira hacia donde apunta.
       const quarter = Math.round(Phaser.Math.Angle.Wrap(this.aimAngle) / (Math.PI / 2));
       this.currentDirection = AIM_DIRECTIONS[(quarter + 4) % 4];
     }
@@ -967,6 +1163,7 @@ export default class MainScene extends Phaser.Scene {
       : this.roleTexture(this.currentDirection));
     this.syncLocalWeapon();
     if (direction) {
+      this.stepSounds(this.walkWobblePhaseMs, this.walkWobblePhaseMs + delta, this.player.x, this.player.y, 0.45);
       this.walkWobblePhaseMs += delta;
       const wobble = Math.sin((this.walkWobblePhaseMs / 1000) * WALK_WOBBLE_HZ * Math.PI * 2);
       this.player.setAngle(wobble * WALK_WOBBLE_DEG);
@@ -1433,7 +1630,7 @@ export default class MainScene extends Phaser.Scene {
     this.layoutGrid = layout.grid;
     this.lighting = new Lighting(this);
     bakeHauntedTextures(this);
-    this.gore = new GoreFx(this);
+    this.gore = new GoreFx(this, { lowPerf: getSettings().lowPerf });
     renderOutside(this, layout.grid, this.lighting, getMyBuilding());
     this.renderGridTiles(layout.grid);
     this.renderDecorations(layout.decorations);

@@ -1,5 +1,6 @@
 import { audio } from './sfx';
 import { channelVolume, onSettingsChange } from './settings';
+import { hasSample, playSample, preloadSamples } from './audioBank';
 
 // Ambiente de las pantallas de afuera (inicio, edificios, sala): viento que sube y baja,
 // y cada tanto una puerta que cruje o un gemido lejano. Todo sintetizado con Web Audio
@@ -149,8 +150,20 @@ function scheduleEvent() {
   eventTimer = setTimeout(() => {
     const ctx = audio();
     if (playing && ctx && ctx.state === 'running') {
-      if (Math.random() < 0.45) creak(ctx);
-      else moan(ctx);
+      // Grabaciones reales si ya cargaron (y pasan por el filtro de adentro/afuera);
+      // si no, las sintetizadas de respaldo.
+      const roll = Math.random();
+      const pick = roll < 0.4 ? 'creak' : roll < 0.8 ? 'ghost' : 'doorClose';
+      const real = hasSample(pick) && playSample(pick, {
+        volume: pick === 'doorClose' ? 0.35 : 0.6,
+        rate: pick === 'doorClose' ? 0.8 : 1,
+        variance: 0.12,
+        destination: master,
+      });
+      if (!real) {
+        if (pick === 'creak') creak(ctx);
+        else moan(ctx);
+      }
     }
     if (playing) scheduleEvent();
   }, 6000 + Math.random() * 9000);
@@ -174,6 +187,7 @@ export function startAmbience(nextMode = 'outdoor') {
     return;
   }
   playing = true;
+  preloadSamples(['creak', 'ghost', 'doorClose']);
   windNodes = startWind(ctx);
   applyVolume();
   unsubscribeSettings = onSettingsChange(applyVolume);

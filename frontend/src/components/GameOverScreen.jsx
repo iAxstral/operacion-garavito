@@ -5,6 +5,7 @@ import { playSfx } from '../game/sfx';
 import RankingPanel from './RankingPanel';
 import Icon from './Icon';
 import { earnAchievements } from '../game/achievements';
+import { creditRun } from '../game/costumes';
 
 const OUTCOMES = {
   TEAM_WIPED: {
@@ -47,6 +48,7 @@ export default function GameOverScreen({ onExitToMenu }) {
   const [summary, setSummary] = useState(null);
   const [showRanking, setShowRanking] = useState(false);
   const [earned, setEarned] = useState([]);
+  const [candies, setCandies] = useState(0);
 
   useEffect(() => onGameEvent((event) => {
     if (!OUTCOMES[event.type]) return;
@@ -55,6 +57,8 @@ export default function GameOverScreen({ onExitToMenu }) {
     const runSummary = getLatestState().summary ?? null;
     setSummary(runSummary);
     setEarned(earnAchievements(runSummary, getMyRole()));
+    const mine = runSummary?.players?.find((p) => p.role === getMyRole());
+    setCandies(runSummary ? creditRun(runSummary.id, mine?.candies ?? 0) : 0);
     setInputLocked(true);
     playSfx(event.type === 'VICTORY' ? 'coins' : 'breakWood');
   }), []);
@@ -126,6 +130,10 @@ export default function GameOverScreen({ onExitToMenu }) {
               </tbody>
             </table>
           </div>
+        )}
+
+        {candies > 0 && (
+          <p className="results-candies"><Icon name="pumpkin" /> +{candies} dulces a tu bolsa: cámbialos por disfraces en el menú</p>
         )}
 
         {earned.length > 0 && (

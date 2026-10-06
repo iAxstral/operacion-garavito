@@ -808,3 +808,199 @@
   font-size: 22px;
   color: var(--hw-gold);
 }
+
+/* ---------- Energia para correr ---------- */
+
+.hud-stamina {
+  width: 180px;
+  height: 6px;
+  margin-left: 32px;
+  overflow: hidden;
+  background: rgba(10, 4, 6, 0.8);
+  border: 1px solid rgba(232, 182, 74, 0.4);
+  border-radius: 3px;
+  transition: opacity 0.6s ease;
+}
+
+.hud-stamina div {
+  height: 100%;
+  background: linear-gradient(90deg, #c9e86a, #e8b64a);
+  transition: width 0.12s linear;
+}
+
+.hud-stamina--full {
+  opacity: 0;
+}
+
+.hud-stamina--empty div {
+  background: #c41c12;
+  animation: connection-blink 0.6s ease-in-out infinite;
+}
+
+@media (max-width: 640px), (max-height: 500px) {
+  .hud-stamina {
+    width: 140px;
+    margin-left: 26px;
+  }
+}
+
+/* ---------- Escondido en un armario: se ve por las rejillas ---------- */
+
+.hud-hidden {
+  position: absolute;
+  inset: 0;
+  z-index: 15;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: calc(110px + env(safe-area-inset-bottom));
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(180deg, rgba(5, 4, 6, 0.96) 0 22px, rgba(5, 4, 6, 0.55) 22px 30px),
+    radial-gradient(ellipse at center, transparent 30%, rgba(0, 0, 0, 0.9) 80%);
+  animation: hw-fade-in 0.25s ease-out;
+}
+
+.hud-hidden span {
+  padding: 6px 14px;
+  font-size: 14px;
+  color: var(--hw-bone);
+  background: rgba(10, 6, 8, 0.85);
+  border: 1px solid rgba(232, 182, 74, 0.5);
+  border-radius: 999px;
+}
+
+.hud-hidden strong {
+  color: var(--hw-gold);
+}
+
+/* ---------- Dulces ---------- */
+
+.hud-candies {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+  padding: 0 8px;
+  font-size: 13px;
+  color: #ffb347;
+  background: linear-gradient(180deg, rgba(30, 12, 14, 0.9), rgba(10, 5, 7, 0.92));
+  border: 1px solid rgba(255, 140, 40, 0.55);
+  border-radius: 4px;
+}
+
+.hud-candies .hw-icon {
+  color: #ff8a2a;
+}
+
+.results-candies {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffb347 !important;
+}
+
+.results-candies .hw-icon {
+  color: #ff8a2a;
+}
+
+/* ---------- Tienda de disfraces ---------- */
+
+.costume-panel {
+  width: min(640px, 100%);
+}
+
+.costume-bag {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--hw-bone-dim);
+}
+
+.costume-bag strong {
+  font-size: 18px;
+  color: #ffb347;
+}
+
+.costume-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+}
+
+.costume-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px;
+  color: var(--hw-bone);
+  text-align: center;
+  background: rgba(40, 14, 16, 0.75);
+  border: 1px solid var(--hw-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.costume-card:hover {
+  border-color: var(--hw-gold);
+}
+
+.costume-card strong {
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: 18px;
+}
+
+.costume-card small {
+  font-size: 11px;
+  color: var(--hw-bone-dim);
+}
+
+.costume-preview {
+  width: 64px;
+  height: 64px;
+  background: radial-gradient(circle, rgba(255, 140, 40, 0.18), transparent 70%);
+}
+
+.costume-action {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #120708;
+  background: var(--hw-gold);
+  border-radius: 999px;
+}
+
+.costume-card--worn {
+  border-color: #ff8a2a;
+  box-shadow: 0 0 16px rgba(255, 138, 42, 0.45);
+}
+
+.costume-card--worn .costume-action {
+  background: #ff8a2a;
+}
+
+.costume-card--locked {
+  opacity: 0.55;
+}
+
+/* En celular los botones secundarios del inicio van de a dos para que quepan. */
+@media (max-width: 640px) {
+  .start-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .start-actions .start-btn--primary {
+    grid-column: span 2;
+  }
+
+  .start-actions .start-btn:not(.start-btn--primary) {
+    padding: 10px 8px;
+    font-size: 15px;
+  }
+}

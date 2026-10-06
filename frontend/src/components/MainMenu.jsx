@@ -3,6 +3,7 @@ import SettingsPanel from './SettingsPanel';
 import HowToPlay from './HowToPlay';
 import RankingPanel from './RankingPanel';
 import AchievementsPanel from './AchievementsPanel';
+import CostumeShop from './CostumeShop';
 import HalloweenCreatures from './HalloweenCreatures';
 import Icon from './Icon';
 import { playSfx } from '../game/sfx';
@@ -179,6 +180,9 @@ export default function MainMenu({ onPlay }) {
             <button type="button" className="start-btn" onClick={() => open('achievements')}>
               <Icon name="star" /> Logros
             </button>
+            <button type="button" className="start-btn" onClick={() => open('costumes')}>
+              <Icon name="pumpkin" /> Disfraces
+            </button>
           </nav>
 
           <button type="button" className="start-link" onClick={replayIntro}>
@@ -193,6 +197,7 @@ export default function MainMenu({ onPlay }) {
       {panel === 'howto' && <HowToPlay onClose={() => setPanel(null)} />}
       {panel === 'ranking' && <RankingPanel onClose={() => setPanel(null)} />}
       {panel === 'achievements' && <AchievementsPanel onClose={() => setPanel(null)} />}
+      {panel === 'costumes' && <CostumeShop onClose={() => setPanel(null)} />}
     </div>
   );
 }

@@ -6,7 +6,7 @@ const STORAGE_KEY = 'garavito.settings.v1';
 export const VOLUME_CHANNELS = [
   { id: 'master', label: 'Volumen general', hint: 'Afecta a todos los sonidos del juego', icon: '🔊' },
   { id: 'music', label: 'Música', hint: 'Música del menú y de la partida', icon: '🎵' },
-  { id: 'ambient', label: 'Ambiente', hint: 'Viento, lluvia, crujidos y gemidos lejanos', icon: '🌧️' },
+  { id: 'ambient', label: 'Ambiente', hint: 'Viento, lluvia, pasos, puertas, crujidos y gemidos lejanos', icon: '🌧️' },
   { id: 'zombies', label: 'Zombis', hint: 'Gruñidos, rugidos y mordidas', icon: '🧟' },
   { id: 'combat', label: 'Combate', hint: 'Tus golpes, impactos y el daño que recibes', icon: '⚔️' },
   { id: 'ui', label: 'Interfaz', hint: 'Botones y menús', icon: '🖱️' },
@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   screenShake: true,
   tips: true,
   typeShapes: false,
+  lowPerf: false,
 });
 
 function sanitize(raw) {
@@ -35,6 +36,7 @@ function sanitize(raw) {
     screenShake: typeof raw?.screenShake === 'boolean' ? raw.screenShake : DEFAULT_SETTINGS.screenShake,
     tips: typeof raw?.tips === 'boolean' ? raw.tips : DEFAULT_SETTINGS.tips,
     typeShapes: typeof raw?.typeShapes === 'boolean' ? raw.typeShapes : DEFAULT_SETTINGS.typeShapes,
+    lowPerf: typeof raw?.lowPerf === 'boolean' ? raw.lowPerf : DEFAULT_SETTINGS.lowPerf,
   };
 }
 

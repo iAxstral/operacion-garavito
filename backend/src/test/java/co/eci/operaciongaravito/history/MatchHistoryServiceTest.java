@@ -31,8 +31,8 @@ class MatchHistoryServiceTest {
 
     private static MatchSummary summary(boolean victory, int kinder, long seconds, int kills) {
         return new MatchSummary(1, Building.C, victory, kinder, seconds, List.of(
-                new MatchSummary.PlayerSummary("SEGURIDAD", kills, 2, 50, 30, 0, 1, "Lina"),
-                new MatchSummary.PlayerSummary("SALUD", 1, 3, 75, 10, 2, 0, null)));
+                new MatchSummary.PlayerSummary("SEGURIDAD", kills, 2, 50, 30, 0, 1, "Lina", 3),
+                new MatchSummary.PlayerSummary("SALUD", 1, 3, 75, 10, 2, 0, null, 0)));
     }
 
     @Test

@@ -11,10 +11,12 @@ export const SHELL_KEY = 'hw_shell';
 export const FLASH_KEY = 'hw_flash';
 export const GIB_KEY = 'hw_gib';
 export const SHADOW_KEY = 'hw_shadow';
+export const LOCKER_KEY = 'hw_locker';
 const BLOOD_KEYS = ['hw_blood_0', 'hw_blood_1', 'hw_blood_2', 'hw_blood_3'];
 
 // Las manchas del piso se quedan, pero con tope: las mas viejas se desvanecen.
 const MAX_DECALS = 90;
+const LOW_PERF_DECALS = 30;
 const DEPTH_DECAL = 1.5;
 const DEPTH_DUST = 4995;
 
@@ -136,6 +138,27 @@ export function bakeHauntedTextures(scene) {
     ctx.fill();
     ctx.fillStyle = '#b3201a';
     ctx.fillRect(2, 1, 2, 2);
+  });
+
+  // Armario metalico con rejillas y manija (escondite).
+  canvasTexture(scene, LOCKER_KEY, 40, 74, (ctx) => {
+    const body = ctx.createLinearGradient(0, 0, 40, 0);
+    body.addColorStop(0, '#3c4248');
+    body.addColorStop(0.5, '#5c646c');
+    body.addColorStop(1, '#2c3136');
+    ctx.fillStyle = body;
+    ctx.fillRect(2, 2, 36, 70);
+    ctx.strokeStyle = '#15181b';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(2, 2, 36, 70);
+    ctx.fillStyle = '#1b1f23';
+    for (let y = 10; y < 26; y += 4) ctx.fillRect(9, y, 22, 2);
+    for (let y = 52; y < 64; y += 4) ctx.fillRect(9, y, 22, 2);
+    ctx.fillStyle = '#b8a76a';
+    ctx.fillRect(30, 34, 3, 9);
+    ctx.fillStyle = 'rgba(120, 20, 15, 0.7)';
+    ctx.fillRect(6, 40, 6, 3);
+    ctx.fillRect(9, 43, 3, 6);
   });
 
   canvasTexture(scene, SHADOW_KEY, 32, 12, (ctx) => {
@@ -268,9 +291,11 @@ export function startDust(scene, target) {
  * casquillos. Una instancia por escena.
  */
 export class GoreFx {
-  constructor(scene) {
+  constructor(scene, { lowPerf = false } = {}) {
     this.scene = scene;
     this.decals = [];
+    this.maxDecals = lowPerf ? LOW_PERF_DECALS : MAX_DECALS;
+    this.gibs = lowPerf ? 6 : 14;
   }
 
   blood(x, y, { big = false } = {}) {
@@ -282,7 +307,7 @@ export class GoreFx {
       .setAlpha(0.9);
     this.scene.tweens.add({ targets: decal, scale: (big ? 1.1 : 0.55) * (0.85 + Math.random() * 0.3), duration: 140, ease: 'Quad.easeOut' });
     this.decals.push(decal);
-    if (this.decals.length > MAX_DECALS) {
+    if (this.decals.length > this.maxDecals) {
       const old = this.decals.shift();
       this.scene.tweens.add({ targets: old, alpha: 0, duration: 800, onComplete: () => old.destroy() });
     }
@@ -312,7 +337,7 @@ export class GoreFx {
   // Muerte: estallido de pedazos que caen y una mancha grande.
   burst(x, y, tint = 0x6e0b0b) {
     this.blood(x, y, { big: true });
-    for (let i = 0; i < 14; i += 1) {
+    for (let i = 0; i < this.gibs; i += 1) {
       const a = Math.random() * Math.PI * 2;
       const d = 18 + Math.random() * 42;
       const gib = this.scene.add.image(x, y - 12, GIB_KEY)

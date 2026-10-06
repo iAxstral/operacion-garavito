@@ -22,6 +22,7 @@ public record MatchSummary(
             int damageTaken,
             int revives,
             int downs,
-            String name) {
+            String name,
+            int candies) {
     }
 }

@@ -1,6 +1,7 @@
 
-import { socketService } from '../services/socketService';
+import { API_BASE, socketService } from '../services/socketService';
 import { getNickname } from './profile';
+import { getEquippedCostume } from './costumes';
 
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
@@ -198,7 +199,9 @@ export async function joinAs(role) {
   const token = newToken();
   const reply = awaitEvent((event) => (event.type === 'JOIN_OK' && event.itemId === CLIENT_ID)
     || (event.type === 'JOIN_REJECTED' && event.playerId === CLIENT_ID));
-  socketService.publish(`/app/game/${gameId}/join`, { role, clientId: CLIENT_ID, token, name: getNickname() || null });
+  socketService.publish(`/app/game/${gameId}/join`, {
+    role, clientId: CLIENT_ID, token, name: getNickname() || null, costume: getEquippedCostume(),
+  });
 
   const event = await reply;
   if (event.type === 'JOIN_REJECTED') throw new Error(event.reason);
@@ -211,7 +214,7 @@ export async function joinAs(role) {
 
 function sendRejoin() {
   socketService.publish(`/app/game/${gameId}/rejoin`, {
-    role: myRole, clientId: CLIENT_ID, token: seatToken, name: getNickname() || null,
+    role: myRole, clientId: CLIENT_ID, token: seatToken, name: getNickname() || null, costume: getEquippedCostume(),
   });
 }
 
@@ -392,6 +395,33 @@ export function getNearEvent() {
 /** Barricadas de Infraestructura ({ id, ownerId, floor, col, row, health, maxHealth }). */
 export function getBarricades() {
   return latestState.barricades ?? [];
+}
+
+// Armarios para esconderse: fijos por edificio, se piden una vez al servidor.
+const hideSpotsByBuilding = new Map();
+let nearHide = null;
+
+export function loadHideSpots(building) {
+  if (!hideSpotsByBuilding.has(building)) {
+    hideSpotsByBuilding.set(building, fetch(`${API_BASE}/api/buildings/${building}/hide-spots`)
+      .then((response) => (response.ok ? response.json() : []))
+      .catch(() => []));
+  }
+  return hideSpotsByBuilding.get(building);
+}
+
+export function setNearHide(spot) {
+  nearHide = spot;
+}
+
+export function getNearHide() {
+  return nearHide;
+}
+
+/** Entra al armario cercano o sale del que esta. */
+export function requestHide() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/hide`, { playerId: myRole });
 }
 
 export function setNearBarricade(barricade) {

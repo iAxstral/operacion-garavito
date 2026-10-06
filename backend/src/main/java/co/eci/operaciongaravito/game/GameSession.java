@@ -72,6 +72,13 @@ public class GameSession {
     /** Avisos al equipo que se aceptan, y cada cuanto puede mandar uno cada jugador. */
     static final java.util.Set<String> PING_KINDS = java.util.Set.of("ZOMBIES", "HELP", "REVIVE", "GO", "AMMO");
     static final long PING_COOLDOWN_MS = 1_500;
+
+    /** Cuanto puede quedarse escondido en un armario y cuanto espera para volver. */
+    static final long HIDE_MAX_MS = 8_000;
+    static final long HIDE_COOLDOWN_MS = 12_000;
+
+    static final double CANDY_CHANCE = 1.0 / 3;
+    static final int CANDIES_PER_BOSS = 10;
     private final Map<String, Barricade> barricades = new ConcurrentHashMap<>();
     private long barricadeSequence;
     private final WaveDirector waveDirector;
@@ -298,7 +305,7 @@ public class GameSession {
                             p.getShotSeq(), p.getShotFacing(),
                             p.getReviveTargetId(), p.reviveProgress(now),
                             missionBoard.viewFor(p.getPlayerId()), p.abilityReadyInMs(now), p.isConnected(),
-                            p.getName());
+                            p.getName(), p.getHidingIn(), p.hiddenMs(now), p.getCandies(), p.getCostume());
                 })
                 .toList();
     }
@@ -309,8 +316,9 @@ public class GameSession {
      */
     public boolean reportPosition(String playerId, int floor, double x, double y) {
         Player player = players.get(playerId);
-        // Un caido se queda donde cayo: su cliente pasa a modo espectador.
-        if (player == null || !player.isAlive() || !building.hasFloor(floor)) {
+        // Un caido se queda donde cayo (su cliente pasa a modo espectador) y uno escondido
+        // no se mueve del armario.
+        if (player == null || !player.isAlive() || player.isHidden() || !building.hasFloor(floor)) {
             return true;
         }
         long now = System.currentTimeMillis();
@@ -366,9 +374,57 @@ public class GameSession {
         }
     }
 
+    /**
+     * Entra al armario libre mas cercano, o sale si ya estaba escondido. Rechazos:
+     * downed, no_spot (no hay uno al alcance), spot_taken, on_cooldown.
+     */
+    public synchronized PlayerActionResult attemptHide(String playerId, long now) {
+        Player player = players.get(playerId);
+        if (player == null || !player.isAlive()) {
+            return PlayerActionResult.rejected("downed");
+        }
+        if (player.isHidden()) {
+            player.unhide(now, HIDE_COOLDOWN_MS);
+            return PlayerActionResult.ok();
+        }
+        if (!player.canHide(now)) {
+            return PlayerActionResult.rejected("on_cooldown");
+        }
+        HideSpots.Spot spot = HideSpots.near(building, player.getFloor(), player.getX(), player.getY());
+        if (spot == null) {
+            return PlayerActionResult.rejected("no_spot");
+        }
+        boolean taken = players.values().stream().anyMatch(other -> spot.id().equals(other.getHidingIn()));
+        if (taken) {
+            return PlayerActionResult.rejected("spot_taken");
+        }
+        player.hide(spot.id(), now, HIDE_MAX_MS);
+        return PlayerActionResult.ok();
+    }
+
     public List<PuddleState> puddleStates() {
         long now = System.currentTimeMillis();
         return puddles.values().stream().map(puddle -> puddle.toState(now)).toList();
+    }
+
+    /** Algunos zombis sueltan dulces: 1 de cada 3 da uno (a veces dos); el jefe, diez. */
+    static int candiesFor(int zombieKills, int bossKills, java.util.random.RandomGenerator random) {
+        int candies = bossKills * CANDIES_PER_BOSS;
+        for (int i = 0; i < zombieKills; i++) {
+            double roll = random.nextDouble();
+            if (roll < CANDY_CHANCE) {
+                candies += roll < CANDY_CHANCE / 6 ? 2 : 1;
+            }
+        }
+        return candies;
+    }
+
+    /** Disfraz del jugador (se llama al unirse o al volver a su puesto). */
+    public synchronized void setPlayerCostume(String role, String costume) {
+        Player player = players.get(role);
+        if (player != null) {
+            player.setCostume(costume);
+        }
     }
 
     /** Apodo del jugador (se llama al unirse o al volver a su puesto). */
@@ -453,9 +509,12 @@ public class GameSession {
             }
         }
 
-        List<Player> targets = players.values().stream().filter(Player::isAlive).toList();
+        players.values().forEach(player -> player.expireHide(now, HIDE_COOLDOWN_MS));
+        List<Player> alive = players.values().stream().filter(Player::isAlive).toList();
+        // Los escondidos estan vivos pero los zombis no los ven.
+        List<Player> targets = alive.stream().filter(player -> !player.isHidden()).toList();
 
-        if (targets.isEmpty() && !players.isEmpty()) {
+        if (alive.isEmpty() && !players.isEmpty()) {
             closeRun(false, waveDirector.getKinder(), now);
             zombies.clear();
             acids.clear();
@@ -918,6 +977,9 @@ public class GameSession {
         if (!player.isAlive()) {
             return AttackResult.rejected("downed");
         }
+        if (player.isHidden()) {
+            return AttackResult.rejected("hidden");
+        }
 
         long now = System.currentTimeMillis();
         // El origen del golpe es la posicion del servidor, salvo una diferencia chica
@@ -1087,6 +1149,7 @@ public class GameSession {
             player.addEarnings(zombieKills * GARAVITOS_PER_ZOMBIE);
             waveDirector.onZombiesKilled(zombieKills);
         }
+        player.addCandies(candiesFor(zombieKills, bossKills, java.util.concurrent.ThreadLocalRandom.current()));
         player.recordKills(zombieKills + bossKills);
         return AttackResult.ok(hits, zombieKills + bossKills);
     }

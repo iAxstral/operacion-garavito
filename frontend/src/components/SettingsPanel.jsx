@@ -172,6 +172,12 @@ export default function SettingsPanel({ onClose, inGame = false }) {
             onChange={(screenShake) => updateSettings({ screenShake })}
           />
           <Toggle
+            label="Modo de rendimiento"
+            hint="Para celulares lentos: luz más simple, sin neblina ni polvo y menos sangre. Se aplica al cambiar de piso"
+            checked={settings.lowPerf}
+            onChange={(lowPerf) => updateSettings({ lowPerf })}
+          />
+          <Toggle
             label="Formas según el tipo de zombi"
             hint="Para daltonismo: cuadrado el resistente, triángulo el corredor, gota el escupidor"
             checked={settings.typeShapes}
