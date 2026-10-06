@@ -4,6 +4,7 @@ import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
 import HauntLayer from './HauntLayer';
+import { bakeCostumes, costumeKey, COSTUME_LAYOUT, HEAD_Y, NECK_Y } from './costumeArt';
 import { setStamina } from './stamina';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
@@ -346,6 +347,29 @@ export default class MainScene extends Phaser.Scene {
     return Boolean(hiddenIn);
   }
 
+  // Disfraz encima del personaje (o la capa detras). `holder` guarda la imagen.
+  syncCostume(holder, sprite, id) {
+    const costume = id && COSTUME_LAYOUT[id] ? id : null;
+    if (holder.costumeId !== costume) {
+      holder.costumeImage?.destroy();
+      holder.costumeImage = costume ? this.add.image(sprite.x, sprite.y, costumeKey(costume)) : null;
+      holder.costumeId = costume;
+    }
+    const image = holder.costumeImage;
+    if (!image) return;
+    const layout = COSTUME_LAYOUT[costume];
+    const top = sprite.y - sprite.displayHeight / 2;
+    const y = layout.anchor === 'body' ? sprite.y + layout.dy : top + (layout.anchor === 'neck' ? NECK_Y : HEAD_Y) + layout.dy;
+    image
+      .setPosition(sprite.x, y)
+      .setScale(layout.scale)
+      .setAngle(sprite.angle)
+      .setFlipX(sprite.texture.key.includes('_left'))
+      .setVisible(sprite.visible)
+      .setAlpha(sprite.alpha)
+      .setDepth(sprite.depth + (layout.anchor === 'neck' ? -0.2 : 0.2));
+  }
+
   // Superficie bajo los pies: escalera y descanso de madera, el resto baldosa/concreto.
   surfaceAt(x, y) {
     const cell = this.layoutGrid?.[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
@@ -504,6 +528,7 @@ export default class MainScene extends Phaser.Scene {
 
     const spawn = this.spawnOverride ?? layout.spawn;
     bakeAllWalkFrames(this, ROLE_CATALOG.map((entry) => entry.spritePrefix));
+    bakeCostumes(this);
     this.player = this.physics.add.sprite(spawn.x, spawn.y, this.roleTexture('down'));
 
     this.player.setCollideWorldBounds(true);
@@ -790,6 +815,7 @@ export default class MainScene extends Phaser.Scene {
       entry.sprite.setVisible(!hidden);
       entry.label.setVisible(!hidden);
       entry.shadow.setVisible(!hidden);
+      this.syncCostume(entry, entry.sprite, state.costume);
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
       entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.sprite.displayHeight / 2 - 5);
       const labelText = state.connected === false ? `${displayName(state)} (desconectado)` : displayName(state);
@@ -810,6 +836,7 @@ export default class MainScene extends Phaser.Scene {
       if (seen.has(id)) return;
       entry.sprite.destroy();
       entry.shadow.destroy();
+      entry.costumeImage?.destroy();
       entry.label.destroy();
       this.weaponLayer.remove(id);
       this.remotePlayers.delete(id);
@@ -1038,6 +1065,7 @@ export default class MainScene extends Phaser.Scene {
     this.playerShadow
       .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)
       .setVisible(this.player.visible);
+    this.syncCostume(this, this.player, getMyPlayerState()?.costume);
     // La linterna apunta hacia donde mira el jugador (o el compañero que se espectea).
     const watched = this.spectating ? this.remotePlayers.get(getSpectateTarget()) : null;
     const flashlightAim = this.spectating ? (watched?.aim ?? null) : this.aimAngle;
