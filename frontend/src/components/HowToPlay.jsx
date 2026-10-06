@@ -21,6 +21,7 @@ const KEYBOARD = [
   ['R', 'Recargar'],
   ['C', 'Ataque cargado (en área)'],
   ['Shift', 'Dash (esquivar)'],
+  ['Espacio', 'Correr (gasta energía, se recupera sola)'],
   ['F', 'Habilidad de tu rol'],
   ['E', 'Interactuar: misiones, tienda, puertas, escaleras, inventario'],
   ['M / Tab', 'Mapa y equipo'],
@@ -29,7 +30,7 @@ const KEYBOARD = [
 ];
 
 const TOUCH = [
-  ['Joystick', 'Toca y arrastra en la mitad izquierda'],
+  ['Joystick', 'Toca y arrastra en la mitad izquierda; al tope, corres'],
   ['⚔', 'Atacar o disparar (apunta solo al zombi más cercano)'],
   ['💥', 'Ataque cargado'],
   ['»', 'Dash'],

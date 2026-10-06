@@ -808,3 +808,38 @@
   font-size: 22px;
   color: var(--hw-gold);
 }
+
+/* ---------- Energia para correr ---------- */
+
+.hud-stamina {
+  width: 180px;
+  height: 6px;
+  margin-left: 32px;
+  overflow: hidden;
+  background: rgba(10, 4, 6, 0.8);
+  border: 1px solid rgba(232, 182, 74, 0.4);
+  border-radius: 3px;
+  transition: opacity 0.6s ease;
+}
+
+.hud-stamina div {
+  height: 100%;
+  background: linear-gradient(90deg, #c9e86a, #e8b64a);
+  transition: width 0.12s linear;
+}
+
+.hud-stamina--full {
+  opacity: 0;
+}
+
+.hud-stamina--empty div {
+  background: #c41c12;
+  animation: connection-blink 0.6s ease-in-out infinite;
+}
+
+@media (max-width: 640px), (max-height: 500px) {
+  .hud-stamina {
+    width: 140px;
+    margin-left: 26px;
+  }
+}

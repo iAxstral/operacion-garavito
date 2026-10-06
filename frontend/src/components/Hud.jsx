@@ -32,6 +32,7 @@ import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog'
 import { abilityFor, BARRICADE_COOLDOWN_MS, MAX_BARRICADES, priceFor } from '../game/abilityCatalog';
 import { roleInfo } from '../game/roleCatalog';
 import { displayName, nameWithRole } from '../game/profile';
+import { getStamina, onStaminaChange } from '../game/stamina';
 import { buildFloorLayout, MAP_COLS, MAP_ROWS, TILE } from '../game/mapLayout';
 
 const MAP_CELL_PX = 12;
@@ -218,6 +219,8 @@ export default function Hud() {
   const [mapOpen, setMapOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [hurtKey, setHurtKey] = useState(0);
+  const [stamina, setStaminaView] = useState(getStamina);
+  useEffect(() => onStaminaChange(setStaminaView), []);
   const previousHealthRef = useRef(null);
   const lockBeforeSettingsRef = useRef(false);
   const touch = isTouchDevice();
@@ -481,6 +484,12 @@ export default function Hud() {
             <div className="hud-health-fill" style={{ width: `${health}%`, background: healthColor(health) }} />
             <span className="hud-health-label">{health} / 100</span>
           </div>
+        </div>
+        <div
+          className={`hud-stamina${stamina.value >= 1 ? ' hud-stamina--full' : ''}${stamina.exhausted ? ' hud-stamina--empty' : ''}`}
+          title={touch ? 'Energía: lleva el joystick al tope para correr' : 'Energía: mantén Espacio para correr'}
+        >
+          <div style={{ width: `${Math.round(stamina.value * 100)}%` }} />
         </div>
 
         <div className="hud-stats-row">
