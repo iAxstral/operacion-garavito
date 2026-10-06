@@ -6,6 +6,7 @@ import RankingPanel from './RankingPanel';
 import Icon from './Icon';
 import { earnAchievements } from '../game/achievements';
 import { creditRun } from '../game/costumes';
+import Credits from './Credits';
 
 const OUTCOMES = {
   TEAM_WIPED: {
@@ -49,6 +50,7 @@ export default function GameOverScreen({ onExitToMenu }) {
   const [showRanking, setShowRanking] = useState(false);
   const [earned, setEarned] = useState([]);
   const [candies, setCandies] = useState(0);
+  const [showCredits, setShowCredits] = useState(false);
 
   useEffect(() => onGameEvent((event) => {
     if (!OUTCOMES[event.type]) return;
@@ -60,10 +62,14 @@ export default function GameOverScreen({ onExitToMenu }) {
     const mine = runSummary?.players?.find((p) => p.role === getMyRole());
     setCandies(runSummary ? creditRun(runSummary.id, mine?.candies ?? 0) : 0);
     setInputLocked(true);
+    setShowCredits(event.type === 'VICTORY');
     playSfx(event.type === 'VICTORY' ? 'coins' : 'breakWood');
   }), []);
 
   if (!outcome) return null;
+  if (showCredits) {
+    return <Credits survivors={summary?.players ?? []} onClose={() => setShowCredits(false)} />;
+  }
 
   const handleRetry = () => {
     setOutcome(null);
@@ -158,6 +164,11 @@ export default function GameOverScreen({ onExitToMenu }) {
           {outcome.canRetry && (
             <button type="button" className="game-over-btn game-over-btn--primary" onClick={handleRetry}>
               Reintentar
+            </button>
+          )}
+          {summary?.victory && (
+            <button type="button" className="game-over-btn" onClick={() => setShowCredits(true)}>
+              Créditos
             </button>
           )}
           <button type="button" className="game-over-btn" onClick={() => setShowRanking(true)}>
