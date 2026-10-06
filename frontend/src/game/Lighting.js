@@ -299,7 +299,8 @@ export default class Lighting {
       this.punch(ctx, view, player.x, player.y - 8, this.blackout ? BLACKOUT_PLAYER_RADIUS : PLAYER_RADIUS, 1);
     } else if (player) {
       this.punch(ctx, view, player.x, player.y - 8, this.blackout ? HALO_RADIUS * 0.7 : HALO_RADIUS, 1);
-      this.punchCone(ctx, view, player.x, player.y - 8, aimAngle, this.blackout ? BLACKOUT_CONE_LENGTH : CONE_LENGTH, 1);
+      const coneLength = (this.blackout ? BLACKOUT_CONE_LENGTH : CONE_LENGTH) * (this.coneFactor ?? 1);
+      this.punchCone(ctx, view, player.x, player.y - 8, aimAngle, coneLength, 1);
     }
     this.pulses = this.pulses.filter((p) => time - p.born < p.ms);
     this.pulses.forEach((p) => this.punch(ctx, view, p.x, p.y, p.radius, 1 - (time - p.born) / p.ms));

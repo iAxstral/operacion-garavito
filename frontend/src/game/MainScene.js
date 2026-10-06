@@ -7,6 +7,7 @@ import HauntLayer from './HauntLayer';
 import { pollGamepad } from './gamepad';
 import { bakeCostumes, costumeKey, COSTUME_LAYOUT, HEAD_Y, NECK_Y } from './costumeArt';
 import { setStamina } from './stamina';
+import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { PING_KINDS } from './voice';
@@ -287,7 +288,8 @@ export default class MainScene extends Phaser.Scene {
     const wants = this.sprintKey.isDown || touchInput.sprint || Math.hypot(touchInput.moveX, touchInput.moveY) >= TOUCH_SPRINT;
     const sprinting = wants && moving && !this.exhausted && this.stamina > 0;
     if (sprinting) {
-      this.stamina = Math.max(0, this.stamina - (STAMINA_DRAIN_PER_S * delta) / 1000);
+      const drain = STAMINA_DRAIN_PER_S * (hasPerk(getMyPlayerState(), 'ENERGIA') ? ENERGIA_DRAIN_FACTOR : 1);
+      this.stamina = Math.max(0, this.stamina - (drain * delta) / 1000);
       this.lastSprintAt = time;
       if (this.stamina === 0) this.exhausted = true;
     } else if (time - this.lastSprintAt > STAMINA_REGEN_DELAY_MS) {
@@ -1100,6 +1102,7 @@ export default class MainScene extends Phaser.Scene {
     // La linterna apunta hacia donde mira el jugador (o el compañero que se espectea).
     const watched = this.spectating ? this.remotePlayers.get(getSpectateTarget()) : null;
     const flashlightAim = this.spectating ? (watched?.aim ?? null) : this.aimAngle;
+    this.lighting.coneFactor = !this.spectating && hasPerk(getMyPlayerState(), 'LINTERNA') ? LINTERNA_CONE_FACTOR : 1;
     this.lighting.update(time, this.focusSprite(), this.remotePlayers, flashlightAim);
     const ear = this.focusSprite();
     if (ear) setListener(ear.x, ear.y, this.floor);
