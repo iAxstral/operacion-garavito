@@ -341,7 +341,7 @@ export class GoreFx {
   damageNumber(x, y, amount, { crit = false } = {}) {
     const label = this.scene.add
       .text(x + (Math.random() - 0.5) * 16, y, `${amount}`, {
-        fontFamily: 'Creepster, Impact, sans-serif',
+        fontFamily: '"Creepster", Impact, sans-serif',
         fontSize: crit ? '26px' : '20px',
         color: crit ? '#ffd23a' : '#ffffff',
         stroke: '#3a0000',

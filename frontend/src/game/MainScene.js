@@ -124,6 +124,8 @@ export function cameraZoomFor(width, height) {
 }
 
 const WALK_WOBBLE_HZ = 3;
+// Letra gotica del tema (GameCanvas espera a que cargue antes de crear la escena).
+const GOTHIC_FONT = '"Pirata One", Georgia, serif';
 const WALK_WOBBLE_DEG = 1.5;
 
 const TILE_TEXTURE_FILES = {
@@ -298,7 +300,8 @@ export default class MainScene extends Phaser.Scene {
         const from = this.nearestPlayerTo(entry.x, entry.y) ?? { x: entry.x, y: entry.y - 1 };
         this.gore.splatter(entry.x, entry.y, from.x, from.y);
         this.gore.blood(entry.x, entry.y);
-        if (amount > 0) this.gore.damageNumber(entry.x, entry.y - 34, amount, { crit: amount >= 3 });
+        // La vida de los zombis es de pocos puntos: se muestra por 10 para que se sienta.
+        if (amount > 0) this.gore.damageNumber(entry.x, entry.y - 34, amount * 10, { crit: amount >= 3 });
       },
       onDeath: (entry) => {
         if (entry.deathStyle === 'corpse') this.gore.blood(entry.x, entry.y + 4, { big: true });
@@ -481,12 +484,12 @@ export default class MainScene extends Phaser.Scene {
     const { width, height } = this.scale;
     const banner = this.add
       .text(width / 2, height / 2 + (BANNER_TOP_PX - height / 2) / zoom, name, {
-        fontFamily: 'sans-serif',
-        fontSize: '30px',
-        fontStyle: 'bold',
-        color: '#f2fbe2',
-        stroke: '#0b120b',
-        strokeThickness: 6,
+        fontFamily: GOTHIC_FONT,
+        fontSize: '40px',
+        color: '#ecdfcc',
+        stroke: '#3a0505',
+        strokeThickness: 7,
+        shadow: { offsetX: 0, offsetY: 0, color: '#e8321f', blur: 14, fill: true, stroke: true },
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
@@ -520,12 +523,14 @@ export default class MainScene extends Phaser.Scene {
       const info = missionType(mission.type);
       const text = this.add
         .text(mission.x, mission.y, `${info.icon}\nMisión`, {
-          fontFamily: 'sans-serif',
-          fontSize: '13px',
-          color: '#ffffff',
+          fontFamily: GOTHIC_FONT,
+          fontSize: '16px',
+          color: '#e8b64a',
           align: 'center',
-          backgroundColor: '#5b3fa0',
-          padding: { x: 5, y: 3 },
+          backgroundColor: 'rgba(30, 8, 10, 0.9)',
+          padding: { x: 7, y: 4 },
+          stroke: '#120406',
+          strokeThickness: 2,
         })
         .setOrigin(0.5)
         .setDepth(4)
@@ -1453,9 +1458,10 @@ export default class MainScene extends Phaser.Scene {
             {
               fontFamily: 'sans-serif',
               fontSize: '13px',
-              color: '#ffffff',
-              backgroundColor: '#1f6f43',
-              padding: { x: 6, y: 3 },
+              fontStyle: 'bold',
+              color: '#ecdfcc',
+              backgroundColor: 'rgba(40, 10, 12, 0.92)',
+              padding: { x: 7, y: 4 },
             },
           )
           .setDepth(20)
@@ -1470,12 +1476,12 @@ export default class MainScene extends Phaser.Scene {
     const modes = ['flicker', 'steady', 'broken'];
     layout.decorations
       .filter((deco) => deco.type === 'column')
-      .filter((deco, i) => i % 2 === 0)
+      .filter((deco, i) => i % 3 === 0)
       .forEach((deco, i) => {
         this.lighting.addLight({
           x: deco.x * TILE + TILE / 2,
           y: (deco.y + 2.5) * TILE,
-          radius: 260,
+          radius: 220,
           mode: modes[i % modes.length],
         });
       });
@@ -1660,11 +1666,11 @@ export default class MainScene extends Phaser.Scene {
     labels.forEach((label) => {
       this.add
         .text(label.x, label.y, label.text, {
-          fontFamily: 'sans-serif',
-          fontSize: '13px',
-          color: '#3a2f22',
-          backgroundColor: '#e8e2d4',
-          padding: { x: 4, y: 2 },
+          fontFamily: GOTHIC_FONT,
+          fontSize: '16px',
+          color: '#e8d9b8',
+          backgroundColor: 'rgba(26, 12, 10, 0.82)',
+          padding: { x: 6, y: 2 },
         })
         .setDepth(15);
     });
