@@ -79,6 +79,11 @@ public class Player {
     public static final java.util.Set<String> COSTUMES = java.util.Set.of(
             "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA");
 
+    /** Mejoras elegidas en la corrida y las tres que se le ofrecen ahora (o ninguna). */
+    private final java.util.EnumSet<Perk> perks = java.util.EnumSet.noneOf(Perk.class);
+    private List<Perk> perkOffer = List.of();
+    private long lastRegenAt = 0;
+
     /** Hasta cuando "hace ruido" (disparo, golpe o correr): los zombis ciegos lo oyen. */
     private volatile long noiseUntil = 0;
 
@@ -96,6 +101,51 @@ public class Player {
 
     public String getName() {
         return name;
+    }
+
+    public synchronized boolean hasPerk(Perk perk) {
+        return perks.contains(perk);
+    }
+
+    public synchronized List<String> perkNames() {
+        return perks.stream().map(Enum::name).toList();
+    }
+
+    public synchronized List<String> perkOfferNames() {
+        return perkOffer.stream().map(Enum::name).toList();
+    }
+
+    /** Le ofrece hasta tres mejoras que todavia no tiene (reemplaza una oferta sin elegir). */
+    public synchronized void offerPerks(java.util.random.RandomGenerator random) {
+        List<Perk> available = new ArrayList<>(java.util.Arrays.stream(Perk.values()).filter(p -> !perks.contains(p)).toList());
+        java.util.Collections.shuffle(available, new java.util.Random(random.nextLong()));
+        perkOffer = List.copyOf(available.subList(0, Math.min(Perk.OFFER_SIZE, available.size())));
+    }
+
+    /** Elige una de las ofrecidas y aplica su efecto inmediato. False si no estaba en la oferta. */
+    public synchronized boolean choosePerk(Perk perk) {
+        if (perk == null || !perkOffer.contains(perk)) {
+            return false;
+        }
+        perks.add(perk);
+        perkOffer = List.of();
+        if (perk == Perk.REFUERZO) {
+            heal(Perk.REFUERZO_HEAL);
+        } else if (perk == Perk.MUNICION) {
+            reserveAmmo += Perk.MUNICION_ROUNDS;
+        }
+        return true;
+    }
+
+    /** Regeneracion: 1 de vida cada 3 s tras 5 s sin recibir daño. */
+    public synchronized void regenerate(long now) {
+        if (!perks.contains(Perk.REGENERACION) || !isAlive() || health >= 100) {
+            return;
+        }
+        if (now - lastDamagedAt >= Perk.REGEN_IDLE_MS && now - lastRegenAt >= Perk.REGEN_EVERY_MS) {
+            health += 1;
+            lastRegenAt = now;
+        }
     }
 
     public void makeNoise(long until) {
@@ -361,7 +411,8 @@ public class Player {
         if (now < biteGraceUntil) {
             return false;
         }
-        boolean damaged = takeDamage(amount);
+        int bite = perks.contains(Perk.PIEL_DURA) ? Math.max(1, amount - 1) : amount;
+        boolean damaged = takeDamage(bite);
         if (damaged) {
             biteGraceUntil = now + BITE_GRACE_MS;
         }
@@ -491,7 +542,8 @@ public class Player {
             return "no_ammo";
         }
         reloadingWeapon = weapon;
-        reloadingUntil = now + weapon.reloadMs();
+        reloadingUntil = now + (perks.contains(Perk.RECARGA_RAPIDA)
+                ? Math.round(weapon.reloadMs() * Perk.RELOAD_FACTOR) : weapon.reloadMs());
         return null;
     }
 
@@ -559,6 +611,8 @@ public class Player {
     }
 
     public synchronized void resetStats() {
+        perks.clear();
+        perkOffer = List.of();
         statCandies = 0;
         statKills = 0;
         statMissions = 0;
@@ -591,6 +645,8 @@ public class Player {
     }
 
     public synchronized void reset() {
+        perks.clear();
+        perkOffer = List.of();
         health = 100;
         garavitos = 0;
         inventory.clear();
