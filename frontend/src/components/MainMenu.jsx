@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import SettingsPanel from './SettingsPanel';
 import HowToPlay from './HowToPlay';
 import RankingPanel from './RankingPanel';
+import AchievementsPanel from './AchievementsPanel';
 import HalloweenCreatures from './HalloweenCreatures';
 import Icon from './Icon';
 import { playSfx } from '../game/sfx';
@@ -175,6 +176,9 @@ export default function MainMenu({ onPlay }) {
             <button type="button" className="start-btn" onClick={() => open('ranking')}>
               <Icon name="trophy" /> Ranking
             </button>
+            <button type="button" className="start-btn" onClick={() => open('achievements')}>
+              <Icon name="star" /> Logros
+            </button>
           </nav>
 
           <button type="button" className="start-link" onClick={replayIntro}>
@@ -188,6 +192,7 @@ export default function MainMenu({ onPlay }) {
       {panel === 'settings' && <SettingsPanel onClose={() => setPanel(null)} />}
       {panel === 'howto' && <HowToPlay onClose={() => setPanel(null)} />}
       {panel === 'ranking' && <RankingPanel onClose={() => setPanel(null)} />}
+      {panel === 'achievements' && <AchievementsPanel onClose={() => setPanel(null)} />}
     </div>
   );
 }
