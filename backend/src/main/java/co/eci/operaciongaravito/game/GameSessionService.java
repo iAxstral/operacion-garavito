@@ -223,7 +223,7 @@ public class GameSessionService {
                 session.lastSummary(),
                 session.kinderEvent(),
                 session.puddleStates()
-        );
+        ).withBlasts(session.blastStates());
     }
 
     private void startTicking(String gameId) {

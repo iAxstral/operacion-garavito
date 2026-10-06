@@ -79,6 +79,9 @@ public class Player {
     public static final java.util.Set<String> COSTUMES = java.util.Set.of(
             "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA");
 
+    /** Hasta cuando "hace ruido" (disparo, golpe o correr): los zombis ciegos lo oyen. */
+    private volatile long noiseUntil = 0;
+
     /** Apodo que eligio el jugador, o null (entonces se le llama por su rol). */
     private volatile String name = null;
     /** Ultimo aviso al equipo (pings): se limita para que nadie llene la pantalla. */
@@ -93,6 +96,14 @@ public class Player {
 
     public String getName() {
         return name;
+    }
+
+    public void makeNoise(long until) {
+        noiseUntil = Math.max(noiseUntil, until);
+    }
+
+    public boolean isNoisy(long now) {
+        return now < noiseUntil;
     }
 
     public String getCostume() {

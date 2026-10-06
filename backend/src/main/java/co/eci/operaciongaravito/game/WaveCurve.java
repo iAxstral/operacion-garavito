@@ -29,13 +29,13 @@ public final class WaveCurve {
     // vez, no del total vivo). Bajar a 2 vivos si baja el techo real a ~6.7/s. Kinder
     // 3-5 quedan igual: la escalada de dificultad sigue ahi.
     private static final List<WaveBlueprint> KINDERS = List.of(
-            //                kinder cuota vivos rafaga cada  resist  vmin vmax jefe  corredor escupidor
-            new WaveBlueprint(1,     8,    2,    2,    1200, 0.0,    55,  75,  false, 0.0,     0.0),
-            new WaveBlueprint(2,     14,   4,    2,    1000, 0.0,    62,  85,  false, 0.25,    0.0),
-            new WaveBlueprint(3,     25,   12,   3,    900,  0.15,   70,  95,  false, 0.25,    0.15),
-            new WaveBlueprint(4,     30,   14,   3,    800,  0.3,    78,  110, false, 0.3,     0.2),
+            //                kinder cuota vivos rafaga cada  resist  vmin vmax jefe  corredor escupidor explosivo griton ciego
+            new WaveBlueprint(1,     8,    2,    2,    1200, 0.0,    55,  75,  false, 0.0,     0.0,      0.0,      0.0,   0.0),
+            new WaveBlueprint(2,     14,   4,    2,    1000, 0.0,    62,  85,  false, 0.25,    0.0,      0.0,      0.0,   0.0),
+            new WaveBlueprint(3,     25,   12,   3,    900,  0.15,   70,  95,  false, 0.25,    0.15,     0.08,     0.05,  0.08),
+            new WaveBlueprint(4,     30,   14,   3,    800,  0.3,    78,  110, false, 0.3,     0.2,      0.1,      0.07,  0.1),
             // Kinder 5: el Ingeniero de Sistemas con su escolta. Se pasa matando al jefe.
-            new WaveBlueprint(5,     0,    8,    2,    1500, 0.35,   85,  120, true,  0.2,     0.2)
+            new WaveBlueprint(5,     0,    8,    2,    1500, 0.35,   85,  120, true,  0.2,     0.2,      0.08,     0.05,  0.08)
     );
 
     private WaveCurve() {
@@ -57,13 +57,27 @@ public final class WaveCurve {
         return roll < blueprint.toughChance() ? ZOMBIE_TOUGH_HEALTH : ZOMBIE_BASE_HEALTH;
     }
 
-    /** Tipo de zombi para un sorteo en [0, 1): corredor, escupidor o comun. */
+    /** Tipo de zombi para un sorteo en [0, 1): cada tipo ocupa su franja; el resto, comun. */
     public static ZombieKind rollKind(WaveBlueprint blueprint, double roll) {
-        if (roll < blueprint.runnerChance()) {
+        double edge = blueprint.runnerChance();
+        if (roll < edge) {
             return ZombieKind.RUNNER;
         }
-        if (roll < blueprint.runnerChance() + blueprint.spitterChance()) {
+        edge += blueprint.spitterChance();
+        if (roll < edge) {
             return ZombieKind.SPITTER;
+        }
+        edge += blueprint.exploderChance();
+        if (roll < edge) {
+            return ZombieKind.EXPLODER;
+        }
+        edge += blueprint.screamerChance();
+        if (roll < edge) {
+            return ZombieKind.SCREAMER;
+        }
+        edge += blueprint.blindChance();
+        if (roll < edge) {
+            return ZombieKind.BLIND;
         }
         return ZombieKind.WALKER;
     }

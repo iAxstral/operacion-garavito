@@ -33,6 +33,15 @@ public class Zombie {
     static final long SPIT_RECOVER_MS = 500;
     static final long SPIT_COOLDOWN_MS = 2_400;
 
+    /** Explosivo: dano al reventar al morir (al alcanzarte usa el del tipo). */
+    static final int DEATH_BLAST_DAMAGE = 8;
+    /** Griton: grita si ve a un jugador a esta distancia, y cada cuanto puede volver. */
+    static final double SCREAM_RANGE_PX = 300;
+    static final long SCREAM_WINDUP_MS = 900;
+    static final long SCREAM_COOLDOWN_MS = 9_000;
+    /** Enfurecido por un grito: mas rapido por un rato. */
+    static final double ENRAGED_SPEED_FACTOR = 1.45;
+
     private final String id;
     private final int floor;
     private final double speed;
@@ -44,6 +53,14 @@ public class Zombie {
     private volatile long nextSpitAt;
     private AcidProjectile pendingAcid;
     private int acidSequence;
+
+    /** Explosivo: dano de la explosion pendiente (0 si no hay). */
+    private int pendingBlast;
+    /** Griton: la preparacion en curso es un grito; y si ya termino de gritar. */
+    private volatile boolean screaming;
+    private boolean screamPending;
+    private volatile long nextScreamAt;
+    private volatile long enragedUntil;
 
     private volatile double x;
     private volatile double y;
@@ -116,6 +133,9 @@ public class Zombie {
             return false;
         }
         health -= damage;
+        if (health <= 0 && kind == ZombieKind.EXPLODER) {
+            pendingBlast = Math.max(pendingBlast, DEATH_BLAST_DAMAGE);
+        }
         this.knockbackVx = knockbackVx;
         this.knockbackVy = knockbackVy;
         this.knockbackUntil = now + 180;
@@ -168,6 +188,9 @@ public class Zombie {
             }
 
             double currentSpeed = phase == ZombieAttackPhase.CHASE ? speed : speed * RECOVER_SPEED_FACTOR;
+            if (now < enragedUntil) {
+                currentSpeed *= ENRAGED_SPEED_FACTOR;
+            }
             moveX = dirX * currentSpeed * deltaSeconds + separationX * deltaSeconds;
             moveY = dirY * currentSpeed * deltaSeconds + separationY * deltaSeconds;
         }
@@ -206,6 +229,10 @@ public class Zombie {
                     attackTarget = target;
                     spitting = true;
                     enterPhase(ZombieAttackPhase.WINDUP, now + SPIT_WINDUP_MS);
+                } else if (canScreamAt(target, grid, now)) {
+                    attackTarget = target;
+                    screaming = true;
+                    enterPhase(ZombieAttackPhase.WINDUP, now + SCREAM_WINDUP_MS);
                 }
             }
             case WINDUP -> {
@@ -213,6 +240,19 @@ public class Zombie {
                     Player bitten = attackTarget;
                     if (spitting) {
                         spit(bitten, now);
+                        return false;
+                    }
+                    if (screaming) {
+                        screaming = false;
+                        screamPending = true;
+                        nextScreamAt = now + SCREAM_COOLDOWN_MS;
+                        enterPhase(ZombieAttackPhase.STRIKE, now + SPIT_RECOVER_MS);
+                        return false;
+                    }
+                    if (kind == ZombieKind.EXPLODER) {
+                        // No muerde: revienta (el dano a todos lo reparte GameSession).
+                        pendingBlast = kind.biteDamage();
+                        health = 0;
                         return false;
                     }
                     enterPhase(ZombieAttackPhase.STRIKE, now + STRIKE_RECOVER_MS);
@@ -230,6 +270,42 @@ public class Zombie {
             }
         }
         return false;
+    }
+
+    private boolean canScreamAt(Player target, FloorGrid grid, long now) {
+        return kind == ZombieKind.SCREAMER
+                && grid != null
+                && target != null
+                && now >= nextScreamAt
+                && distanceTo(target) <= SCREAM_RANGE_PX
+                && grid.hasLineOfSight(x, y, target.getX(), target.getY());
+    }
+
+    /** Dano de la explosion pendiente sin consumirla (0 si no hay). */
+    public synchronized int pendingBlastDamage() {
+        return pendingBlast;
+    }
+
+    /** Dano de la explosion pendiente (una sola vez), o 0. */
+    public synchronized int consumeBlast() {
+        int blast = pendingBlast;
+        pendingBlast = 0;
+        return blast;
+    }
+
+    /** True una sola vez cuando termina de gritar. */
+    public synchronized boolean consumeScream() {
+        boolean scream = screamPending;
+        screamPending = false;
+        return scream;
+    }
+
+    public void enrage(long until) {
+        enragedUntil = Math.max(enragedUntil, until);
+    }
+
+    public boolean isEnraged(long now) {
+        return now < enragedUntil;
     }
 
     private boolean canSpitAt(Player target, FloorGrid grid, long now) {
@@ -257,6 +333,7 @@ public class Zombie {
         phaseEndsAt = endsAt;
         if (next != ZombieAttackPhase.WINDUP) {
             attackTarget = null;
+            screaming = false;
         }
     }
 
@@ -265,6 +342,7 @@ public class Zombie {
     }
 
     public ZombieState toState() {
-        return new ZombieState(id, floor, Math.round(x), Math.round(y), health, tough, phase, kind, spitting);
+        return new ZombieState(id, floor, Math.round(x), Math.round(y), health, tough, phase, kind, spitting,
+                screaming, isEnraged(System.currentTimeMillis()));
     }
 }

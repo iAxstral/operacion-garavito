@@ -17,6 +17,7 @@ public record GameStateMessage(
         MatchSummary summary,
         KinderEvent event,
         List<PuddleState> puddles,
+        List<BlastState> blasts,
         List<String> unchanged,
         boolean full) {
 
@@ -26,7 +27,13 @@ public record GameStateMessage(
             List<ProjectileState> projectiles, List<BarricadeState> barricades, MatchSummary summary,
             KinderEvent event, List<PuddleState> puddles) {
         this(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles, barricades, summary,
-                event, puddles, List.of(), true);
+                event, puddles, List.of(), List.of(), true);
+    }
+
+    /** Copia con las explosiones que se estan viendo. */
+    public GameStateMessage withBlasts(List<BlastState> current) {
+        return new GameStateMessage(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles,
+                barricades, summary, event, puddles, current, unchanged, full);
     }
 
     public static GameStateMessage eventOnly(LastEvent event) {

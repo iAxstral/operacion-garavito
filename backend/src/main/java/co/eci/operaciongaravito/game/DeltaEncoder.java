@@ -88,6 +88,7 @@ public class DeltaEncoder {
                 sameSummary ? null : full.summary(),
                 sameEvent ? null : full.event(),
                 full.puddles(),
+                full.blasts(),
                 unchanged,
                 false);
     }

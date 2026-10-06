@@ -78,6 +78,23 @@ public class GameSession {
     static final long HIDE_COOLDOWN_MS = 12_000;
 
     static final double CANDY_CHANCE = 1.0 / 3;
+
+    /** Explosion del zombi explosivo: radio, dano a otros zombis y cuanto se ve. */
+    static final double BLAST_RADIUS_PX = 95;
+    static final int BLAST_ZOMBIE_DAMAGE = 3;
+    static final long BLAST_VISIBLE_MS = 500;
+    /** Grito: enfurece a los zombis de su piso a esta distancia, por este tiempo. */
+    static final double SCREAM_REACH_PX = 700;
+    static final long ENRAGE_MS = 6_000;
+    /** Zombi ciego: oye a un jugador a esta distancia si hace ruido, y siempre si esta muy cerca. */
+    static final double BLIND_HEAR_PX = 520;
+    static final double BLIND_TOUCH_PX = 140;
+    static final long NOISE_ATTACK_MS = 1_500;
+    static final long NOISE_RUN_MS = 800;
+    /** Mas rapido que esto entre dos reportes cuenta como correr (hace ruido). */
+    static final double NOISY_SPEED_PX_S = 185;
+    private final Map<String, BlastState> blasts = new ConcurrentHashMap<>();
+    private long blastSequence = 0;
     static final int CANDIES_PER_BOSS = 10;
     private final Map<String, Barricade> barricades = new ConcurrentHashMap<>();
     private long barricadeSequence;
@@ -335,6 +352,12 @@ public class GameSession {
             player.countRejectedMove();
             return false;
         }
+        if (floor == player.getFloor() && player.getLastMoveAt() > 0) {
+            double seconds = Math.max(0.05, (now - player.getLastMoveAt()) / 1000.0);
+            if (Math.hypot(x - player.getX(), y - player.getY()) / seconds > NOISY_SPEED_PX_S) {
+                player.makeNoise(now + NOISE_RUN_MS);
+            }
+        }
         player.reportPosition(floor, x, y);
         player.setLastMoveAt(now);
         return true;
@@ -409,6 +432,65 @@ public class GameSession {
         }
         player.hide(spot.id(), now, HIDE_MAX_MS);
         return PlayerActionResult.ok();
+    }
+
+    private boolean blindHears(Zombie zombie, Player player, long now) {
+        if (player.getFloor() != zombie.getFloor()) {
+            return false;
+        }
+        double distance = Math.hypot(player.getX() - zombie.getX(), player.getY() - zombie.getY());
+        return distance <= BLIND_TOUCH_PX || (player.isNoisy(now) && distance <= BLIND_HEAR_PX);
+    }
+
+    // Grito: todos los zombis del piso a su alcance se enfurecen un rato.
+    private void resolveScreams(long now) {
+        zombies.values().stream().filter(Zombie::consumeScream).toList().forEach(screamer ->
+                zombies.values().stream()
+                        .filter(other -> other.isAlive() && other.getFloor() == screamer.getFloor()
+                                && Math.hypot(other.getX() - screamer.getX(), other.getY() - screamer.getY()) <= SCREAM_REACH_PX)
+                        .forEach(other -> other.enrage(now + ENRAGE_MS)));
+    }
+
+    /**
+     * Explosiones: daña a los jugadores y a los zombis cercanos. Un explosivo que muere
+     * por otra explosion revienta tambien (cadena), por eso se repite hasta que no quede
+     * ninguna pendiente. Los zombis que mata una explosion cuentan para la cuota.
+     */
+    private void resolveBlasts(long now) {
+        for (int round = 0; round < 6; round++) {
+            List<Zombie> exploding = zombies.values().stream().filter(z -> z.pendingBlastDamage() > 0).toList();
+            if (exploding.isEmpty()) {
+                return;
+            }
+            for (Zombie bomb : exploding) {
+                int damage = bomb.consumeBlast();
+                String id = "bl" + (++blastSequence);
+                blasts.put(id, new BlastState(id, bomb.getFloor(), Math.round(bomb.getX()), Math.round(bomb.getY()), now));
+                players.values().forEach(player -> {
+                    if (player.isAlive() && player.getFloor() == bomb.getFloor()
+                            && Math.hypot(player.getX() - bomb.getX(), player.getY() - bomb.getY()) <= BLAST_RADIUS_PX) {
+                        player.takeDamage(damage);
+                    }
+                });
+                int killed = 0;
+                for (Zombie other : zombies.values()) {
+                    if (other != bomb && other.isAlive() && other.getFloor() == bomb.getFloor()
+                            && Math.hypot(other.getX() - bomb.getX(), other.getY() - bomb.getY()) <= BLAST_RADIUS_PX) {
+                        double angle = Math.atan2(other.getY() - bomb.getY(), other.getX() - bomb.getX());
+                        if (other.hit(BLAST_ZOMBIE_DAMAGE, Math.cos(angle) * 300, Math.sin(angle) * 300, now)) {
+                            killed++;
+                        }
+                    }
+                }
+                if (killed > 0) {
+                    waveDirector.onZombiesKilled(killed);
+                }
+            }
+        }
+    }
+
+    public List<BlastState> blastStates() {
+        return List.copyOf(blasts.values());
     }
 
     public List<PuddleState> puddleStates() {
@@ -543,7 +625,9 @@ public class GameSession {
                         floorGrid(target.getFloor()).distanceField(target.getX(), target.getY())));
 
         for (Zombie zombie : living) {
-            Player target = nearestPlayer(zombie, targets);
+            Player target = nearestPlayer(zombie, zombie.getKind() == ZombieKind.BLIND
+                    ? targets.stream().filter(player -> blindHears(zombie, player, now)).toList()
+                    : targets);
             if (target == null) {
                 // Sin nadie en su piso igual termina la mordida o el aturdimiento en curso.
                 zombie.updateAttack(null, now);
@@ -557,6 +641,10 @@ public class GameSession {
             collectAcid(zombie);
         }
         acids.values().removeIf(acid -> !acid.step(floorGrid(acid.getFloor()), players.values(), deltaSeconds, now));
+
+        resolveScreams(now);
+        resolveBlasts(now);
+        blasts.values().removeIf(blast -> now - blast.bornAt() > BLAST_VISIBLE_MS);
 
         // El escupidor muerto deja un charco de acido donde cayo.
         zombies.values().stream()
@@ -993,6 +1081,7 @@ public class GameSession {
         long now = System.currentTimeMillis();
         // El origen del golpe es la posicion del servidor, salvo una diferencia chica
         // (el ataque puede llegar antes que el ultimo reporte de movimiento).
+        player.makeNoise(now + NOISE_ATTACK_MS);
         if (Math.hypot(x - player.getX(), y - player.getY()) > ACTION_POSITION_TOLERANCE_PX) {
             x = player.getX();
             y = player.getY();
