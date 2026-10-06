@@ -7,6 +7,10 @@ const TEXTURE = 'zombie';
 const TOUGH_TEXTURE = 'zombie-teso';
 const RUNNER_TEXTURE = 'zombie-corredor';
 const SPITTER_TEXTURE = 'zombie-escupidor';
+const KIND_TEXTURES = { EXPLODER: 'zombie-explosivo', SCREAMER: 'zombie-griton', BLIND: 'zombie-ciego' };
+const SCREAM_WINDUP_MS = 900;
+const SCREAM_TINT = 0xe05aff;
+const ENRAGED_TINT = 0xff8080;
 const TOUGH_HEALTH = 4;
 
 const LERP_PER_SECOND = 12;
@@ -24,12 +28,14 @@ const STAGGER_TINT = 0xb9c4ff;
 const LUNGE_PX = 16;
 
 // Contorno de color para reconocer el tipo de un vistazo (el caminante normal no lleva).
-const OUTLINE_COLORS = { RUNNER: 0x3fd8ff, SPITTER: 0x9dff3a, TOUGH: 0xff3a2a };
+const OUTLINE_COLORS = {
+  RUNNER: 0x3fd8ff, SPITTER: 0x9dff3a, TOUGH: 0xff3a2a, EXPLODER: 0xff8a1a, SCREAMER: 0xd94aff, BLIND: 0xdedede,
+};
 const OUTLINE_SCALE = 1.14;
 const RISE_MS = 520;
 // Opcion para daltonismo: una forma blanca sobre la cabeza ademas del color.
 const SHAPE_KEY = 'zombie-type-shapes';
-const SHAPES = { TOUGH: 0, RUNNER: 1, SPITTER: 2 };
+const SHAPES = { TOUGH: 0, RUNNER: 1, SPITTER: 2, EXPLODER: 3, SCREAMER: 4, BLIND: 5 };
 
 function bakeTypeShapes(scene) {
   if (scene.textures.exists(SHAPE_KEY)) return;
@@ -44,10 +50,19 @@ function bakeTypeShapes(scene) {
   // Gota (escupidor)
   g.fillCircle(2 * size + 9, 11, 6).strokeCircle(2 * size + 9, 11, 6);
   g.fillTriangle(2 * size + 4, 9, 2 * size + 14, 9, 2 * size + 9, 1);
-  g.generateTexture(SHAPE_KEY, size * 3, size);
+  // Rombo (explosivo)
+  g.fillPoints([{ x: 3 * size + 9, y: 1 }, { x: 3 * size + 17, y: 9 }, { x: 3 * size + 9, y: 17 }, { x: 3 * size + 1, y: 9 }], true);
+  g.strokePoints([{ x: 3 * size + 9, y: 1 }, { x: 3 * size + 17, y: 9 }, { x: 3 * size + 9, y: 17 }, { x: 3 * size + 1, y: 9 }], true);
+  // Anillo (griton)
+  g.lineStyle(5, 0x0d0608, 1).strokeCircle(4 * size + 9, 9, 6);
+  g.lineStyle(3, 0xffffff, 1).strokeCircle(4 * size + 9, 9, 6);
+  // Equis (ciego)
+  g.lineStyle(6, 0x0d0608, 1).lineBetween(5 * size + 3, 3, 5 * size + 15, 15).lineBetween(5 * size + 15, 3, 5 * size + 3, 15);
+  g.lineStyle(3, 0xffffff, 1).lineBetween(5 * size + 3, 3, 5 * size + 15, 15).lineBetween(5 * size + 15, 3, 5 * size + 3, 15);
+  g.generateTexture(SHAPE_KEY, size * 6, size);
   g.destroy();
   const texture = scene.textures.get(SHAPE_KEY);
-  [0, 1, 2].forEach((i) => texture.add(i, 0, i * size, 0, size, size));
+  [0, 1, 2, 3, 4, 5].forEach((i) => texture.add(i, 0, i * size, 0, size, size));
 }
 // Lo que el cuerpo de un zombi que cayo entero se queda en el piso.
 const CORPSE_MS = 6000;
@@ -55,6 +70,7 @@ const CORPSE_MS = 6000;
 function textureFor(state, tough) {
   if (state.kind === 'RUNNER') return RUNNER_TEXTURE;
   if (state.kind === 'SPITTER') return SPITTER_TEXTURE;
+  if (KIND_TEXTURES[state.kind]) return KIND_TEXTURES[state.kind];
   return tough ? TOUGH_TEXTURE : TEXTURE;
 }
 
@@ -104,7 +120,14 @@ export default class ZombieLayer {
       entry.health = state.health;
 
       const phase = state.phase ?? 'CHASE';
-      if (phase === 'WINDUP' && entry.phase !== 'WINDUP') entry.spitting = Boolean(state.spitting);
+      if (phase === 'WINDUP' && entry.phase !== 'WINDUP') {
+        entry.spitting = Boolean(state.spitting);
+        entry.screaming = Boolean(state.screaming);
+      }
+      if (Boolean(state.enraged) !== Boolean(entry.enraged)) {
+        entry.enraged = Boolean(state.enraged);
+        this.applyPhaseTint(entry);
+      }
       if (phase !== entry.phase) this.changePhase(entry, phase);
     });
 
@@ -227,18 +250,20 @@ export default class ZombieLayer {
     const { sprite } = entry;
     if (!sprite.active) return;
     sprite.setTintMode(Phaser.TintModes.MULTIPLY);
-    if (entry.phase === 'WINDUP') sprite.setTint(entry.spitting ? SPIT_TINT : WINDUP_TINT);
+    if (entry.phase === 'WINDUP') sprite.setTint(entry.screaming ? SCREAM_TINT : entry.spitting ? SPIT_TINT : WINDUP_TINT);
     else if (entry.phase === 'STAGGER') sprite.setTint(STAGGER_TINT);
+    else if (entry.enraged) sprite.setTint(ENRAGED_TINT);
     else sprite.clearTint();
   }
 
   showWarning(entry) {
-    const duration = entry.spitting ? SPIT_WINDUP_MS
-      : entry.tough ? TOUGH_WINDUP_MS
-        : entry.kind === 'RUNNER' ? RUNNER_WINDUP_MS : WINDUP_MS;
+    const duration = entry.screaming ? SCREAM_WINDUP_MS
+      : entry.spitting ? SPIT_WINDUP_MS
+        : entry.tough ? TOUGH_WINDUP_MS
+          : entry.kind === 'RUNNER' ? RUNNER_WINDUP_MS : WINDUP_MS;
     const radius = entry.tough || entry.kind === 'SPITTER' ? 30 : 24;
-    const color = entry.spitting ? '#b6ff5a' : '#ff4040';
-    entry.ringColor = entry.spitting ? 0x9dff3a : 0xff4040;
+    const color = entry.screaming ? '#e05aff' : entry.spitting ? '#b6ff5a' : '#ff4040';
+    entry.ringColor = entry.screaming ? 0xd94aff : entry.spitting ? 0x9dff3a : 0xff4040;
 
     entry.ring = this.scene.add.graphics().setDepth(2);
     entry.ring.progress = 0;

@@ -417,6 +417,15 @@ export default class MainScene extends Phaser.Scene {
   zombieHooks() {
     return {
       onWindup: (entry) => {
+        if (entry.screaming) {
+          // Griton: alarido agudo y ondas violetas.
+          playSample('ghost', { channel: 'zombies', volume: 1, rate: 1.7, at: { x: entry.x, y: entry.y, floor: this.floor } });
+          [0, 180, 360].forEach((delay) => {
+            const wave = this.add.circle(entry.x, entry.y, 20, 0xd94aff, 0).setStrokeStyle(4, 0xd94aff, 0.8).setDepth(5002);
+            this.tweens.add({ targets: wave, radius: 260, alpha: 0, delay, duration: 700, onComplete: () => wave.destroy() });
+          });
+          return;
+        }
         if (entry.spitting) {
           playSfx('spitCharge', this.hearing(entry.x, entry.y));
           return;
@@ -1018,6 +1027,27 @@ export default class MainScene extends Phaser.Scene {
     this.pingLayer.add({ kind: event.itemId, x, y, label: `${who}: ${PING_KINDS[event.itemId]?.label ?? '¡Aquí!'}` });
   }
 
+  // Explosiones de zombis explosivos: destello, fuego, sangre, sacudida y estruendo.
+  syncBlasts() {
+    if (!this.seenBlasts) this.seenBlasts = new Set();
+    (getLatestState().blasts ?? []).filter((b) => b.floor === this.floor && !this.seenBlasts.has(b.id)).forEach((b) => {
+      this.seenBlasts.add(b.id);
+      const at = { x: b.x, y: b.y, floor: this.floor };
+      playSample('plankBreak', { channel: 'zombies', volume: 1, rate: 0.6, at });
+      playSample('hitHeavy', { channel: 'zombies', volume: 1, rate: 0.5, at });
+      this.lighting?.pulse(b.x, b.y, 300, 260);
+      this.gore.burst(b.x, b.y, 0xff6a1a);
+      const fire = this.add.circle(b.x, b.y, 18, 0xffb347, 0.9).setDepth(5004).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: fire, radius: 95, alpha: 0, duration: 380, onComplete: () => fire.destroy() });
+      const scorch = this.add.ellipse(b.x, b.y + 10, 120, 60, 0x0d0705, 0.55).setDepth(1.5);
+      this.tweens.add({ targets: scorch, alpha: 0, delay: 8000, duration: 1500, onComplete: () => scorch.destroy() });
+      if (getSettings().screenShake && Math.hypot(this.player.x - b.x, this.player.y - b.y) < 500) {
+        this.cameras.main.shake(220, 0.01);
+      }
+    });
+    if (this.seenBlasts.size > 200) this.seenBlasts.clear();
+  }
+
   // Charcos de acido de los escupidores muertos: verdes, burbujean y se secan.
   syncPuddles() {
     if (!this.puddleSprites) this.puddleSprites = new Map();
@@ -1074,6 +1104,7 @@ export default class MainScene extends Phaser.Scene {
     const ear = this.focusSprite();
     if (ear) setListener(ear.x, ear.y, this.floor);
     this.syncPuddles();
+    this.syncBlasts();
     this.pingLayer?.update(time);
     this.hauntLayer?.update(time);
     this.checkDamageTaken();
