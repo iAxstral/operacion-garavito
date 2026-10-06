@@ -2,6 +2,8 @@ import * as layoutF from './layouts/mapLayoutF.js';
 import * as layoutC from './layouts/mapLayoutC.js';
 import * as layoutG from './layouts/mapLayoutG.js';
 import * as layoutA from './layouts/mapLayoutA.js';
+import * as layoutB from './layouts/mapLayoutB.js';
+import * as layoutBiblioteca from './layouts/mapLayoutBiblioteca.js';
 
 // Cada edificio tiene su propio mapa: construir uno reescribiendo el del otro fue
 // lo que borro el Edificio F. Todos comparten la misma grilla (40x30, tile 64) porque
@@ -10,9 +12,14 @@ export const TILE = 64;
 export const MAP_COLS = 40;
 export const MAP_ROWS = 30;
 
-export const BUILDINGS = ['F', 'C', 'G', 'A'];
+export const BUILDINGS = ['F', 'C', 'G', 'A', 'B', 'BIBLIOTECA'];
 
-const LAYOUTS = { F: layoutF, C: layoutC, G: layoutG, A: layoutA };
+const LAYOUTS = { F: layoutF, C: layoutC, G: layoutG, A: layoutA, B: layoutB, BIBLIOTECA: layoutBiblioteca };
+
+/** "Edificio F" o "Biblioteca": como se nombra un edificio en pantalla. */
+export function buildingLabel(building) {
+  return building === 'BIBLIOTECA' ? 'Biblioteca' : `Edificio ${building}`;
+}
 
 function layoutFor(building) {
   const layout = LAYOUTS[building];
