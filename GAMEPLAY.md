@@ -132,12 +132,39 @@ generado: **entrada normalizada** (la diagonal deja de ir 41% más rápido) y
 **dash con `Shift`/`Espacio`** con invulnerabilidad breve, que es el único
 recurso defensivo antes del hacha.
 
+## 8. Lo que se agregó después (temporada de Halloween)
+
+- **Misiones**: cuatro minijuegos por rol (antes dos). `MissionBoard` reparte
+  tres distintos por Kinder y pone primero el que no tocó en el anterior.
+  - Seguridad: cámaras, código, ronda de vigilancia, calibrar sensores.
+  - Biomédica: cables, vacuna, tomar el pulso, ordenar medicamentos.
+  - Economía: cuentas, dar el cambio, cuadrar el presupuesto, revisar facturas.
+  - Infraestructura: torre, fusibles, conectar tuberías, nivelar la viga.
+- **Avisos al equipo** (`/ping`): `ZOMBIES`, `HELP`, `REVIVE`, `GO`, `AMMO`.
+  El servidor pone la posición que él conoce y limita uno cada 1,5 s por
+  jugador. Viajan como `LastEvent("PING", jugador, tipo, "piso,x,y")`. El
+  cliente los marca en el mapa y los dice en voz alta (Web Speech API) con
+  un tono y una velocidad distintos por rol.
+- **Apodos**: opcionales al unirse; el servidor los limpia (16 caracteres, sin
+  caracteres de control), los manda en `PlayerState.name` y en el resumen, y
+  se guardan en el historial (migración Flyway `V2`).
+- **Charcos de ácido**: el escupidor muerto deja un `AcidPuddle` que daña 2
+  cada 600 ms a quien esté encima durante 5 s (`GameStateMessage.puddles`).
+- **Logros**: se calculan en el cliente con el resumen de la corrida y se
+  guardan en el navegador (`game/achievements.js`).
+- **Accesibilidad**: formas sobre los zombis según su tipo para daltonismo y
+  volumen propio para las voces del equipo.
+- **App instalable** (PWA): manifiesto, íconos y service worker solo en
+  producción; el WebSocket y la API nunca pasan por la caché.
+
 ## Fuera de alcance
 
-- Validación de movimiento en el servidor (anti-cheat).
-- Deltas o compresión binaria en el broadcast.
-- Navegación de zombis con pathfinding: persiguen en línea recta con
-  separación entre ellos, sin rodear muros.
-- Reanimar a un jugador `DOWNED` por otro jugador (por ahora solo revive al
-  terminar la oleada).
-- Zombis en pisos distintos del que está el jugador.
+- ~~Validación de movimiento en el servidor (anti-cheat).~~ Hecho:
+  `GameSession.isValidMove` y `POSITION_CORRECTED`.
+- Deltas o compresión binaria en el broadcast (ver `docs/ESCALABILIDAD.md`).
+- ~~Navegación de zombis con pathfinding.~~ Hecho: campo de distancias por
+  piso (`FloorGrid.distanceField`).
+- ~~Reanimar a un jugador `DOWNED` por otro jugador.~~ Hecho: solo Biomédica
+  revive, manteniendo E junto al caído.
+- ~~Zombis en pisos distintos del que está el jugador.~~ Hecho: cada zombi
+  tiene su piso.
