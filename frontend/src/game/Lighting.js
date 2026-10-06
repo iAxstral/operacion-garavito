@@ -176,6 +176,11 @@ export default class Lighting {
       .setDisplaySize(width / camera.zoom, height / camera.zoom);
   }
 
+  /** Susto: los bombillos fallan `ms` (la linterna sigue funcionando). */
+  failLights(ms) {
+    this.failUntil = this.scene.time.now + ms;
+  }
+
   setBlackout(on) {
     this.blackout = Boolean(on);
   }
@@ -269,7 +274,8 @@ export default class Lighting {
 
     ctx.globalCompositeOperation = 'destination-out';
     this.lights.forEach((light) => {
-      const level = this.blackout ? 0 : this.intensity(light, time);
+      let level = this.blackout ? 0 : this.intensity(light, time);
+      if (time < (this.failUntil ?? 0)) level *= Math.random() < 0.2 ? 0.6 : 0.04;
       if (light.glow) {
         light.glow.setAlpha(0.5 * level).setDisplaySize(70 + 40 * level, 70 + 40 * level);
         light.halo.setAlpha(0.22 * level).setDisplaySize(light.radius * 0.9, light.radius * 0.9);
