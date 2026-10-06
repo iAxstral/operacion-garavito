@@ -173,7 +173,7 @@ export function generateLobbyCode() {
   return Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('');
 }
 
-export async function openLobby(code, create, building, redirected = false) {
+export async function openLobby(code, create, building, redirected = false, mode = 'NORMAL') {
   await socketService.whenConnected();
   resetLocalState();
   gameId = code;
@@ -181,7 +181,7 @@ export async function openLobby(code, create, building, redirected = false) {
 
   const reply = awaitEvent((event) => event.playerId === CLIENT_ID
     && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED' || event.type === 'LOBBY_REDIRECT'));
-  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building });
+  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building, mode });
 
   let event;
   try {
@@ -195,7 +195,7 @@ export async function openLobby(code, create, building, redirected = false) {
     closeTopic();
     if (redirected) throw new Error('lobby_not_found');
     await socketService.switchTo(event.reason);
-    return openLobby(code, create, building, true);
+    return openLobby(code, create, building, true, mode);
   }
   if (event.type === 'LOBBY_REJECTED') {
     closeTopic();
