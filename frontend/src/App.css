@@ -3554,9 +3554,22 @@ kbd {
   background: radial-gradient(ellipse at 50% 35%, #142019 0%, #050806 75%);
 }
 
+/* Ocupa el alto que dejan libre los modos y los textos de abajo, sea cual sea su alto:
+   el escenario se ajusta a este hueco para no encogerse y desalinear los botones. */
+.lobby-stage-slot {
+  flex: 1 1 0;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  container-type: size;
+}
+
 .lobby-stage {
   position: relative;
-  width: min(100vw, calc((100dvh - 56px) * var(--stage-ratio)));
+  flex-shrink: 0;
+  width: min(100cqw, 100cqh * var(--stage-ratio));
   margin: 0;
   overflow: hidden;
   container-type: inline-size;
@@ -3698,10 +3711,6 @@ kbd {
 }
 
 @media (max-aspect-ratio: 1/1) {
-  .lobby-stage {
-    width: min(100vw, calc((100dvh - 90px) * var(--stage-ratio)));
-  }
-
   .lobby-eye {
     width: 4.4%;
   }
