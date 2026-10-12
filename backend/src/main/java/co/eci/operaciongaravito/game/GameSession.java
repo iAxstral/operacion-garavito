@@ -102,14 +102,16 @@ public class GameSession {
     static final int CANDIES_PER_BOSS = 10;
     private final Map<String, Barricade> barricades = new ConcurrentHashMap<>();
     private long barricadeSequence;
-    private final WaveDirector waveDirector;
-    private final MissionBoard missionBoard;
+    // Dependen del edificio: se rearman si la votacion de la sala elige otro (ver start).
+    private volatile WaveDirector waveDirector;
+    private volatile MissionBoard missionBoard;
     private final BossConfig bossConfig;
     private volatile BossZombie boss;
     private long bossAloneSince;
     private long bossSequence;
-    private final Building building;
-    private final List<FloorGrid> floors;
+    private volatile Building building;
+    private volatile List<FloorGrid> floors;
+    private final BuildingVote buildingVote = new BuildingVote();
 
     private volatile boolean wipedRun = false;
     private volatile boolean victoryPending = false;
@@ -172,15 +174,21 @@ public class GameSession {
     public GameSession(String gameId, Building building, BossConfig bossConfig, Difficulty difficulty) {
         this.gameId = gameId;
         this.difficulty = difficulty;
-        this.building = building;
         this.bossConfig = bossConfig;
-        this.floors = java.util.stream.IntStream.rangeClosed(1, building.floorCount())
-                .mapToObj(floor -> FloorGrid.forFloor(building, floor))
-                .toList();
+        useBuilding(building);
+    }
 
-        this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, floors);
-        this.waveDirector.setDifficulty(difficulty);
-        this.missionBoard = new MissionBoard(building, java.util.random.RandomGenerator.getDefault());
+    /** Arma mapa, oleadas y misiones del edificio. Solo antes de empezar (constructor o start). */
+    private void useBuilding(Building chosen) {
+        List<FloorGrid> grids = java.util.stream.IntStream.rangeClosed(1, chosen.floorCount())
+                .mapToObj(floor -> FloorGrid.forFloor(chosen, floor))
+                .toList();
+        WaveDirector director = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, grids);
+        director.setDifficulty(difficulty);
+        this.floors = grids;
+        this.waveDirector = director;
+        this.missionBoard = new MissionBoard(chosen, java.util.random.RandomGenerator.getDefault());
+        this.building = chosen;
     }
 
     private final Difficulty difficulty;
@@ -241,6 +249,7 @@ public class GameSession {
     public synchronized void removePlayer(String role) {
         players.remove(role);
         seatTokens.remove(role);
+        buildingVote.remove(role);
         missionBoard.remove(role);
         if (role.equals(host)) {
             host = players.keySet().stream().sorted().findFirst().orElse(null);
@@ -252,10 +261,42 @@ public class GameSession {
             return false;
         }
         if (!started) {
+            // Se cierra la votacion: gana el edificio con mas votos de los que estan.
+            Building winner = buildingVote.winner(players.keySet(), host, building);
+            if (winner != building) {
+                useBuilding(winner);
+            }
             resetGame();
             started = true;
         }
         return true;
+    }
+
+    /**
+     * Voto de un jugador por el edificio de la partida. Devuelve null si cuenta, o el
+     * motivo del rechazo. Bajo el mismo monitor que {@link #start}: un voto que llega a
+     * la vez que el anfitrion empieza, o entra al conteo o se rechaza con "already_started".
+     */
+    public synchronized String voteBuilding(String role, String buildingName) {
+        if (role == null || !players.containsKey(role)) {
+            return "unknown_player";
+        }
+        if (started) {
+            return "already_started";
+        }
+        Building choice;
+        try {
+            choice = Building.valueOf(buildingName == null ? "" : buildingName.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            return "invalid_building";
+        }
+        buildingVote.vote(role, choice);
+        return null;
+    }
+
+    /** Edificio que ganaria si se empezara ahora. */
+    public Building leadingBuilding() {
+        return buildingVote.winner(players.keySet(), host, building);
     }
 
     /** Se cayo la conexion de este jugador: se le guarda el puesto un rato. */
@@ -296,7 +337,8 @@ public class GameSession {
     }
 
     public LobbyState lobbyState() {
-        return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule());
+        return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule(),
+                buildingVote.snapshot(players.keySet()), started ? building : leadingBuilding());
     }
 
     public PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
