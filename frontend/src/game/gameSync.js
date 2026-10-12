@@ -648,6 +648,8 @@ export function onNearVendorChange(callback) {
 if (import.meta.env.DEV) {
   window.__gameSync = {
     getLatestState,
+    getMyBuilding,
+    voteBuilding,
     getMyPlayerState,
     joinAs,
     openLobby,

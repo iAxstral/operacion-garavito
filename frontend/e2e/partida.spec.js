@@ -55,13 +55,13 @@ test('dos jugadores en la misma sala se ven y comparten el avance de misiones', 
   const host = await (await browser.newContext()).newPage();
   const guest = await (await browser.newContext()).newPage();
 
-  await openLobbyScreen(host, 'F');
+  await openLobbyScreen(host);
   await host.getByRole('button', { name: 'Crear' }).click();
   await host.waitForSelector('.role-card');
   const code = (await host.locator('.main-menu-kicker').textContent()).match(/Sala (\w+)/)[1];
   await host.locator('.role-card', { hasText: 'Biomédica' }).click();
 
-  await openLobbyScreen(guest, 'F');
+  await openLobbyScreen(guest);
   await guest.getByLabel('Código de la sala').fill(code);
   await guest.getByRole('button', { name: 'Entrar' }).click();
   await guest.locator('.role-card', { hasText: 'Infraestructura' }).click();

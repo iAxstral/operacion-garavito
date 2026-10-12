@@ -17,14 +17,14 @@ test('el apodo se ve en la sala y un aviso llega al compañero con su nombre y s
     }
   });
 
-  await openLobbyScreen(host, 'F');
+  await openLobbyScreen(host);
   await host.getByRole('button', { name: 'Crear' }).click();
   await host.waitForSelector('.role-card');
   await host.getByPlaceholder(/Opcional/).fill('  Lina\tla Vigilante de la noche ');
   const code = (await host.locator('.main-menu-kicker').textContent()).match(/Sala (\w+)/)[1];
   await host.locator('.role-card', { hasText: 'Seguridad' }).click();
 
-  await openLobbyScreen(guest, 'F');
+  await openLobbyScreen(guest);
   await guest.getByLabel('Código de la sala').fill(code);
   await guest.getByRole('button', { name: 'Entrar' }).click();
   await guest.locator('.role-card', { hasText: 'Biomédica' }).click();

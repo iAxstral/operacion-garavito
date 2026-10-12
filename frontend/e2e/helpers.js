@@ -7,14 +7,20 @@ export async function skipIntro(page) {
   await expect(page.getByRole('button', { name: /Jugar/ })).toBeVisible();
 }
 
-/** Desde la pantalla de inicio hasta la sala del edificio indicado. */
-export async function openLobbyScreen(page, building = 'F') {
+/** Desde la pantalla de inicio hasta la de crear o unirse a sala. */
+export async function openLobbyScreen(page) {
   await page.goto('/');
   await page.waitForSelector('.start-screen');
   await page.waitForTimeout(300);
   await skipIntro(page);
   await page.getByRole('button', { name: /Jugar/ }).click();
-  await page.locator(`[aria-label="Edificio ${building}"]`).first().click();
+}
+
+/** En la sala de espera: vota el edificio y espera a que el servidor cuente el voto. */
+export async function voteBuilding(page, building) {
+  const label = building === 'BIBLIOTECA' ? 'Biblioteca' : `Edificio ${building}`;
+  await page.locator('.vote-card', { hasText: label }).click();
+  await expect(page.locator('.vote-card--mine', { hasText: label })).toBeVisible();
 }
 
 /** Espera a que la escena de Phaser (que se carga aparte) tenga al jugador. */
@@ -26,12 +32,13 @@ export async function waitForScene(page) {
 
 /** Crea una sala, elige rol y la inicia. Devuelve el codigo de la sala. */
 export async function startSoloGame(page, { building = 'F', role = 'Seguridad' } = {}) {
-  await openLobbyScreen(page, building);
+  await openLobbyScreen(page);
   await page.getByRole('button', { name: 'Crear' }).click();
   await page.waitForSelector('.role-card');
   const kicker = await page.locator('.main-menu-kicker').textContent();
   const code = kicker.match(/Sala (\w+)/)[1];
   await page.locator('.role-card', { hasText: role }).click();
+  await voteBuilding(page, building);
   await page.getByRole('button', { name: /Comenzar/ }).click();
   await expect(page.locator('.hud-weapon')).toBeVisible();
   await waitForScene(page);
