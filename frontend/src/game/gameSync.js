@@ -45,8 +45,8 @@ function newToken() {
 }
 let myRole = 'SEGURIDAD';
 let currentFloor = 1;
-// Edificio de la sala. Lo decide quien la crea; quien entra con un codigo adopta el
-// que devuelve el servidor, porque mapa, grillas y misiones dependen de el.
+// Edificio de la sala. Se vota en la sala de espera y lo decide el servidor al
+// empezar; todos adoptan el que devuelve, porque mapa, grillas y misiones dependen de el.
 let myBuilding = 'F';
 
 function emptyState() {
@@ -157,6 +157,11 @@ function handleMessage(body) {
     ...mergeDelta(body, latestState),
     lastEvent: body.lastEvent ?? latestState.lastEvent,
   };
+  const building = latestState.lobby?.building;
+  if (building && building !== myBuilding) {
+    myBuilding = building;
+    if (joined) saveSeat();
+  }
   if (body.lastEvent) {
     eventListeners.forEach((callback) => callback(body.lastEvent));
     eventWaiters.forEach((waiter) => {
@@ -272,6 +277,11 @@ export async function resumeSession() {
   joined = true;
   myBuilding = latestState.lobby?.building ?? myBuilding;
   return { started: Boolean(latestState.lobby?.started) };
+}
+
+/** Voto de este jugador por el edificio de la partida (se puede cambiar hasta empezar). */
+export function voteBuilding(building) {
+  socketService.publish(`/app/game/${gameId}/vote`, { playerId: myRole, building });
 }
 
 export function startGame() {
