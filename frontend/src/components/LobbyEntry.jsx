@@ -105,73 +105,75 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
 
   return (
     <div className="lobby-screen">
-      <form
-        className={`lobby-stage${busy ? ' lobby-stage--busy' : ''}`}
-        style={{ aspectRatio: `${cw} / ${ch}`, '--stage-ratio': cw / ch }}
-        onSubmit={handleJoin}
-      >
-        <img
-          className="lobby-stage-art"
-          src="/mapa/crear-sala-halloween.jpg"
-          alt="Sala de juego: crear sala o unirse con código"
-          draggable={false}
-          style={{
-            width: `${(IMAGE_W / cw) * 100}%`,
-            left: `${(-cx / cw) * 100}%`,
-            top: `${(-cy / ch) * 100}%`,
-          }}
-        />
-        {EYES.map(([x, y]) => (
-          <span
-            key={x}
-            className="lobby-eye"
-            aria-hidden="true"
-            style={{ left: `${((x - cx) / cw) * 100}%`, top: `${((y - cy) / ch) * 100}%` }}
+      <div className="lobby-stage-slot">
+        <form
+          className={`lobby-stage${busy ? ' lobby-stage--busy' : ''}`}
+          style={{ aspectRatio: `${cw} / ${ch}`, '--stage-ratio': cw / ch }}
+          onSubmit={handleJoin}
+        >
+          <img
+            className="lobby-stage-art"
+            src="/mapa/crear-sala-halloween.jpg"
+            alt="Sala de juego: crear sala o unirse con código"
+            draggable={false}
+            style={{
+              width: `${(IMAGE_W / cw) * 100}%`,
+              left: `${(-cx / cw) * 100}%`,
+              top: `${(-cy / ch) * 100}%`,
+            }}
           />
-        ))}
-        <span className="lobby-building-tag">{buildingLabel(building)}</span>
+          {EYES.map(([x, y]) => (
+            <span
+              key={x}
+              className="lobby-eye"
+              aria-hidden="true"
+              style={{ left: `${((x - cx) / cw) * 100}%`, top: `${((y - cy) / ch) * 100}%` }}
+            />
+          ))}
+          <span className="lobby-building-tag">{buildingLabel(building)}</span>
 
-        <button
-          type="button"
-          className="lobby-hotspot"
-          style={boxStyle(SPOTS.create, crop)}
-          disabled={busy}
-          onClick={handleCreate}
-          aria-label="Crear sala"
-          title="Crear una sala nueva"
-        />
-        <input
-          className="lobby-code-field"
-          style={boxStyle(SPOTS.code, crop)}
-          value={code}
-          maxLength={4}
-          placeholder="ABCD"
-          aria-label="Código de la sala"
-          autoCapitalize="characters"
-          autoComplete="off"
-          autoCorrect="off"
-          spellCheck={false}
-          onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-        />
-        <button
-          type="submit"
-          className="lobby-hotspot"
-          style={boxStyle(SPOTS.join, crop)}
-          disabled={busy || code.trim().length < 4}
-          aria-label="Entrar"
-          title={code.trim().length < 4 ? 'Escribe el código de 4 letras' : 'Entrar a la sala'}
-        />
-        <button
-          type="button"
-          className="lobby-hotspot lobby-hotspot--back"
-          style={boxStyle(SPOTS.back, crop)}
-          onClick={() => {
-            playSfx('click');
-            onBack();
-          }}
-          aria-label="Volver"
-        />
-      </form>
+          <button
+            type="button"
+            className="lobby-hotspot"
+            style={boxStyle(SPOTS.create, crop)}
+            disabled={busy}
+            onClick={handleCreate}
+            aria-label="Crear sala"
+            title="Crear una sala nueva"
+          />
+          <input
+            className="lobby-code-field"
+            style={boxStyle(SPOTS.code, crop)}
+            value={code}
+            maxLength={4}
+            placeholder="ABCD"
+            aria-label="Código de la sala"
+            autoCapitalize="characters"
+            autoComplete="off"
+            autoCorrect="off"
+            spellCheck={false}
+            onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+          />
+          <button
+            type="submit"
+            className="lobby-hotspot"
+            style={boxStyle(SPOTS.join, crop)}
+            disabled={busy || code.trim().length < 4}
+            aria-label="Entrar"
+            title={code.trim().length < 4 ? 'Escribe el código de 4 letras' : 'Entrar a la sala'}
+          />
+          <button
+            type="button"
+            className="lobby-hotspot lobby-hotspot--back"
+            style={boxStyle(SPOTS.back, crop)}
+            onClick={() => {
+              playSfx('click');
+              onBack();
+            }}
+            aria-label="Volver"
+          />
+        </form>
+      </div>
 
       <div className="lobby-modes" role="radiogroup" aria-label="Modo de la sala nueva">
         {Object.entries(MODES).map(([id, info]) => (
