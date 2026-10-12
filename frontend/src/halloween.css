@@ -1117,10 +1117,10 @@ kbd {
 
 .vote-panel { width: min(720px, calc(100vw - 32px)); display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .vote-panel .main-menu-kicker { margin: 0; }
-.vote-grid { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.vote-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(108px, 1fr)); gap: 8px; }
 .vote-card {
   display: flex; flex-direction: column; align-items: center; gap: 4px;
-  min-height: 112px; padding: 10px 8px;
+  padding: 8px 6px;
   color: var(--hw-bone); font: inherit; cursor: pointer;
   background: linear-gradient(180deg, #1c0f12, #0b0608);
   border: 2px solid rgba(120, 30, 26, 0.35); border-radius: 10px;
@@ -1131,14 +1131,18 @@ kbd {
 .vote-card--leading { border-color: var(--hw-ghost); box-shadow: 0 0 18px rgba(110, 255, 80, 0.35); }
 .vote-card--mine { border-color: var(--hw-blood-bright); box-shadow: 0 0 20px rgba(232, 50, 31, 0.45); }
 .vote-card--mine.vote-card--leading { box-shadow: 0 0 20px rgba(232, 50, 31, 0.45), 0 0 18px rgba(110, 255, 80, 0.35); }
-.vote-card-name { font-family: var(--hw-title-font); font-size: 18px; }
+.vote-card-name { font-family: var(--hw-title-font); font-size: 17px; }
 .vote-card-floors { font-size: 12px; opacity: 0.6; }
 .vote-card-count { font-size: 13px; font-weight: bold; color: var(--hw-ghost); }
-.vote-card-voters { display: flex; gap: 4px; min-height: 26px; }
-.vote-card-voters img { width: 26px; height: 26px; object-fit: cover; object-position: top; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.35); background: #000; }
+.vote-card-voters { display: flex; gap: 3px; min-height: 22px; }
+.vote-card-voters img { width: 22px; height: 22px; object-fit: cover; object-position: top; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.35); background: #000; }
 .vote-map-link { padding: 0; font: inherit; color: var(--hw-ghost); background: none; border: none; text-decoration: underline; cursor: pointer; }
 @media (max-width: 560px) {
-  .vote-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .vote-card { min-height: 96px; padding: 8px 6px; }
-  .vote-card-name { font-size: 16px; }
+  .vote-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .vote-card-name { font-size: 15px; }
 }
+
+/* Con la votacion la sala de espera ya no cabe en pantallas bajas: centrado con margen
+   automatico, que a diferencia de align-items no recorta arriba lo que se desborda. */
+.role-select { align-items: flex-start; }
+.role-select-content { margin: auto 0; }
