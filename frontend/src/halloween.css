@@ -1146,3 +1146,7 @@ kbd {
    automatico, que a diferencia de align-items no recorta arriba lo que se desborda. */
 .role-select { align-items: flex-start; }
 .role-select-content { margin: auto 0; }
+.vote-card-mine { padding: 1px 8px; font-size: 12px; font-weight: bold; color: #1a0606; background: var(--hw-blood-bright); border-radius: 999px; }
+.vote-card-mine--pending { color: var(--hw-bone); background: rgba(255, 255, 255, 0.12); animation: hw-ghost-pulse 1s ease-in-out infinite; }
+.vote-status { margin: 0; font-size: 14px; font-weight: bold; color: var(--hw-ghost); }
+.vote-status--error { color: #ff8a7a; }

@@ -1,17 +1,35 @@
 import { useEffect, useState } from 'react';
 import { ROLE_CATALOG, roleInfo } from '../game/roleCatalog';
-import { getLobbyCode, getMyRole, onStateChange, startGame, voteBuilding } from '../game/gameSync';
+import { getLobbyCode, getMyRole, onGameEvent, onStateChange, startGame, voteBuilding } from '../game/gameSync';
 import HalloweenCreatures from './HalloweenCreatures';
 import BuildingSelect from './BuildingSelect';
 import { DAILY_RULES, MODES } from '../game/gameModes';
 import { BUILDINGS, buildingLabel, floorCount } from '../game/mapLayout';
 import { playSfx } from '../game/sfx';
 
+// Si el servidor no confirma el voto en este tiempo, se avisa (p. ej. un backend sin /vote).
+const VOTE_CONFIRM_MS = 4000;
+const VOTE_ERRORS = {
+  already_started: 'La partida ya empezó: el voto no cuenta.',
+  invalid_building: 'Ese edificio no existe.',
+  unknown_player: 'No estás en la sala: vuelve a entrar.',
+  no_reply: 'El servidor no registró tu voto. Si acabas de actualizar el juego, reinicia el backend.',
+};
+
 export default function WaitingRoom({ onStarted, onLeave }) {
   const [state, setState] = useState({ players: [], lobby: null });
   const [showMap, setShowMap] = useState(false);
+  // Voto enviado que el servidor aun no confirma, y el motivo si no conto.
+  const [pendingVote, setPendingVote] = useState(null);
+  const [voteError, setVoteError] = useState(null);
 
   useEffect(() => onStateChange(setState), []);
+  useEffect(() => onGameEvent((event) => {
+    if (event.type === 'VOTE_REJECTED' && event.playerId === getMyRole()) {
+      setPendingVote(null);
+      setVoteError(VOTE_ERRORS[event.reason] ?? 'No se pudo registrar el voto.');
+    }
+  }), []);
 
   const started = state.lobby?.started;
   useEffect(() => {
@@ -23,15 +41,28 @@ export default function WaitingRoom({ onStarted, onLeave }) {
 
   // Votacion del edificio: cada jugador presente vota uno; al empezar gana el mas votado.
   const votes = state.lobby?.votes ?? {};
-  const myVote = votes[getMyRole()];
+  const confirmedVote = votes[getMyRole()];
+  const waitingVote = pendingVote && pendingVote !== confirmedVote ? pendingVote : null;
+  const myVote = waitingVote ?? confirmedVote;
   const leading = state.lobby?.leading;
   const voteCount = Object.keys(votes).length;
   const missingVotes = Math.max(0, joinedRoles.length - voteCount);
   const votersOf = (building) => Object.keys(votes).filter((role) => votes[role] === building);
   const vote = (building) => {
     playSfx('click');
+    setVoteError(null);
+    setPendingVote(building);
     voteBuilding(building);
   };
+
+  useEffect(() => {
+    if (!waitingVote) return undefined;
+    const timer = setTimeout(() => {
+      setPendingVote(null);
+      setVoteError(VOTE_ERRORS.no_reply);
+    }, VOTE_CONFIRM_MS);
+    return () => clearTimeout(timer);
+  }, [waitingVote]);
 
   if (showMap) {
     return (
@@ -105,6 +136,11 @@ export default function WaitingRoom({ onStarted, onLeave }) {
                   <span className="vote-card-count">
                     {voters.length} {voters.length === 1 ? 'voto' : 'votos'}
                   </span>
+                  {myVote === building && (
+                    <span className={`vote-card-mine${waitingVote ? ' vote-card-mine--pending' : ''}`}>
+                      {waitingVote ? 'Enviando…' : '✓ Tu voto'}
+                    </span>
+                  )}
                   <span className="vote-card-voters">
                     {voters.map((role) => (
                       <img key={role} src={roleInfo(role).portrait} alt={roleInfo(role).name} title={roleInfo(role).name} />
@@ -114,6 +150,15 @@ export default function WaitingRoom({ onStarted, onLeave }) {
               );
             })}
           </div>
+          {voteError ? (
+            <p className="vote-status vote-status--error" role="alert">{voteError}</p>
+          ) : (
+            <p className="vote-status">
+              {confirmedVote ? `Votaste por ${buildingLabel(confirmedVote)}. Puedes cambiarlo hasta que empiece.`
+                : waitingVote ? `Enviando tu voto por ${buildingLabel(waitingVote)}…`
+                  : 'Aún no votas: toca un edificio.'}
+            </p>
+          )}
           <p className="lobby-help">
             {voteCount === 0
               ? `Nadie ha votado: si empiezan así se juega en ${buildingLabel(leading ?? 'F')}.`
