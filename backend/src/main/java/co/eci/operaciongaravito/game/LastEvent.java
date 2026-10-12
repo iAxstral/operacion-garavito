@@ -61,6 +61,11 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("LOBBY_REJECTED", clientId, null, reason);
     }
 
+    /** El voto de edificio no conto (la partida ya empezo, edificio invalido...). */
+    public static LastEvent voteRejected(String playerId, String building, String reason) {
+        return new LastEvent("VOTE_REJECTED", playerId, building, reason);
+    }
+
     public static LastEvent pickupSuccess(String playerId, String itemId) {
         return new LastEvent("PICKUP_SUCCESS", playerId, itemId, null);
     }

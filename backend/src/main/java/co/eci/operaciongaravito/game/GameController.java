@@ -117,6 +117,18 @@ public class GameController {
         }
     }
 
+    @MessageMapping("/game/{gameId}/vote")
+    public void vote(@DestinationVariable String gameId, VoteRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        String rejection = session.voteBuilding(request.playerId(), request.building());
+        broadcast(gameId, session, rejection == null
+                ? null
+                : LastEvent.voteRejected(request.playerId(), request.building(), rejection));
+    }
+
     @MessageMapping("/game/{gameId}/start")
     public void start(@DestinationVariable String gameId, StartRequest request) {
         GameSession session = sessionService.find(gameId);
