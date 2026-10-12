@@ -83,7 +83,7 @@ export default function HowToPlay({ onClose }) {
 
         {tab === 'goal' && (
           <section className="howto-section">
-            <p>El campus se llenó de zombis. Hasta 4 jugadores, cada uno con un rol distinto, tienen que sobrevivir <strong>5 Kinders</strong> en el edificio.</p>
+            <p>El campus se llenó de zombis. Hasta 4 jugadores, cada uno con un rol distinto, tienen que sobrevivir <strong>5 Kinders</strong> en el edificio. El edificio lo votan en la sala de espera: gana el que más votos tenga.</p>
             <ol>
               <li>Cada Kinder se pasa matando la <strong>cuota de zombis</strong> y completando <strong>3 misiones por jugador</strong> (el último Kinder además pide derrotar al Ingeniero de Sistemas).</li>
               <li>Las misiones pagan <strong>Garavitos</strong>: úsenlos bien en armas, munición y comida.</li>

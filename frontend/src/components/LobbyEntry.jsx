@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { generateLobbyCode, openLobby } from '../game/gameSync';
 import { DAILY_RULES, MODES, fetchDailyChallenge } from '../game/gameModes';
-import { buildingLabel } from '../game/mapLayout';
 import { playSfx } from '../game/sfx';
 import HalloweenCreatures from './HalloweenCreatures';
 
@@ -51,7 +50,7 @@ function boxStyle([x0, y0, x1, y1], [cx, cy, cw, ch]) {
   };
 }
 
-export default function LobbyEntry({ building, onEntered, onBack }) {
+export default function LobbyEntry({ onEntered, onBack }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -83,7 +82,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
   const handleCreate = () => run(async () => {
     for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt += 1) {
       try {
-        const created = await openLobby(generateLobbyCode(), true, building, false, mode);
+        const created = await openLobby(generateLobbyCode(), true, undefined, false, mode);
         onEntered(created);
         return;
       } catch (err) {
@@ -98,7 +97,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
     const normalized = code.trim().toUpperCase();
     if (normalized.length < 4) return;
     run(async () => {
-      await openLobby(normalized, false, building);
+      await openLobby(normalized, false);
       onEntered(normalized);
     });
   };
@@ -130,7 +129,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
               style={{ left: `${((x - cx) / cw) * 100}%`, top: `${((y - cy) / ch) * 100}%` }}
             />
           ))}
-          <span className="lobby-building-tag">{buildingLabel(building)}</span>
+          <span className="lobby-building-tag">El edificio se vota en la sala</span>
 
           <button
             type="button"

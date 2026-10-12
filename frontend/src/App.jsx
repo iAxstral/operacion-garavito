@@ -29,7 +29,6 @@ import TreasuryPanel from './components/TreasuryPanel';
 import GameOverScreen from './components/GameOverScreen';
 import ConnectionStatus from './components/ConnectionStatus';
 import MainMenu from './components/MainMenu';
-import BuildingSelect from './components/BuildingSelect';
 import RoleSelect from './components/RoleSelect';
 import LobbyEntry from './components/LobbyEntry';
 import WaitingRoom from './components/WaitingRoom';
@@ -41,7 +40,6 @@ import './minigames.css';
 
 function App() {
   const [view, setView] = useState('menu');
-  const [building, setBuilding] = useState(null);
 
   // Si se recargo la pagina en medio de una partida, se vuelve al mismo puesto.
   useEffect(() => {
@@ -68,27 +66,15 @@ function App() {
   };
 
   if (view === 'menu') {
-    return fade(<MainMenu onPlay={() => setView('buildings')} />);
-  }
-
-  if (view === 'buildings') {
-    return fade(
-      <BuildingSelect
-        onSelect={(id) => {
-          setBuilding(id);
-          setView('lobby');
-        }}
-        onBack={() => setView('menu')}
-      />
-    );
+    // El edificio ya no se elige antes: se vota en la sala de espera.
+    return fade(<MainMenu onPlay={() => setView('lobby')} />);
   }
 
   if (view === 'lobby') {
     return fade(
       <LobbyEntry
-        building={building}
         onEntered={() => setView('roles')}
-        onBack={() => setView('buildings')}
+        onBack={() => setView('menu')}
       />
     );
   }
