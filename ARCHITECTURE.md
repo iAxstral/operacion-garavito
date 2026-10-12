@@ -231,6 +231,47 @@ anterior. La recompensa sube con el Kinder (25, 30, 35…).
   completada en paralelo se resuelve una sola vez, con el mismo estado para
   todos (test de concurrencia arriba).
 
+## Votación del edificio (sala de espera)
+
+El edificio ya no se elige antes de crear la sala: **Jugar → crear o unirse con
+código → rol → sala de espera**, y ahí cada jugador vota. Al empezar gana el
+edificio con más votos entre los jugadores que **siguen en la sala**.
+
+**Estructura**: `BuildingVote` (uno por `GameSession`) guarda `rol -> edificio`
+en un `ConcurrentHashMap`. Votar otra vez reemplaza el voto anterior (un `put`
+atómico), así que cada jugador cuenta una sola vez; quien se va de la sala
+pierde su voto (`removePlayer`).
+
+**Concurrencia**: los votos llegan a la vez desde hilos distintos de STOMP, y
+uno puede llegar justo cuando el anfitrión empieza. `voteBuilding` y `start`
+son `synchronized` sobre la misma `GameSession`, así que el voto o entra antes
+del conteo (y cuenta) o después (y se rechaza con `already_started`): nunca se
+cuenta a medias ni cambia el edificio con la partida corriendo. Al cerrar la
+votación, `start` rearma mapa (`FloorGrid`), oleadas (`WaveDirector`) y
+misiones (`MissionBoard`) del ganador antes de marcar la partida como empezada;
+el tick de la sala no corre hasta entonces.
+
+**Empates**: gana el voto del anfitrión si está entre los empatados; si no, el
+edificio con que se creó la sala (F); si no, el primero en el orden del enum.
+Sin votos se juega el F.
+
+### Mensajes
+
+- `/app/game/{gameId}/vote` ⟵ `{ playerId, building }`
+- `/topic/game/{gameId}` ⟶ `lobby.votes` (rol -> edificio), `lobby.leading`
+  (el que ganaría si se empezara ya) y `lobby.building` (el de la partida).
+  Rechazo: `lastEvent = VOTE_REJECTED` con `reason`
+  (`already_started`, `invalid_building`, `unknown_player`).
+
+### Verificado
+
+- `BuildingVoteTest`: mayoría, cambio de voto, voto de quien se va, empates,
+  rechazos, y 32 hilos votando 200 veces cada uno mientras el anfitrión empieza:
+  ningún voto se pierde ni se cuenta a medias, y el edificio de la partida es el
+  ganador de los votos que quedaron.
+- `e2e/votacion.spec.js`: tres navegadores votan en el mismo instante (2 por el B,
+  1 por la Biblioteca) y los tres terminan jugando en el B.
+
 ## Sistema de pisos (pendiente)
 
 Se diseñó (bloque de escalera con `hasUpStairs`/`hasDownStairs` en
