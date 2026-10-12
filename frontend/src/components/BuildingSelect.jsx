@@ -46,7 +46,7 @@ function toStyle([x0, y0, x1, y1]) {
   };
 }
 
-export default function BuildingSelect({ onSelect, onBack }) {
+export default function BuildingSelect({ onSelect, onBack, prompt = DEFAULT_NOTICE, action = 'clic para entrar' }) {
   const [notice, setNotice] = useState(null);
   const [hovered, setHovered] = useState(null);
   // Cambia en cada clic a un edificio cerrado para reiniciar la sacudida del aviso.
@@ -65,8 +65,8 @@ export default function BuildingSelect({ onSelect, onBack }) {
 
   const hoveredBuilding = BUILDINGS.find((b) => b.id === hovered);
   const message = hoveredBuilding
-    ? `${hoveredBuilding.info}${hoveredBuilding.enabled ? ' — clic para entrar' : ''}`
-    : (notice ?? DEFAULT_NOTICE);
+    ? `${hoveredBuilding.info}${hoveredBuilding.enabled ? ` — ${action}` : ''}`
+    : (notice ?? prompt);
 
   return (
     <div className="building-select">
