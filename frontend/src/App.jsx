@@ -40,6 +40,7 @@ import './App.css';
 import './halloween.css';
 import './minigames.css';
 
+
 function App() {
   const [view, setView] = useState('menu');
   const [building, setBuilding] = useState(null);
