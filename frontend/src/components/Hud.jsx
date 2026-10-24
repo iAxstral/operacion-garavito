@@ -678,9 +678,14 @@ export default function Hud({ onExit }) {
         </div>
       )}
 
-      {nearBarricade && (
+      {nearBarricade && me?.role === 'INFRAESTRUCTURA' && (
         <div className="hud-interact-hint">
-          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — Reparar barricada ({nearBarricade.health}/20)
+          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — Reparar · <strong>X</strong> — Desmontar barricada ({nearBarricade.health}/20)
+        </div>
+      )}
+      {nearBarricade && me?.role !== 'INFRAESTRUCTURA' && (
+        <div className="hud-interact-hint">
+          {touch ? 'Toca' : 'Presiona'} <strong>X</strong> — Desmontar barricada
         </div>
       )}
 
