@@ -82,7 +82,8 @@ export default function MedicamentosMission() {
                       className={`med-bottle${position >= 0 ? ' med-bottle--picked' : ''}`}
                       style={{ '--cap': bottle.color }}
                       onClick={() => pick(bottle)}
-                      aria-label={`${bottle.dose} miligramos`}
+                      aria-label={`${bottle.dose} miligramos${position >= 0 ? `, posición ${position + 1}` : ''}`}
+                      aria-pressed={position >= 0}
                     >
                       <span className="med-cap" />
                       <span className="med-label">{bottle.dose}<small>mg</small></span>
