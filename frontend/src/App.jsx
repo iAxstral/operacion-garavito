@@ -157,6 +157,7 @@ function App() {
         <GameOverScreen onExitToMenu={handleExitToMenu} />
       </div>
       <ConnectionStatus />
+      <FullscreenButton />
     </div>
   );
 }
