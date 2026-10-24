@@ -79,7 +79,11 @@ export default function NivelMission() {
           {phase === 'active' && (
             <>
               <p>Mantén la burbuja en el centro mientras se suelda (◀ ▶ o las flechas).</p>
-              <div className={`level-tube${centered ? ' level-tube--ok' : ''}`}>
+              <div
+                className={`level-tube${centered ? ' level-tube--ok' : ''}`}
+                role="img"
+                aria-label={`Nivel de burbuja: ${centered ? 'centrada' : 'fuera del centro'}`}
+              >
                 <span className="level-center" style={{ left: `${50 - CENTER}%`, width: `${CENTER * 2}%` }} />
                 <span className="level-bubble" style={{ left: `${bubble}%` }} />
               </div>
