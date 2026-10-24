@@ -243,7 +243,7 @@ export default function SecurityMission() {
                   onClick={handleClick}
                 />
               </div>
-              <div className="mission-progress">{kills} / {KILLS_TARGET} eliminados</div>
+              <div className="mission-progress" role="status" aria-live="polite">{kills} / {KILLS_TARGET} eliminados</div>
               <button type="button" className="mission-cancel-btn" onClick={handleCancelClick}>
                 Cancelar (Esc)
               </button>
