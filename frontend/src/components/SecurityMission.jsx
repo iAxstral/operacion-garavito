@@ -15,7 +15,7 @@ const WINDOW_H = 260;
 const SPAWN_INTERVAL_MS = 1100;
 const TRAVEL_MS_MAX = 6000;
 const TRAVEL_MS_MIN = 3000;
-const HIT_PADDING_PX = 10;
+const HIT_PADDING_PX = 14;
 const SUCCESS_CLOSE_DELAY_MS = 1100;
 
 const EDGE_RADIUS = Math.hypot(WINDOW_W, WINDOW_H) / 2;
