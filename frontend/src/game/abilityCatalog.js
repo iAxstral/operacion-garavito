@@ -26,7 +26,7 @@ export const ABILITIES = {
 
 export const BARRICADE_COOLDOWN_MS = 15000;
 export const MAX_BARRICADES = 2;
-export const BARRICADE_REPAIR_RANGE_PX = 90;
+export const BARRICADE_REPAIR_RANGE_PX = 100;
 export const TREASURER_DISCOUNT = 0.2;
 
 export function abilityFor(role) {
