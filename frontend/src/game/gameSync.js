@@ -379,6 +379,11 @@ export function requestRepairBarricade(barricadeId) {
   socketService.publish(`/app/game/${gameId}/barricade/repair`, { playerId: myRole, barricadeId });
 }
 
+export function requestDismantleBarricade(barricadeId) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/barricade/dismantle`, { playerId: myRole, barricadeId });
+}
+
 export function requestTransfer(targetId, amount) {
   if (!joined || !socketService.isConnected()) return;
   socketService.publish(`/app/game/${gameId}/transfer`, { playerId: myRole, targetId, amount });
