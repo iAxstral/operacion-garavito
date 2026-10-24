@@ -3,7 +3,7 @@ import useMissionFlow from './useMissionFlow';
 
 // Economia: dar el cambio exacto a cada cliente de la cafeteria.
 const MISSION_TYPE = 'CAJA';
-const CUSTOMERS = 3;
+const CUSTOMERS = 2;
 const MONEY = [50, 100, 200, 500, 1000, 2000];
 
 const peso = (value) => `$${value.toLocaleString('es-CO')}`;
