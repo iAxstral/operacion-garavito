@@ -961,25 +961,29 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
-  // Tecla F / boton ★: la habilidad del rol. E repara la barricada que esta al lado.
+  // Tecla F / boton ★: la habilidad del rol. E repara la barricada (solo Infra). X desmonta para cualquiera.
   updateAbility() {
     const me = getMyPlayerState();
     if (!me) return;
     const pressed = Phaser.Input.Keyboard.JustDown(this.abilityKey) || touchInput.ability;
     touchInput.ability = false;
 
+    let near = null;
+    this.barricadeSprites.forEach((entry, id) => {
+      if (Math.hypot(this.player.x - entry.x, this.player.y - entry.y) <= BARRICADE_REPAIR_RANGE_PX) near = { id, ...entry };
+    });
+    setNearBarricade(near ? { barricadeId: near.id, health: near.health } : null);
+
     if (me.role === 'INFRAESTRUCTURA') {
-      let near = null;
-      this.barricadeSprites.forEach((entry, id) => {
-        if (Math.hypot(this.player.x - entry.x, this.player.y - entry.y) <= BARRICADE_REPAIR_RANGE_PX) near = { id, ...entry };
-      });
-      setNearBarricade(near ? { barricadeId: near.id, health: near.health } : null);
       if (near && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
         requestRepairBarricade(near.id);
         playSfx('hammer');
       }
-    } else {
-      setNearBarricade(null);
+    }
+
+    if (near && Phaser.Input.Keyboard.JustDown(this.dismantleKey)) {
+      requestDismantleBarricade(near.id);
+      playSfx('hammer');
     }
 
     if (!pressed) return;
