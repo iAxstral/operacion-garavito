@@ -6,7 +6,7 @@ import { playSfx } from '../game/sfx';
 // encontrarla. Tres aciertos; un error trae facturas nuevas sin sumar.
 const MISSION_TYPE = 'FACTURAS';
 const GOAL = 2;
-const CONCEPTS = ['Gasolina', 'Comida', 'Vendas', 'Cables', 'Tornillos', 'Baterías', 'Papel', 'Café', 'Linternas'];
+const CONCEPTS = ['Gasolina', 'Comida', 'Vendas', 'Cables', 'Tornillos', 'Baterías', 'Papel', 'Café', 'Linternas', 'Medicinas', 'Herramientas'];
 
 function newInvoices() {
   const wrong = Math.floor(Math.random() * 3);
