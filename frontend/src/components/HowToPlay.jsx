@@ -24,6 +24,7 @@ const KEYBOARD = [
   ['Espacio', 'Correr (gasta energía, se recupera sola)'],
   ['F', 'Habilidad de tu rol'],
   ['E', 'Interactuar: misiones, tienda, puertas, escaleras, inventario'],
+  ['T', 'Desmontar barricada cercana (cualquier rol)'],
   ['M / Tab', 'Mapa y equipo'],
   ['Z / X / V / G / B', 'Avisar al equipo: zombis, ayuda, revívanme, vamos, munición'],
   ['Esc', 'Configuración'],
