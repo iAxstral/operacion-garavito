@@ -93,7 +93,12 @@ export default function CodeMission() {
           {phase === 'active' && (
             <>
               <p>{showing ? 'Memoriza el código…' : 'Márcalo en el teclado'}</p>
-              <div className={`code-display${wrong ? ' code-display--wrong' : ''}`}>
+              <div
+                className={`code-display${wrong ? ' code-display--wrong' : ''}`}
+                aria-label={showing ? 'Memoriza el código' : `Código ingresado: ${typed || 'vacío'}`}
+                role="status"
+                aria-live="polite"
+              >
                 {showing
                   ? code
                   : Array.from({ length: code.length }, (_, i) => typed[i] ?? '·').join(' ')}
