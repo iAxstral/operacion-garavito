@@ -860,7 +860,7 @@ export default function Hud({ onExit }) {
         </div>
       )}
 
-      {settingsOpen && <SettingsPanel inGame onClose={closeSettings} />}
+      {settingsOpen && <SettingsPanel inGame onClose={closeSettings} onExit={onExit} />}
     </div>
   );
 }
