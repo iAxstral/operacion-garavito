@@ -6,7 +6,7 @@ import { playSfx } from '../game/sfx';
 // empezar la fila. Dos bandejas.
 const MISSION_TYPE = 'MEDICAMENTOS';
 const BOTTLES = 5;
-const TRAYS = 2;
+const TRAYS = 1;
 const COLORS = ['#c0392b', '#2e86c1', '#27ae60', '#d4ac0d', '#8e44ad', '#d35400'];
 
 function newTray() {
