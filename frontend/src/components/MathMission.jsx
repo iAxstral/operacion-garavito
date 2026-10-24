@@ -77,7 +77,7 @@ export default function MathMission() {
                   </button>
                 ))}
               </div>
-              <div className="mission-progress">{solved} / {QUESTIONS_TARGET} correctas</div>
+              <div className="mission-progress" role="status" aria-live="polite">{solved} / {QUESTIONS_TARGET} correctas</div>
               <button type="button" className="mission-cancel-btn" onClick={cancel}>
                 Cancelar (Esc)
               </button>
