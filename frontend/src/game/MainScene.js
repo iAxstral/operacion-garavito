@@ -582,6 +582,7 @@ export default class MainScene extends Phaser.Scene {
     this.weaponKeys = WEAPON_KEYS.map((name) => this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes[name]));
     this.reloadKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     this.abilityKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+    this.dismantleKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.X);
     this.bakeBarricadeTexture();
     this.aimAngle = this.facingAngle;
     this.mouseAimAt = -Infinity;
