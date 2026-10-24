@@ -41,8 +41,9 @@ function Toggle({ checked, onChange, label, hint }) {
   );
 }
 
-export default function SettingsPanel({ onClose, inGame = false }) {
+export default function SettingsPanel({ onClose, onExit, inGame = false }) {
   const [settings, setSettingsState] = useState(getSettings);
+  const [confirmExit, setConfirmExit] = useState(false);
   const previewRef = useRef(null);
   const dialogRef = useRef(null);
 
