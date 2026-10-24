@@ -67,6 +67,7 @@ export default function FacturasMission() {
                     type="button"
                     className={`invoice${miss === invoice.id ? ' invoice--miss' : ''}`}
                     onClick={() => choose(invoice)}
+                    aria-label={`Factura ${invoice.id + 1}, total ${invoice.total}`}
                   >
                     {invoice.lines.map((line) => (
                       <span key={line.concept} className="invoice-line">
