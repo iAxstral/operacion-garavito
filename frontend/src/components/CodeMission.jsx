@@ -117,7 +117,7 @@ export default function CodeMission() {
                   </button>
                 ))}
               </div>
-              <div className="mission-progress">Cerradura {round + 1} / {ROUND_LENGTHS.length}</div>
+              <div className="mission-progress" role="status" aria-live="polite">Cerradura {round + 1} / {ROUND_LENGTHS.length}</div>
               <button type="button" className="mission-cancel-btn" onClick={cancel}>
                 Cancelar (Esc)
               </button>
