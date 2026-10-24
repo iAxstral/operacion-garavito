@@ -29,6 +29,7 @@ import TreasuryPanel from './components/TreasuryPanel';
 import GameOverScreen from './components/GameOverScreen';
 import ConnectionStatus from './components/ConnectionStatus';
 import MainMenu from './components/MainMenu';
+import FullscreenButton from './components/FullscreenButton';
 import BuildingSelect from './components/BuildingSelect';
 import RoleSelect from './components/RoleSelect';
 import LobbyEntry from './components/LobbyEntry';
