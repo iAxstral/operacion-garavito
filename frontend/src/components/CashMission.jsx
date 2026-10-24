@@ -61,7 +61,12 @@ export default function CashMission() {
               <p>
                 La cuenta es <strong>{peso(sale.price)}</strong> y el cliente paga con <strong>{peso(sale.paid)}</strong>.
               </p>
-              <div className={`cash-total${wrong ? ' cash-total--wrong' : ''}`}>
+              <div
+                className={`cash-total${wrong ? ' cash-total--wrong' : ''}`}
+                role="status"
+                aria-live="polite"
+                aria-label={`Cambio entregado: ${peso(total)}`}
+              >
                 Cambio entregado: {peso(total)}
               </div>
               <div className="cash-money">
