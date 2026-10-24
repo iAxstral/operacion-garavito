@@ -85,7 +85,7 @@ export default function PulsoMission() {
           {phase === 'active' && (
             <>
               <p>Marca cuando la línea pase por el latido (Espacio o el botón).</p>
-              <div className={`pulse-monitor${flash ? ` pulse-monitor--${flash}` : ''}`}>
+              <div className={`pulse-monitor${flash ? ` pulse-monitor--${flash}` : ''}`} role="img" aria-label="Monitor de pulso cardíaco">
                 <svg className="pulse-wave" viewBox="0 0 100 30" preserveAspectRatio="none" aria-hidden="true">
                   <polyline
                     points={`0,15 ${zone - 4},15 ${zone},15 ${zone + 2},4 ${zone + 5},27 ${zone + 8},10 ${zone + ZONE},15 100,15`}
