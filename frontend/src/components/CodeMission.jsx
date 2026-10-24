@@ -5,7 +5,7 @@ import useMissionFlow from './useMissionFlow';
 const MISSION_TYPE = 'CODIGO';
 const ROUND_LENGTHS = [3, 4, 4];
 const SHOW_MS = 3000;
-const WRONG_FLASH_MS = 500;
+const WRONG_FLASH_MS = 700;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✓'];
 
 function newCode(length) {
