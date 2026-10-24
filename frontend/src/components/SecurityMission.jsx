@@ -241,6 +241,8 @@ export default function SecurityMission() {
                   height={WINDOW_H}
                   onMouseMove={handlePointerMove}
                   onClick={handleClick}
+                  role="img"
+                  aria-label="Pantalla de cámara de vigilancia con zombis acercándose"
                 />
               </div>
               <div className="mission-progress" role="status" aria-live="polite">{kills} / {KILLS_TARGET} eliminados</div>
