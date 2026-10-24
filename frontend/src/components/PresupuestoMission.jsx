@@ -74,6 +74,7 @@ export default function PresupuestoMission() {
                     type="button"
                     className={`budget-item${selected.includes(item.id) ? ' budget-item--on' : ''}`}
                     aria-pressed={selected.includes(item.id)}
+                    aria-label={`${item.name}, precio ${item.price}`}
                     onClick={() => toggle(item.id)}
                   >
                     <span>{item.name}</span>
