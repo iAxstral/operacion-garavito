@@ -1852,6 +1852,42 @@ body {
   padding: 10px 32px;
 }
 
+.settings-exit-btn {
+  padding: 8px 18px;
+  border: 1px solid rgba(220, 60, 40, 0.6);
+  border-radius: 6px;
+  background: rgba(120, 20, 10, 0.55);
+  color: #f8a89a;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.settings-exit-btn:hover {
+  background: rgba(180, 30, 15, 0.75);
+  border-color: rgba(240, 80, 50, 0.85);
+  color: #fff;
+}
+
+.settings-exit-btn--confirm {
+  background: rgba(180, 30, 15, 0.75);
+  border-color: rgba(240, 80, 50, 0.85);
+  color: #fff;
+}
+
+.settings-exit-confirm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.settings-exit-confirm span {
+  font-size: 13px;
+  color: #f8c8b0;
+  white-space: nowrap;
+}
+
 /* ---------- Celular ---------- */
 
 @media (pointer: coarse) {
