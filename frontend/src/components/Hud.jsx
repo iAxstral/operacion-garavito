@@ -608,7 +608,7 @@ export default function Hud({ onExit }) {
           </div>
         )}
 
-        <div className="hud-hint">Tab: equipo · M: mapa · E: inventario · Esc: ajustes</div>
+        <div className="hud-hint">Tab: equipo · M: mapa · E: inventario · X: desmontar barricada · Esc: ajustes</div>
       </div>
 
       {!isTouchDevice() && (
