@@ -208,7 +208,7 @@ function toastFor(event) {
   return message ? { message, ms: 2500 } : null;
 }
 
-export default function Hud() {
+export default function Hud({ onExit }) {
   const [state, setState] = useState({ players: [], claimedItemIds: [], lastEvent: null });
   const [panelOpen, setPanelOpen] = useState(false);
   const [toast, setToast] = useState(null);
