@@ -331,6 +331,16 @@ public class GameController {
         broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
     }
 
+    @MessageMapping("/game/{gameId}/barricade/dismantle")
+    public void dismantleBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
+        GameSession session = sessionService.find(gameId);
+        if (session == null) {
+            return;
+        }
+        PlayerActionResult result = session.attemptDismantleBarricade(request.playerId(), request.barricadeId());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+    }
+
     @MessageMapping("/game/{gameId}/transfer")
     public void transfer(@DestinationVariable String gameId, TransferRequest request) {
         GameSession session = sessionService.find(gameId);
