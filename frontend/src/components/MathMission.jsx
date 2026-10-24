@@ -63,7 +63,7 @@ export default function MathMission() {
           {phase === 'active' && (
             <>
               <p>Resuelve las sumas para cerrar la caja.</p>
-              <div className="math-question">{question.text}</div>
+              <div className="math-question" role="heading" aria-level="4">{question.text}</div>
               <div className="math-options">
                 {question.options.map((option) => (
                   <button
