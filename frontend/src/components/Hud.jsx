@@ -608,7 +608,7 @@ export default function Hud({ onExit }) {
           </div>
         )}
 
-        <div className="hud-hint">Tab: equipo · M: mapa · E: inventario · X: desmontar barricada · Esc: ajustes</div>
+        <div className="hud-hint">Tab: equipo · M: mapa · E: inventario · T: desmontar barricada · Esc: ajustes</div>
       </div>
 
       {!isTouchDevice() && (
@@ -680,12 +680,12 @@ export default function Hud({ onExit }) {
 
       {nearBarricade && me?.role === 'INFRAESTRUCTURA' && (
         <div className="hud-interact-hint">
-          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — Reparar · <strong>X</strong> — Desmontar barricada ({nearBarricade.health}/20)
+          {touch ? 'Toca' : 'Presiona'} <strong>E</strong> — Reparar · <strong>T</strong> — Desmontar barricada ({nearBarricade.health}/20)
         </div>
       )}
       {nearBarricade && me?.role !== 'INFRAESTRUCTURA' && (
         <div className="hud-interact-hint">
-          {touch ? 'Toca' : 'Presiona'} <strong>X</strong> — Desmontar barricada
+          {touch ? 'Toca' : 'Presiona'} <strong>T</strong> — Desmontar barricada
         </div>
       )}
 
