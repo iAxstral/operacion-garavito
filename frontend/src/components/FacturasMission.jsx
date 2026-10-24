@@ -5,7 +5,7 @@ import { playSfx } from '../game/sfx';
 // Economia: revisar facturas. De tres facturas, una tiene mal sumado el total: hay que
 // encontrarla. Tres aciertos; un error trae facturas nuevas sin sumar.
 const MISSION_TYPE = 'FACTURAS';
-const GOAL = 3;
+const GOAL = 2;
 const CONCEPTS = ['Gasolina', 'Comida', 'Vendas', 'Cables', 'Tornillos', 'Baterías', 'Papel', 'Café', 'Linternas'];
 
 function newInvoices() {
