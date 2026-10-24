@@ -94,8 +94,8 @@ export default function PulsoMission() {
                 <span className="pulse-zone" style={{ left: `${zone}%`, width: `${ZONE}%` }} />
                 <span className="pulse-marker" style={{ left: `${marker}%` }} />
               </div>
-              <button type="button" className="main-menu-play-btn pulse-mark" onClick={mark}>Marcar</button>
-              <div className="mission-progress">{hits} / {HITS} latidos</div>
+              <button type="button" className="main-menu-play-btn pulse-mark" onClick={mark} aria-label="Marcar latido">Marcar</button>
+              <div className="mission-progress" role="status" aria-live="polite">{hits} / {HITS} latidos</div>
               <button type="button" className="mission-cancel-btn" onClick={cancel}>Cancelar (Esc)</button>
             </>
           )}
