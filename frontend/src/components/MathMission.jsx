@@ -4,7 +4,7 @@ import useMissionFlow from './useMissionFlow';
 const MISSION_TYPE = 'CUENTAS';
 const QUESTIONS_TARGET = 3;
 const OPTION_COUNT = 4;
-const WRONG_FLASH_MS = 450;
+const WRONG_FLASH_MS = 600;
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
