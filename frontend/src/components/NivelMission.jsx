@@ -7,8 +7,8 @@ import { playSfx } from '../game/sfx';
 // la barra.
 const MISSION_TYPE = 'NIVEL';
 const HOLD_SECONDS = 3;
-const CENTER = 10; // mitad del ancho de la zona buena, en %
-const NUDGE = 14;
+const CENTER = 13; // mitad del ancho de la zona buena, en %
+const NUDGE = 16;
 
 export default function NivelMission() {
   const [bubble, setBubble] = useState(50);
