@@ -77,10 +77,10 @@ export default function CashMission() {
                 ))}
               </div>
               <div className="stack-actions">
-                <button type="button" className="mission-cancel-btn" onClick={() => setGiven((list) => list.slice(0, -1))}>
+                <button type="button" className="mission-cancel-btn" onClick={() => setGiven((list) => list.slice(0, -1))} aria-label="Quitar último billete o moneda">
                   Deshacer
                 </button>
-                <button type="button" className="inventory-use" onClick={deliver}>
+                <button type="button" className="inventory-use" onClick={deliver} aria-label="Entregar cambio al cliente">
                   Entregar
                 </button>
               </div>
