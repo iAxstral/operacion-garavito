@@ -71,6 +71,7 @@ export default function MathMission() {
                     type="button"
                     className={`math-option${wrong === option ? ' math-option--wrong' : ''}`}
                     onClick={() => handleAnswer(option)}
+                    aria-label={`Respuesta: ${option}`}
                   >
                     {option}
                   </button>
