@@ -44,6 +44,7 @@ import {
   getBarricades,
   requestPlaceBarricade,
   requestRepairBarricade,
+  requestDismantleBarricade,
   setNearBarricade,
   getAbilityPanel,
   setAbilityPanel,
