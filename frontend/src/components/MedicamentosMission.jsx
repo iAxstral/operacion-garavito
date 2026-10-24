@@ -92,7 +92,7 @@ export default function MedicamentosMission() {
                   );
                 })}
               </div>
-              <div className="mission-progress">Bandeja {Math.min(done + 1, TRAYS)} / {TRAYS}</div>
+              <div className="mission-progress" role="status" aria-live="polite">Bandeja {Math.min(done + 1, TRAYS)} / {TRAYS}</div>
               <button type="button" className="mission-cancel-btn" onClick={cancel}>Cancelar (Esc)</button>
             </>
           )}
