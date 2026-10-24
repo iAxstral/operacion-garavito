@@ -8,9 +8,9 @@ public class Barricade {
 
     public static final double MAX_HEALTH = 20;
     /** Dano por segundo que le hace cada zombi pegado a ella. */
-    static final double ZOMBIE_DPS = 1.6;
-    static final double BOSS_DPS = 5;
-    static final double REPAIR_AMOUNT = 8;
+    static final double ZOMBIE_DPS = 1.2;
+    static final double BOSS_DPS = 4;
+    static final double REPAIR_AMOUNT = 10;
 
     private final String id;
     private final String ownerId;
