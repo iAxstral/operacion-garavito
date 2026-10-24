@@ -1,3 +1,37 @@
+/* Botón de pantalla completa — solo visible en dispositivos táctiles */
+.fullscreen-btn {
+  display: none;
+  position: fixed;
+  bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  right: max(12px, env(safe-area-inset-right, 12px));
+  z-index: 9999;
+  width: 40px;
+  height: 40px;
+  padding: 8px;
+  background: rgba(20, 0, 0, 0.65);
+  border: 1px solid rgba(255, 100, 50, 0.4);
+  border-radius: 8px;
+  color: rgba(255, 200, 150, 0.9);
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  touch-action: manipulation;
+}
+
+.fullscreen-btn svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+@media (pointer: coarse) {
+  .fullscreen-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 #game-root {
   position: relative;
   display: flex;
