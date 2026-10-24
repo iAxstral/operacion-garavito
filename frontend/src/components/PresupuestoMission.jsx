@@ -6,7 +6,7 @@ import { playSfx } from '../game/sfx';
 // lo aprobado. Siempre tiene solucion: la meta sale de sumar algunos de los gastos.
 const MISSION_TYPE = 'PRESUPUESTO';
 const ROUNDS = 1;
-const ITEMS = ['Linternas', 'Vendas', 'Pilas', 'Candados', 'Tablas', 'Agua', 'Radios', 'Cinta'];
+const ITEMS = ['Linternas', 'Vendas', 'Pilas', 'Candados', 'Tablas', 'Agua', 'Radios', 'Cinta', 'Generador', 'Bombillas'];
 
 function newBudget() {
   const names = [...ITEMS].sort(() => Math.random() - 0.5).slice(0, 6);
