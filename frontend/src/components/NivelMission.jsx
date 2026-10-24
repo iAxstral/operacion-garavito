@@ -88,7 +88,7 @@ export default function NivelMission() {
                 <div className="level-weld"><div style={{ width: `${progress * 100}%` }} /></div>
                 <button type="button" className="level-btn" onPointerDown={() => nudge(1)} aria-label="Empujar a la derecha">▶</button>
               </div>
-              <div className="mission-progress">Soldadura {Math.round(progress * 100)}%</div>
+              <div className="mission-progress" role="status" aria-live="polite">Soldadura {Math.round(progress * 100)}%</div>
               <button type="button" className="mission-cancel-btn" onClick={cancel}>Cancelar (Esc)</button>
             </>
           )}
