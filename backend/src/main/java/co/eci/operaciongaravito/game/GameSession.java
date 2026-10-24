@@ -49,7 +49,7 @@ public class GameSession {
     static final String BUILDER_ROLE = "INFRAESTRUCTURA";
     static final int MAX_BARRICADES = 2;
     static final long BARRICADE_COOLDOWN_MS = 15_000;
-    static final double BARRICADE_REPAIR_RANGE_PX = 90;
+    static final double BARRICADE_REPAIR_RANGE_PX = 100;
     /** Zombis a esta distancia del centro de una barricada la estan golpeando. */
     static final double BARRICADE_CONTACT_PX = 56;
     static final double BOSS_BARRICADE_CONTACT_PX = 72;
