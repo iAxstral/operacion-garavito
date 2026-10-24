@@ -31,7 +31,7 @@ export default function NivelMission() {
       // Viento que cambia de a poco y empuja la burbuja lejos del centro.
       s.drift += (Math.random() - 0.5) * 60 * dt;
       s.drift = Math.max(-18, Math.min(18, s.drift));
-      s.vel += (s.drift + (s.pos - 50) * 0.6) * dt;
+      s.vel += (s.drift + (s.pos - 50) * 0.45) * dt;
       s.vel *= 0.96;
       s.pos = Math.max(0, Math.min(100, s.pos + s.vel * dt * 6));
       if (Math.abs(s.pos - 50) <= CENTER) s.held += dt;
