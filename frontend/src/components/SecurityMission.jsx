@@ -9,12 +9,12 @@ import {
   setInputLocked,
 } from '../game/gameSync';
 
-const KILLS_TARGET = 10;
+const KILLS_TARGET = 7;
 const WINDOW_W = 420;
 const WINDOW_H = 260;
-const SPAWN_INTERVAL_MS = 900;
-const TRAVEL_MS_MAX = 5200;
-const TRAVEL_MS_MIN = 2400;
+const SPAWN_INTERVAL_MS = 1100;
+const TRAVEL_MS_MAX = 6000;
+const TRAVEL_MS_MIN = 3000;
 const HIT_PADDING_PX = 10;
 const SUCCESS_CLOSE_DELAY_MS = 1100;
 
