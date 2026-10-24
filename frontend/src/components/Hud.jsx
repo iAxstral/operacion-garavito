@@ -44,7 +44,7 @@ const TYPE_COLORS = { WEAPON: '#8a3b3b', FOOD: '#3b8a4e', AMMO: '#8a7a3b' };
 const REJECTION_MESSAGES = {
   inventory_full: 'Inventario lleno',
   already_claimed: 'Alguien más lo recogió primero',
-  too_far: 'Estás muy lejos de ese item',
+  too_far: 'Estás muy lejos para interactuar',
   unknown_item: 'Ese item no existe',
   unknown_player: 'Todavía no te uniste a la partida',
   insufficient_garavitos: 'No tienes suficientes Garavitos',
@@ -59,7 +59,7 @@ const REJECTION_MESSAGES = {
   not_downed: 'Ese compañero ya está de pie',
   too_many_barricades: 'Ya tienes 2 barricadas: repáralas o espera a que caigan',
   blocked_spot: 'No se puede poner la barricada ahí',
-  unknown_barricade: 'Esa barricada ya no existe',
+  unknown_barricade: 'Esa barricada ya no existe o fue destruida',
   needs_builder: 'Solo Infraestructura sabe arreglar el tablero eléctrico',
   no_event: 'Eso ya se resolvió',
 };
