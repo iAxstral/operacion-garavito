@@ -82,7 +82,7 @@ export default function FacturasMission() {
                   </button>
                 ))}
               </div>
-              <div className="mission-progress">{found} / {GOAL} encontradas</div>
+              <div className="mission-progress" role="status" aria-live="polite">{found} / {GOAL} encontradas</div>
               <button type="button" className="mission-cancel-btn" onClick={cancel}>Cancelar (Esc)</button>
             </>
           )}
