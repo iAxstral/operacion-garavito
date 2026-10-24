@@ -3,8 +3,8 @@ import useMissionFlow from './useMissionFlow';
 
 // Seguridad: memorizar el codigo de acceso y marcarlo en el teclado de la cerradura.
 const MISSION_TYPE = 'CODIGO';
-const ROUND_LENGTHS = [4, 4, 5];
-const SHOW_MS = 2200;
+const ROUND_LENGTHS = [3, 4, 4];
+const SHOW_MS = 3000;
 const WRONG_FLASH_MS = 500;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '⌫', '0', '✓'];
 
