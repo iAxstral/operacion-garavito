@@ -56,7 +56,12 @@ function App() {
   }, []);
 
   // Cada pantalla entra con un fundido desde negro (la clave reinicia la animacion).
-  const fade = (screen) => <div key={view} className="hw-screen">{screen}</div>;
+  const fade = (screen) => (
+    <div key={view} className="hw-screen">
+      {screen}
+      <FullscreenButton />
+    </div>
+  );
 
   // Viento, crujidos y gemidos: claros en las pantallas de afuera, apagados en la partida.
   useEffect(() => {
@@ -124,7 +129,7 @@ function App() {
         <Suspense fallback={<div className="game-loading">Cargando el edificio…</div>}>
           <GameCanvas />
         </Suspense>
-        <Hud />
+        <Hud onExit={handleExitToMenu} />
         <SecurityMission />
         <WiresMission />
         <MathMission />
