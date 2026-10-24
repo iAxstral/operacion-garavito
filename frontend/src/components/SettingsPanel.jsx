@@ -231,6 +231,43 @@ export default function SettingsPanel({ onClose, onExit, inGame = false }) {
           >
             Restablecer
           </button>
+          {inGame && onExit && !confirmExit && (
+            <button
+              type="button"
+              className="settings-exit-btn"
+              onClick={() => {
+                playSfx('click');
+                setConfirmExit(true);
+              }}
+            >
+              Salir de la partida
+            </button>
+          )}
+          {inGame && onExit && confirmExit && (
+            <div className="settings-exit-confirm">
+              <span>¿Seguro que quieres salir?</span>
+              <button
+                type="button"
+                className="settings-exit-btn settings-exit-btn--confirm"
+                onClick={() => {
+                  playSfx('click');
+                  onExit();
+                }}
+              >
+                Sí, salir
+              </button>
+              <button
+                type="button"
+                className="screen-back-btn"
+                onClick={() => {
+                  playSfx('click');
+                  setConfirmExit(false);
+                }}
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
           <button type="button" className="main-menu-play-btn settings-done" onClick={onClose}>
             Listo
           </button>
