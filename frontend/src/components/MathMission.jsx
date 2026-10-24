@@ -16,8 +16,8 @@ function newQuestion() {
 
   const options = new Set([answer]);
   while (options.size < OPTION_COUNT) {
-    const candidate = answer + randomInt(-9, 9);
-    if (candidate > 0) options.add(candidate);
+    const candidate = answer + randomInt(-6, 6);
+    if (candidate > 0 && candidate !== answer) options.add(candidate);
   }
   return { text: `${values.join(' + ')} = ?`, answer, options: [...options].sort(() => Math.random() - 0.5) };
 }
