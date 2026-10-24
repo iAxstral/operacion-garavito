@@ -66,7 +66,7 @@ export default function CashMission() {
               </div>
               <div className="cash-money">
                 {MONEY.map((value) => (
-                  <button key={value} type="button" className="math-option cash-coin" onClick={() => setGiven((list) => [...list, value])}>
+                  <button key={value} type="button" className="math-option cash-coin" onClick={() => setGiven((list) => [...list, value])} aria-label={`Agregar ${peso(value)}`}>
                     {peso(value)}
                   </button>
                 ))}
