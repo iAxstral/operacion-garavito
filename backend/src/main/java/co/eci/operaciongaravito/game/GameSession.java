@@ -981,6 +981,24 @@ public class GameSession {
         return PlayerActionResult.ok();
     }
 
+    /** Cualquier jugador puede desmontar una barricada cercana para no quedar atrapado. */
+    public synchronized PlayerActionResult attemptDismantleBarricade(String playerId, String barricadeId) {
+        Player player = players.get(playerId);
+        Barricade barricade = barricadeId == null ? null : barricades.get(barricadeId);
+        if (player == null || barricade == null) {
+            return PlayerActionResult.rejected("unknown_barricade");
+        }
+        if (!player.isAlive()) {
+            return PlayerActionResult.rejected("downed");
+        }
+        if (player.getFloor() != barricade.getFloor()
+                || Math.hypot(player.getX() - barricade.centerX(), player.getY() - barricade.centerY()) > BARRICADE_REPAIR_RANGE_PX) {
+            return PlayerActionResult.rejected("too_far");
+        }
+        removeBarricade(barricade);
+        return PlayerActionResult.ok();
+    }
+
     /** Economia le pasa Garavitos a un compañero (desde cualquier lugar del edificio). */
     public PlayerActionResult attemptTransfer(String playerId, String targetId, int amount) {
         Player giver = players.get(playerId);
