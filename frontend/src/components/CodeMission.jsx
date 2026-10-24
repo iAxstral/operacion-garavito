@@ -111,6 +111,7 @@ export default function CodeMission() {
                     className="math-option code-key"
                     disabled={showing}
                     onClick={() => press(key)}
+                    aria-label={key === '⌫' ? 'Borrar último dígito' : key === '✓' ? 'Confirmar código' : `Dígito ${key}`}
                   >
                     {key}
                   </button>
