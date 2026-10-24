@@ -63,7 +63,12 @@ export default function PresupuestoMission() {
           {phase === 'active' && (
             <>
               <p>Escoge los gastos que suman exactamente lo aprobado.</p>
-              <div className={`budget-total${total > budget.target ? ' budget-total--over' : ''}`}>
+              <div
+                className={`budget-total${total > budget.target ? ' budget-total--over' : ''}`}
+                role="status"
+                aria-live="polite"
+                aria-label={`Aprobado ${budget.target}, llevas ${total}`}
+              >
                 <span>Aprobado <strong>{budget.target}</strong></span>
                 <span>Llevas <strong>{total}</strong></span>
               </div>
