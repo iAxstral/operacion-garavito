@@ -2,7 +2,7 @@ import { useState } from 'react';
 import useMissionFlow from './useMissionFlow';
 
 const MISSION_TYPE = 'CUENTAS';
-const QUESTIONS_TARGET = 5;
+const QUESTIONS_TARGET = 3;
 const OPTION_COUNT = 4;
 const WRONG_FLASH_MS = 450;
 
@@ -11,8 +11,7 @@ function randomInt(min, max) {
 }
 
 function newQuestion() {
-  const terms = Math.random() < 0.4 ? 3 : 2;
-  const values = Array.from({ length: terms }, () => randomInt(2, 25));
+  const values = Array.from({ length: 2 }, () => randomInt(2, 18));
   const answer = values.reduce((sum, value) => sum + value, 0);
 
   const options = new Set([answer]);
