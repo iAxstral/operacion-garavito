@@ -6,8 +6,8 @@ import { playSfx } from '../game/sfx';
 // tocar "Marcar" justo cuando pasa por el latido (la franja). Tres aciertos.
 const MISSION_TYPE = 'PULSO';
 const HITS = 3;
-const ZONE = 12;
-const SPEED = 70; // % del ancho por segundo
+const ZONE = 18;
+const SPEED = 52; // % del ancho por segundo
 
 function newZone() {
   return 15 + Math.random() * (85 - 15 - ZONE);
@@ -32,7 +32,7 @@ export default function PulsoMission() {
     let last = performance.now();
     const loop = (now) => {
       const s = stateRef.current;
-      s.pos += s.dir * SPEED * ((now - last) / 1000) * (1 + hits * 0.25);
+      s.pos += s.dir * SPEED * ((now - last) / 1000) * (1 + hits * 0.12);
       last = now;
       if (s.pos >= 100) { s.pos = 100; s.dir = -1; }
       if (s.pos <= 0) { s.pos = 0; s.dir = 1; }
