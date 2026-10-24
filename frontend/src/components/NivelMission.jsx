@@ -6,7 +6,7 @@ import { playSfx } from '../game/sfx';
 // lados; con los botones (o las flechas) hay que mantenerla en el centro hasta llenar
 // la barra.
 const MISSION_TYPE = 'NIVEL';
-const HOLD_SECONDS = 4;
+const HOLD_SECONDS = 3;
 const CENTER = 10; // mitad del ancho de la zona buena, en %
 const NUDGE = 14;
 
