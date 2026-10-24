@@ -5,7 +5,7 @@ import { playSfx } from '../game/sfx';
 // Economia: cuadrar el presupuesto. Hay que escoger los gastos que suman exactamente
 // lo aprobado. Siempre tiene solucion: la meta sale de sumar algunos de los gastos.
 const MISSION_TYPE = 'PRESUPUESTO';
-const ROUNDS = 2;
+const ROUNDS = 1;
 const ITEMS = ['Linternas', 'Vendas', 'Pilas', 'Candados', 'Tablas', 'Agua', 'Radios', 'Cinta'];
 
 function newBudget() {
