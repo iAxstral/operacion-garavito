@@ -19,12 +19,15 @@
     {
       "type": "stat", "title": "Zombis vivos", "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } } },
       "targets": [{ "expr": "sum(garavito_zombies)", "refId": "A" }]
     },
     {
       "type": "stat", "title": "Mensajes livianos (%)", "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "percent" } },
+      "description": "Mensajes que van como delta (solo lo que cambio). Mas alto es mejor.",
+      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [
+        { "color": "red", "value": null }, { "color": "yellow", "value": 60 }, { "color": "green", "value": 80 }] } } },
       "targets": [{
         "expr": "100 * sum(rate(garavito_messages_total{kind=\"delta\"}[1m])) / sum(rate(garavito_messages_total[1m]))",
         "refId": "A"
