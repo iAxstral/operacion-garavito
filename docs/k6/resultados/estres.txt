@@ -1,0 +1,43 @@
+         /\      Grafana   /‾‾/
+    /\  /  \     |\  __   /  /
+   /  \/    \    | |/ /  /   ‾‾\
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/
+     execution: local
+        script: k6/partidas.js
+ web dashboard:
+        output: Prometheus remote write (http://localhost:9090/api/v1/write)
+     scenarios: (100.00%) 2 scenarios, 205 max VUs, 5m40s max duration (incl. graceful stop):
+              * jugadores: Up to 200 looping VUs for 4m30s over 5 stages (gracefulRampDown: 1m10s, exec: jugador, gracefulStop: 1m10s)
+              * ranking: 5.00 iterations/s for 4m0s (maxVUs: 5, exec: ranking, gracefulStop: 30s)
+     ✓ ranking 200
+     ✓ WebSocket abierto (101)
+     checks.........................: 100.00% 1877 out of 1877
+     conexion_stomp_ms..............: avg=9.3ms       min=1ms      med=5ms     max=150ms    p(90)=21ms     p(95)=35ms
+     data_received..................: 1.8 GB  5.4 MB/s
+     data_sent......................: 67 MB   205 kB/s
+   ✓ entrada_exitosa................: 100.00% 676 out of 676
+     estados_recibidos..............: 589154  1795.998121/s
+     http_req_blocked...............: avg=49.02µs     min=5.75µs   med=9.61µs  max=19.21ms  p(90)=13.47µs  p(95)=21.12µs
+     http_req_connecting............: avg=35.71µs     min=0s       med=0s      max=19.09ms  p(90)=0s       p(95)=0s
+     http_req_duration..............: avg=4.87ms      min=1.2ms    med=2.54ms  max=102.18ms p(90)=9.69ms   p(95)=16.59ms
+     ✓ { endpoint:ranking }.........: avg=4.87ms      min=1.2ms    med=2.54ms  max=102.18ms p(90)=9.69ms   p(95)=16.59ms
+       { expected_response:true }...: avg=4.87ms      min=1.2ms    med=2.54ms  max=102.18ms p(90)=9.69ms   p(95)=16.59ms
+   ✓ http_req_failed................: 0.00%   0 out of 1201
+     http_req_receiving.............: avg=338.97µs    min=34.94µs  med=90.45µs max=17.33ms  p(90)=457.93µs p(95)=847.14µs
+     http_req_sending...............: avg=107.19µs    min=15.59µs  med=36.95µs max=24.7ms   p(90)=81.05µs  p(95)=134.15µs
+     http_req_tls_handshaking.......: avg=0s          min=0s       med=0s      max=0s       p(90)=0s       p(95)=0s
+     http_req_waiting...............: avg=4.42ms      min=1.12ms   med=2.27ms  max=102.08ms p(90)=8.92ms   p(95)=15.4ms
+     http_reqs......................: 1201    3.661171/s
+   ✓ ida_y_vuelta_movimiento_ms.....: avg=56.59ms     min=0s       med=36ms    max=2.13s    p(90)=92ms     p(95)=101ms
+   ✓ intervalo_estado_ms............: avg=65.56ms     min=0s       med=58ms    max=449ms    p(90)=132ms    p(95)=133ms
+     iteration_duration.............: avg=22.33s      min=1.44ms   med=5.64ms  max=1m2s     p(90)=1m2s     p(95)=1m2s
+     iterations.....................: 1877    5.721914/s
+     tamano_estado_bytes............: avg=2819.531072 min=302      med=2564    max=6315     p(90)=4100     p(95)=4502
+     vus............................: 1       min=1            max=200
+     vus_max........................: 205     min=205          max=205
+     ws_connecting..................: avg=5.79ms      min=642.44µs med=2.1ms   max=122.3ms  p(90)=14.66ms  p(95)=25.33ms
+     ws_msgs_received...............: 589830  1798.058863/s
+     ws_msgs_sent...................: 505537  1541.097068/s
+     ws_session_duration............: avg=1m1s        min=1m1s     med=1m1s    max=1m1s     p(90)=1m1s     p(95)=1m1s
+     ws_sessions....................: 676     2.060743/s
