@@ -74,283 +74,403 @@ public class GameController {
     }
 
     @MessageMapping("/game/{gameId}/perk")
-    public void choosePerk(@DestinationVariable String gameId, PerkRequest request) {
+    public void choosePerk(@DestinationVariable String gameId, PerkRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptChoosePerk(request.playerId(), request.perk());
-        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+        PlayerActionResult result = session.attemptChoosePerk(playerId, request.perk());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(playerId, result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/hide")
-    public void hide(@DestinationVariable String gameId, PlayerRequest request) {
+    public void hide(@DestinationVariable String gameId, PlayerRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptHide(request.playerId(), System.currentTimeMillis());
-        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+        PlayerActionResult result = session.attemptHide(playerId, System.currentTimeMillis());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(playerId, result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/chat")
-    public void chat(@DestinationVariable String gameId, ChatRequest request) {
+    public void chat(@DestinationVariable String gameId, ChatRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        LastEvent event = session.attemptChat(request.playerId(), request.phrase(), System.currentTimeMillis());
+        LastEvent event = session.attemptChat(playerId, request.phrase(), System.currentTimeMillis());
         if (event != null) {
             broadcast(gameId, session, event);
         }
     }
 
     @MessageMapping("/game/{gameId}/ping")
-    public void ping(@DestinationVariable String gameId, PingRequest request) {
+    public void ping(@DestinationVariable String gameId, PingRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        LastEvent event = session.attemptPing(request.playerId(), request.kind(), System.currentTimeMillis());
+        LastEvent event = session.attemptPing(playerId, request.kind(), System.currentTimeMillis());
         if (event != null) {
             broadcast(gameId, session, event);
         }
     }
 
     @MessageMapping("/game/{gameId}/start")
-    public void start(@DestinationVariable String gameId, StartRequest request) {
+    public void start(@DestinationVariable String gameId, StartRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
-        if (session != null && session.start(request.playerId())) {
+        if (session != null && session.start(playerId)) {
             sessionService.broadcast(gameId, session, null);
         }
     }
 
     @MessageMapping("/game/{gameId}/leave")
-    public void leave(@DestinationVariable String gameId, LeaveRequest request) {
-        sessionService.leave(gameId, request.playerId());
+    public void leave(@DestinationVariable String gameId, LeaveRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
+        sessionService.leave(gameId, playerId);
     }
 
     @MessageMapping("/game/{gameId}/pickup")
-    public void pickup(@DestinationVariable String gameId, PickupRequest request) {
+    public void pickup(@DestinationVariable String gameId, PickupRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PickupResult result = session.attemptPickup(request.playerId(), request.itemId(), request.x(), request.y());
+        PickupResult result = session.attemptPickup(playerId, request.itemId(), request.x(), request.y());
 
         LastEvent event = result.success()
-                ? LastEvent.pickupSuccess(request.playerId(), request.itemId())
-                : LastEvent.pickupRejected(request.playerId(), request.itemId(), result.reason());
+                ? LastEvent.pickupSuccess(playerId, request.itemId())
+                : LastEvent.pickupRejected(playerId, request.itemId(), result.reason());
 
         broadcast(gameId, session, event);
     }
 
     @MessageMapping("/game/{gameId}/purchase")
-    public void purchase(@DestinationVariable String gameId, PurchaseRequest request) {
+    public void purchase(@DestinationVariable String gameId, PurchaseRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PurchaseResult result = session.attemptPurchase(request.playerId(), request.itemId(), request.x(), request.y());
+        PurchaseResult result = session.attemptPurchase(playerId, request.itemId(), request.x(), request.y());
 
         LastEvent event = result.success()
-                ? LastEvent.purchaseSuccess(request.playerId(), request.itemId())
-                : LastEvent.purchaseRejected(request.playerId(), request.itemId(), result.reason());
+                ? LastEvent.purchaseSuccess(playerId, request.itemId())
+                : LastEvent.purchaseRejected(playerId, request.itemId(), result.reason());
 
         broadcast(gameId, session, event);
     }
 
     @MessageMapping("/game/{gameId}/door/toggle")
-    public void toggleDoor(@DestinationVariable String gameId, DoorToggleRequest request) {
+    public void toggleDoor(@DestinationVariable String gameId, DoorToggleRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
         DoorToggleResult result = session.attemptToggleDoor(
-                request.playerId(), request.doorId(), request.x(), request.y());
+                playerId, request.doorId(), request.x(), request.y());
 
         LastEvent event = result.success()
                 ? null
-                : LastEvent.doorRejected(request.playerId(), request.doorId(), result.reason());
+                : LastEvent.doorRejected(playerId, request.doorId(), result.reason());
         broadcast(gameId, session, event);
     }
 
     @MessageMapping("/game/{gameId}/mission/start")
-    public void startMission(@DestinationVariable String gameId, MissionStartRequest request) {
+    public void startMission(@DestinationVariable String gameId, MissionStartRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        MissionResult result = session.attemptStartMission(request.playerId(), request.missionId());
+        MissionResult result = session.attemptStartMission(playerId, request.missionId());
 
         LastEvent event = result.success()
-                ? LastEvent.missionStarted(request.playerId(), request.missionId())
-                : LastEvent.missionRejected(request.playerId(), request.missionId(), result.reason());
+                ? LastEvent.missionStarted(playerId, request.missionId())
+                : LastEvent.missionRejected(playerId, request.missionId(), result.reason());
 
         broadcast(gameId, session, event);
     }
 
     @MessageMapping("/game/{gameId}/mission/cancel")
-    public void cancelMission(@DestinationVariable String gameId, MissionStartRequest request) {
+    public void cancelMission(@DestinationVariable String gameId, MissionStartRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        session.attemptCancelMission(request.playerId(), request.missionId());
-        broadcast(gameId, session, LastEvent.missionCancelled(request.playerId(), request.missionId()));
+        session.attemptCancelMission(playerId, request.missionId());
+        broadcast(gameId, session, LastEvent.missionCancelled(playerId, request.missionId()));
     }
 
     @MessageMapping("/game/{gameId}/mission/complete")
-    public void completeMission(@DestinationVariable String gameId, MissionCompleteRequest request) {
+    public void completeMission(@DestinationVariable String gameId, MissionCompleteRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        MissionResult result = session.attemptCompleteMission(request.playerId(), request.missionId(), request.x(), request.y());
+        MissionResult result = session.attemptCompleteMission(playerId, request.missionId(), request.x(), request.y());
 
         LastEvent event = result.success()
-                ? LastEvent.missionSuccess(request.playerId(), request.missionId())
-                : LastEvent.missionRejected(request.playerId(), request.missionId(), result.reason());
+                ? LastEvent.missionSuccess(playerId, request.missionId())
+                : LastEvent.missionRejected(playerId, request.missionId(), result.reason());
 
         broadcast(gameId, session, event);
     }
 
     @MessageMapping("/game/{gameId}/move")
-    public void move(@DestinationVariable String gameId, MoveRequest request) {
+    public void move(@DestinationVariable String gameId, MoveRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session != null
-                && !session.reportPosition(request.playerId(), request.floor(), request.x(), request.y())
-                && session.shouldCorrect(request.playerId())) {
-            broadcast(gameId, session, LastEvent.positionCorrected(request.playerId()));
+                && !session.reportPosition(playerId, request.floor(), request.x(), request.y())
+                && session.shouldCorrect(playerId)) {
+            broadcast(gameId, session, LastEvent.positionCorrected(playerId));
         }
     }
 
     @MessageMapping("/game/{gameId}/attack")
-    public void attack(@DestinationVariable String gameId, AttackRequest request) {
+    public void attack(@DestinationVariable String gameId, AttackRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
         AttackResult result = session.attemptAttack(
-                request.playerId(), request.type() == null ? AttackType.BASIC : request.type(),
+                playerId, request.type() == null ? AttackType.BASIC : request.type(),
                 request.x(), request.y(), request.facing());
 
         if (result.kills() > 0 || !result.success()) {
             LastEvent event = result.success()
-                    ? LastEvent.attackKill(request.playerId(), result.kills())
-                    : LastEvent.attackRejected(request.playerId(), result.reason());
+                    ? LastEvent.attackKill(playerId, result.kills())
+                    : LastEvent.attackRejected(playerId, result.reason());
             broadcast(gameId, session, event);
         }
     }
 
     @MessageMapping("/game/{gameId}/use")
-    public void useItem(@DestinationVariable String gameId, UseItemRequest request) {
+    public void useItem(@DestinationVariable String gameId, UseItemRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        UseItemResult result = session.attemptUseItem(request.playerId(), request.itemId());
+        UseItemResult result = session.attemptUseItem(playerId, request.itemId());
 
         LastEvent event = result.success()
-                ? LastEvent.useSuccess(request.playerId(), request.itemId())
-                : LastEvent.useRejected(request.playerId(), request.itemId(), result.reason());
+                ? LastEvent.useSuccess(playerId, request.itemId())
+                : LastEvent.useRejected(playerId, request.itemId(), result.reason());
         broadcast(gameId, session, event);
     }
 
     @MessageMapping("/game/{gameId}/equip")
-    public void equip(@DestinationVariable String gameId, EquipRequest request) {
+    public void equip(@DestinationVariable String gameId, EquipRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptEquip(request.playerId(), request.itemId());
+        PlayerActionResult result = session.attemptEquip(playerId, request.itemId());
         broadcast(gameId, session, result.success()
                 ? null
-                : LastEvent.equipRejected(request.playerId(), request.itemId(), result.reason()));
+                : LastEvent.equipRejected(playerId, request.itemId(), result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/reload")
-    public void reload(@DestinationVariable String gameId, PlayerRequest request) {
+    public void reload(@DestinationVariable String gameId, PlayerRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptReload(request.playerId());
-        broadcast(gameId, session, result.success() ? null : LastEvent.reloadRejected(request.playerId(), result.reason()));
+        PlayerActionResult result = session.attemptReload(playerId);
+        broadcast(gameId, session, result.success() ? null : LastEvent.reloadRejected(playerId, result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/revive/start")
-    public void startRevive(@DestinationVariable String gameId, ReviveRequest request) {
+    public void startRevive(@DestinationVariable String gameId, ReviveRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptReviveStart(request.playerId(), request.targetId());
+        PlayerActionResult result = session.attemptReviveStart(playerId, request.targetId());
         broadcast(gameId, session, result.success()
                 ? null
-                : LastEvent.reviveRejected(request.playerId(), request.targetId(), result.reason()));
+                : LastEvent.reviveRejected(playerId, request.targetId(), result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/revive/cancel")
-    public void cancelRevive(@DestinationVariable String gameId, PlayerRequest request) {
+    public void cancelRevive(@DestinationVariable String gameId, PlayerRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session != null) {
-            session.attemptReviveCancel(request.playerId());
+            session.attemptReviveCancel(playerId);
             broadcast(gameId, session, null);
         }
     }
 
     @MessageMapping("/game/{gameId}/event/interact")
-    public void interactEvent(@DestinationVariable String gameId, PlayerRequest request) {
+    public void interactEvent(@DestinationVariable String gameId, PlayerRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptEventInteract(request.playerId());
+        PlayerActionResult result = session.attemptEventInteract(playerId);
         // El exito lo anuncia el tick (EVENT_RESOLVED); aqui solo el rechazo.
-        broadcast(gameId, session, result.success() ? session.pollEvent() : LastEvent.abilityRejected(request.playerId(), result.reason()));
+        broadcast(gameId, session, result.success() ? session.pollEvent() : LastEvent.abilityRejected(playerId, result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/barricade/place")
-    public void placeBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
+    public void placeBarricade(@DestinationVariable String gameId, BarricadeRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptPlaceBarricade(request.playerId(), request.x(), request.y(), request.facing());
-        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+        PlayerActionResult result = session.attemptPlaceBarricade(playerId, request.x(), request.y(), request.facing());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(playerId, result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/barricade/repair")
-    public void repairBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
+    public void repairBarricade(@DestinationVariable String gameId, BarricadeRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptRepairBarricade(request.playerId(), request.barricadeId());
-        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+        PlayerActionResult result = session.attemptRepairBarricade(playerId, request.barricadeId());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(playerId, result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/barricade/dismantle")
-    public void dismantleBarricade(@DestinationVariable String gameId, BarricadeRequest request) {
+    public void dismantleBarricade(@DestinationVariable String gameId, BarricadeRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptDismantleBarricade(request.playerId(), request.barricadeId());
-        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(request.playerId(), result.reason()));
+        PlayerActionResult result = session.attemptDismantleBarricade(playerId, request.barricadeId());
+        broadcast(gameId, session, result.success() ? null : LastEvent.abilityRejected(playerId, result.reason()));
     }
 
     @MessageMapping("/game/{gameId}/transfer")
-    public void transfer(@DestinationVariable String gameId, TransferRequest request) {
+    public void transfer(@DestinationVariable String gameId, TransferRequest request,
+            SimpMessageHeaderAccessor headers) {
+        String playerId = sessionService.seatRole(gameId, headers.getSessionId());
+        if (playerId == null) {
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
             return;
         }
-        PlayerActionResult result = session.attemptTransfer(request.playerId(), request.targetId(), request.amount());
+        PlayerActionResult result = session.attemptTransfer(playerId, request.targetId(), request.amount());
         broadcast(gameId, session, result.success()
-                ? LastEvent.transfer(request.playerId(), request.targetId(), request.amount())
-                : LastEvent.abilityRejected(request.playerId(), result.reason()));
+                ? LastEvent.transfer(playerId, request.targetId(), request.amount())
+                : LastEvent.abilityRejected(playerId, result.reason()));
     }
 
     private void broadcast(String gameId, GameSession session, LastEvent lastEvent) {
