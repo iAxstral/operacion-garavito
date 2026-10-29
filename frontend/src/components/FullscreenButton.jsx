@@ -13,18 +13,20 @@ function exitFullscreen() {
   return Promise.resolve();
 }
 
+function canFullscreen() {
+  const el = document.documentElement;
+  return !!(el.requestFullscreen || el.webkitRequestFullscreen);
+}
+
 function isFullscreen() {
   return !!(document.fullscreenElement || document.webkitFullscreenElement);
 }
 
 export default function FullscreenButton() {
   const [active, setActive] = useState(isFullscreen);
-  const [supported, setSupported] = useState(false);
+  const [supported] = useState(canFullscreen);
 
   useEffect(() => {
-    const el = document.documentElement;
-    setSupported(!!(el.requestFullscreen || el.webkitRequestFullscreen));
-
     const onChange = () => setActive(isFullscreen());
     document.addEventListener('fullscreenchange', onChange);
     document.addEventListener('webkitfullscreenchange', onChange);
