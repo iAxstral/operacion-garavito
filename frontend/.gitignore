@@ -27,3 +27,7 @@ dist-ssr
 /test-results/
 /playwright-report/
 *.tmp.mjs
+
+# Salidas de depuracion de los scripts de sprites
+scripts/_contact_sheets/
+scripts/_debug_splits/
