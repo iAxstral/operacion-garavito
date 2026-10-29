@@ -948,11 +948,11 @@
   border: 2px solid rgba(134, 168, 106, 0.35);
   border-radius: 10px;
   cursor: pointer;
-  transition: transform 0.12s ease, border-color 0.12s ease;
+  transition: border-color 0.12s ease;
 }
 
+/* Sin mover la carta: si se desplaza, el puntero en su borde entra y sale del hover sin parar. */
 .role-card:hover {
-  transform: translateY(-4px);
   border-color: #e8c34a;
 }
 
