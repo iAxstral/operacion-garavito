@@ -141,6 +141,15 @@ public class GameSessionService {
         }
     }
 
+    /**
+     * Rol que ocupa esta conexion en la sala, o null si no esta sentada en ella. Las
+     * acciones usan esto y no el playerId del mensaje, que el cliente puede falsear.
+     */
+    public String seatRole(String gameId, String connectionId) {
+        Seat seat = connectionId == null ? null : seatsByConnection.get(connectionId);
+        return seat != null && seat.gameId().equals(gameId) ? seat.role() : null;
+    }
+
     public void leave(String gameId, String role) {
         GameSession session = sessions.get(gameId);
         if (session == null) {
@@ -213,6 +222,13 @@ public class GameSessionService {
     }
 
     private GameStateMessage message(GameSession session, LastEvent lastEvent) {
+        // Se arma con el candado de la sala: asi no se cruza con un tick o una accion a medias.
+        synchronized (session) {
+            return buildMessage(session, lastEvent);
+        }
+    }
+
+    private GameStateMessage buildMessage(GameSession session, LastEvent lastEvent) {
         return new GameStateMessage(
                 session.playerStates(),
                 session.claimedItemIdsSnapshot(),

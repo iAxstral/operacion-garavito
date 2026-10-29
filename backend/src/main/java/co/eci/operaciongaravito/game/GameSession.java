@@ -259,7 +259,7 @@ public class GameSession {
     }
 
     /** Se cayo la conexion de este jugador: se le guarda el puesto un rato. */
-    public void markDisconnected(String role, long now) {
+    public synchronized void markDisconnected(String role, long now) {
         Player player = players.get(role);
         if (player != null) {
             player.markDisconnected(now);
@@ -299,7 +299,7 @@ public class GameSession {
         return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule());
     }
 
-    public PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
+    public synchronized PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
         Player player = players.get(playerId);
         if (player == null) {
             return PickupResult.rejected("unknown_player");
@@ -357,7 +357,7 @@ public class GameSession {
      * Posicion que reporta el cliente. Devuelve false si se rechazo (movimiento
      * imposible): el jugador queda donde el servidor lo tenia.
      */
-    public boolean reportPosition(String playerId, int floor, double x, double y) {
+    public synchronized boolean reportPosition(String playerId, int floor, double x, double y) {
         Player player = players.get(playerId);
         // Un caido se queda donde cayo (su cliente pasa a modo espectador) y uno escondido
         // no se mueve del armario.
@@ -381,7 +381,7 @@ public class GameSession {
     }
 
     /** True (como mucho cada CORRECTION_EVERY_MS) si hay que mandarle a este jugador su posicion real. */
-    public boolean shouldCorrect(String playerId) {
+    public synchronized boolean shouldCorrect(String playerId) {
         Player player = players.get(playerId);
         return player != null && player.shouldSendCorrection(System.currentTimeMillis(), CORRECTION_EVERY_MS);
     }
@@ -559,7 +559,7 @@ public class GameSession {
     }
 
     /** Elige una de las mejoras que se le ofrecen. */
-    public PlayerActionResult attemptChoosePerk(String playerId, String perkName) {
+    public synchronized PlayerActionResult attemptChoosePerk(String playerId, String perkName) {
         Player player = players.get(playerId);
         if (player == null) {
             return PlayerActionResult.rejected("unknown_player");
@@ -603,7 +603,7 @@ public class GameSession {
     static final long CHAT_COOLDOWN_MS = 1_000;
 
     /** Frase o emote del chat rapido; null si no existe o si escribe demasiado seguido. */
-    public LastEvent attemptChat(String playerId, String phrase, long now) {
+    public synchronized LastEvent attemptChat(String playerId, String phrase, long now) {
         Player player = players.get(playerId);
         if (player == null || phrase == null) {
             return null;
@@ -615,7 +615,7 @@ public class GameSession {
         return LastEvent.chat(playerId, phrase, emote);
     }
 
-    public LastEvent attemptPing(String playerId, String kind, long now) {
+    public synchronized LastEvent attemptPing(String playerId, String kind, long now) {
         Player player = players.get(playerId);
         if (player == null || kind == null || !PING_KINDS.contains(kind) || !player.tryPing(now, PING_COOLDOWN_MS)) {
             return null;
@@ -631,14 +631,14 @@ public class GameSession {
         return zombies.values().stream().map(Zombie::toState).toList();
     }
 
-    public boolean consumeWipedRun() {
+    public synchronized boolean consumeWipedRun() {
         boolean value = wipedRun;
         wipedRun = false;
         return value;
     }
 
     /** True (una sola vez) si el equipo acaba de ganar el ultimo Kinder. */
-    public boolean consumeVictory() {
+    public synchronized boolean consumeVictory() {
         boolean value = victoryPending;
         victoryPending = false;
         return value;
@@ -667,7 +667,7 @@ public class GameSession {
         return (int) zombies.values().stream().filter(Zombie::isAlive).count();
     }
 
-    public void tick(long now, double deltaSeconds) {
+    public synchronized void tick(long now, double deltaSeconds) {
         if (!started) {
             return;
         }
@@ -789,7 +789,7 @@ public class GameSession {
     }
 
     /** Siguiente resumen que todavia no se guardo en el historial, o null. */
-    public MatchSummary pollSummaryToSave() {
+    public synchronized MatchSummary pollSummaryToSave() {
         return summariesToSave.poll();
     }
 
@@ -961,7 +961,7 @@ public class GameSession {
         return PlayerActionResult.ok();
     }
 
-    public PlayerActionResult attemptRepairBarricade(String playerId, String barricadeId) {
+    public synchronized PlayerActionResult attemptRepairBarricade(String playerId, String barricadeId) {
         Player player = players.get(playerId);
         Barricade barricade = barricadeId == null ? null : barricades.get(barricadeId);
         if (player == null || barricade == null) {
@@ -1000,7 +1000,7 @@ public class GameSession {
     }
 
     /** Economia le pasa Garavitos a un compañero (desde cualquier lugar del edificio). */
-    public PlayerActionResult attemptTransfer(String playerId, String targetId, int amount) {
+    public synchronized PlayerActionResult attemptTransfer(String playerId, String targetId, int amount) {
         Player giver = players.get(playerId);
         Player receiver = targetId == null ? null : players.get(targetId);
         if (giver == null || receiver == null || giver == receiver) {
@@ -1047,7 +1047,7 @@ public class GameSession {
     }
 
     /** Biomedica empieza a revivir a un compañero caido que tiene al lado. */
-    public PlayerActionResult attemptReviveStart(String reviverId, String targetId) {
+    public synchronized PlayerActionResult attemptReviveStart(String reviverId, String targetId) {
         Player reviver = players.get(reviverId);
         Player target = targetId == null ? null : players.get(targetId);
         if (reviver == null || target == null) {
@@ -1072,7 +1072,7 @@ public class GameSession {
         return PlayerActionResult.ok();
     }
 
-    public void attemptReviveCancel(String reviverId) {
+    public synchronized void attemptReviveCancel(String reviverId) {
         Player reviver = players.get(reviverId);
         if (reviver != null) {
             reviver.stopRevive();
@@ -1080,7 +1080,7 @@ public class GameSession {
     }
 
     /** Siguiente aviso pendiente del tick (p. ej. alguien fue revivido), o null. */
-    public LastEvent pollEvent() {
+    public synchronized LastEvent pollEvent() {
         return pendingEvents.poll();
     }
 
@@ -1181,7 +1181,7 @@ public class GameSession {
         return new double[] { sx, sy };
     }
 
-    public AttackResult attemptAttack(String playerId, AttackType type, double x, double y, double facing) {
+    public synchronized AttackResult attemptAttack(String playerId, AttackType type, double x, double y, double facing) {
         Player player = players.get(playerId);
         if (player == null) {
             return AttackResult.rejected("unknown_player");
@@ -1368,7 +1368,7 @@ public class GameSession {
         return AttackResult.ok(hits, zombieKills + bossKills);
     }
 
-    public PlayerActionResult attemptEquip(String playerId, String itemId) {
+    public synchronized PlayerActionResult attemptEquip(String playerId, String itemId) {
         Player player = players.get(playerId);
         if (player == null) {
             return PlayerActionResult.rejected("unknown_player");
@@ -1380,7 +1380,7 @@ public class GameSession {
         return PlayerActionResult.ok();
     }
 
-    public PlayerActionResult attemptReload(String playerId) {
+    public synchronized PlayerActionResult attemptReload(String playerId) {
         Player player = players.get(playerId);
         if (player == null) {
             return PlayerActionResult.rejected("unknown_player");
@@ -1392,7 +1392,7 @@ public class GameSession {
         return reason == null ? PlayerActionResult.ok() : PlayerActionResult.rejected(reason);
     }
 
-    public UseItemResult attemptUseItem(String playerId, String itemId) {
+    public synchronized UseItemResult attemptUseItem(String playerId, String itemId) {
         Player player = players.get(playerId);
         if (player == null) {
             return UseItemResult.rejected("unknown_player");
@@ -1414,7 +1414,7 @@ public class GameSession {
         return Math.IEEEremainder(radians, 2 * Math.PI);
     }
 
-    public PurchaseResult attemptPurchase(String playerId, String itemId, double x, double y) {
+    public synchronized PurchaseResult attemptPurchase(String playerId, String itemId, double x, double y) {
         Player player = players.get(playerId);
         if (player == null) {
             return PurchaseResult.rejected("unknown_player");
@@ -1435,7 +1435,7 @@ public class GameSession {
         return player.purchase(priceFor(player, item.price()), new InventorySlot(item.type(), item.itemId(), item.itemName()));
     }
 
-    public MissionResult attemptStartMission(String playerId, String missionId) {
+    public synchronized MissionResult attemptStartMission(String playerId, String missionId) {
         Player player = players.get(playerId);
         if (player == null) {
             return MissionResult.rejected("unknown_player");
@@ -1450,7 +1450,7 @@ public class GameSession {
         return MissionResult.ok(0);
     }
 
-    public MissionResult attemptCancelMission(String playerId, String missionId) {
+    public synchronized MissionResult attemptCancelMission(String playerId, String missionId) {
         Player player = players.get(playerId);
         if (player == null) {
             return MissionResult.rejected("unknown_player");
@@ -1460,7 +1460,7 @@ public class GameSession {
         return MissionResult.ok(0);
     }
 
-    public MissionResult attemptCompleteMission(String playerId, String missionId, double x, double y) {
+    public synchronized MissionResult attemptCompleteMission(String playerId, String missionId, double x, double y) {
         Player player = players.get(playerId);
         if (player == null) {
             return MissionResult.rejected("unknown_player");
@@ -1496,7 +1496,7 @@ public class GameSession {
         return new HashSet<>(claimedItems.keySet());
     }
 
-    public DoorToggleResult attemptToggleDoor(String playerId, String doorId, double x, double y) {
+    public synchronized DoorToggleResult attemptToggleDoor(String playerId, String doorId, double x, double y) {
         Player player = players.get(playerId);
         if (player == null) {
             return DoorToggleResult.rejected("unknown_player");
@@ -1528,7 +1528,7 @@ public class GameSession {
                 .toList();
     }
 
-    public void resetGame() {
+    public synchronized void resetGame() {
         zombies.clear();
         acids.clear();
         puddles.clear();
