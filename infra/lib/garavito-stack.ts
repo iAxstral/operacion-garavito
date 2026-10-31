@@ -8,6 +8,7 @@ import * as s3assets from 'aws-cdk-lib/aws-s3-assets';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 
 const ROOT = path.join(__dirname, '..', '..');
 const JAR = path.join(ROOT, 'backend', 'target', 'operacion-garavito-0.0.1-SNAPSHOT.jar');
@@ -15,6 +16,12 @@ const FRONTEND_DIST = path.join(ROOT, 'frontend', 'dist');
 
 // Lista de IPs de CloudFront hacia los origenes (us-east-2).
 const CLOUDFRONT_PREFIX_LIST = 'pl-b6a144df';
+
+// Dominio propio (DNS en Namecheap). El certificado vive en us-east-1, como exige
+// CloudFront; se creo con la CLI porque la cuenta no permite CloudFormation alla.
+const DOMAIN = 'www.operaciongaravito.me';
+const CERTIFICATE_ARN =
+  'arn:aws:acm:us-east-1:224772449836:certificate/b3c97791-79fe-4372-9039-9f5cf45e57ca';
 
 /**
  * Despliegue minimo: un EC2 (backend + PostgreSQL en la misma maquina) y el
@@ -54,7 +61,7 @@ export class GaravitoStack extends Stack {
       'SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/operaciongaravito',
       'SPRING_DATASOURCE_USERNAME=garavito',
       'SPRING_DATASOURCE_PASSWORD=$PW',
-      'WS_ALLOWED_ORIGINS=https://*.cloudfront.net',
+      `WS_ALLOWED_ORIGINS=https://${DOMAIN},https://*.cloudfront.net`,
       'EOF',
       'chmod 600 /opt/garavito/app.env',
       'cat > /etc/systemd/system/garavito.service <<EOF',
@@ -114,6 +121,8 @@ export class GaravitoStack extends Stack {
 
     const cdn = new cloudfront.Distribution(this, 'Cdn', {
       defaultRootObject: 'index.html',
+      domainNames: [DOMAIN],
+      certificate: acm.Certificate.fromCertificateArn(this, 'Cert', CERTIFICATE_ARN),
       priceClass: cloudfront.PriceClass.PRICE_CLASS_100,
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(site),
@@ -128,7 +137,8 @@ export class GaravitoStack extends Stack {
       distribution: cdn,
     });
 
-    new CfnOutput(this, 'Url', { value: `https://${cdn.distributionDomainName}` });
+    new CfnOutput(this, 'Url', { value: `https://${DOMAIN}` });
+    new CfnOutput(this, 'CloudFrontDomain', { value: cdn.distributionDomainName });
     new CfnOutput(this, 'InstanceId', { value: instance.instanceId });
   }
 }
