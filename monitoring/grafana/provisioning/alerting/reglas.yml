@@ -1,0 +1,141 @@
+# Reglas de alerta de Operacion Garavito (Grafana Unified Alerting). Se cargan solas al
+# arrancar Grafana, igual que los tableros. Ver docs/grafana (seccion Alertas).
+#
+# Cada regla: A = consulta a Prometheus, B = se queda con el ultimo valor, C = umbral.
+# La alerta pasa a "Pending" cuando se cumple C y a "Firing" si sigue cumpliendose
+# durante "for".
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: Operación Garavito
+    folder: Operación Garavito
+    interval: 10s
+    rules:
+      - uid: garavito-backend-caido
+        title: Backend caído
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, instant: true, expr: 'up{job="garavito"}' }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: lt, params: [1] } }]
+        for: 15s
+        noDataState: Alerting
+        execErrState: Error
+        labels: { severity: critica }
+        annotations:
+          summary: 'Prometheus no puede leer las métricas de {{ $labels.instance }}'
+          description: 'El nodo no responde en /actuator/prometheus. Las salas de ese nodo se perdieron; las nuevas van a los nodos que siguen vivos.'
+
+      - uid: garavito-capacidad
+        title: Más de 150 jugadores conectados
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, instant: true, expr: 'sum(garavito_players)' }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [150] } }]
+        for: 30s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: aviso }
+        annotations:
+          summary: 'Hay {{ $values.B.Value }} jugadores conectados'
+          description: 'Se acerca a lo que medimos con k6 en una sola máquina (200). Considerar levantar otro nodo (docs/escalado).'
+
+      - uid: garavito-tick-lento
+        title: El tick de una sala tarda más de 10 ms
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, instant: true, expr: 'max by (node) (garavito_tick_seconds{quantile="0.99"})' }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0.010] } }]
+        for: 30s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: aviso }
+        annotations:
+          summary: 'El p99 del tick en {{ $labels.node }} es {{ $values.B.Value }} s'
+          description: 'El tick corre cada 66 ms; normalmente tarda menos de 1 ms. Si pasa de 10 ms el servidor está saturado.'
+
+      - uid: garavito-cpu-alta
+        title: CPU del backend sobre 80 %
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, instant: true, expr: 'max by (node) (process_cpu_usage)' }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0.8] } }]
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: aviso }
+        annotations:
+          summary: 'El backend en {{ $labels.node }} usa más del 80 % de CPU'
+
+      - uid: garavito-estado-atrasado
+        title: Los jugadores reciben el estado tarde (k6)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: { from: 60, to: 0 }
+            datasourceUid: prometheus
+            model: { refId: A, instant: true, expr: 'max(k6_intervalo_estado_ms_p95)' }
+          - refId: B
+            datasourceUid: __expr__
+            model: { refId: B, type: reduce, expression: A, reducer: last }
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions: [{ evaluator: { type: gt, params: [0.25] } }]
+        for: 30s
+        noDataState: OK
+        execErrState: Error
+        labels: { severity: aviso }
+        annotations:
+          summary: 'Durante la prueba de k6 el p95 entre estados es {{ $values.B.Value }} s'
+          description: 'Es el mismo umbral que usa k6 (250 ms). Solo tiene datos mientras corre una prueba.'
