@@ -135,6 +135,37 @@ public class GameSessionService {
         return created[0] ? session : null;
     }
 
+    /** Foto de este nodo para GET /api/estado: salas mas llenas primero, sin sus codigos. */
+    public EstadoServidor estado() {
+        java.util.List<EstadoServidor.SalaEnVivo> partidas = new java.util.ArrayList<>();
+        for (GameSession session : sessions.values()) {
+            // Con el candado de la sala, igual que el estado que se manda a los jugadores.
+            synchronized (session) {
+                WaveState wave = session.waveState();
+                partidas.add(new EstadoServidor.SalaEnVivo(session.getBuilding().name(), session.playerCount(),
+                        session.zombieCount(), session.isStarted(), wave.number(), wave.total(), wave.bossStage()));
+            }
+        }
+        partidas.sort(java.util.Comparator.comparingInt(EstadoServidor.SalaEnVivo::jugadores).reversed());
+        Double tickP99Ms = null;
+        if (tickTimer != null) {
+            for (io.micrometer.core.instrument.distribution.ValueAtPercentile value
+                    : tickTimer.takeSnapshot().percentileValues()) {
+                if (value.percentile() == 0.99) {
+                    tickP99Ms = value.value(java.util.concurrent.TimeUnit.MILLISECONDS);
+                }
+            }
+        }
+        return new EstadoServidor(
+                nodeUrl,
+                java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime() / 1000,
+                partidas.size(),
+                partidas.stream().mapToInt(EstadoServidor.SalaEnVivo::jugadores).sum(),
+                partidas.stream().mapToInt(EstadoServidor.SalaEnVivo::zombis).sum(),
+                tickP99Ms,
+                partidas);
+    }
+
     public void registerSeat(String connectionId, String gameId, String role) {
         if (connectionId != null) {
             seatsByConnection.put(connectionId, new Seat(gameId, role));
