@@ -1,11 +1,14 @@
-# Dos nodos del backend que comparten Redis (registro sala -> nodo) y PostgreSQL
-# (historial y ranking). Cada sala vive en un nodo; si un jugador pide una sala del otro
-# nodo, el servidor le responde LOBBY_REDIRECT y el cliente se reconecta alla.
+# Dos nodos del backend detras de un balanceador, que comparten Redis (registro
+# sala -> nodo) y PostgreSQL (historial y ranking), con Prometheus y Grafana.
+# Cada sala vive en un nodo; si un jugador pide una sala del otro nodo, el servidor le
+# responde LOBBY_REDIRECT y el cliente se reconecta alla. Ver docs/escalado.
 #
 #   docker compose -f docker-compose.cluster.yml up --build
-#   Nodo 1: http://localhost:8081   Nodo 2: http://localhost:8082
 #
-# El frontend se apunta a cualquiera de los dos (VITE_WS_URL=http://localhost:8081/ws).
+#   Balanceador: http://localhost:8080   (frontend: VITE_WS_URL=http://localhost:8080/ws)
+#   Nodo 1: http://localhost:8081        Nodo 2: http://localhost:8082
+#   Prometheus: http://localhost:9090    Grafana: http://localhost:3000 (admin / garavito)
+#
 # NODE_PUBLIC_URL debe ser la direccion con la que los navegadores llegan a ese nodo:
 # si se juega desde otros equipos de la red, cambiar localhost por la IP de esta maquina.
 
@@ -51,3 +54,38 @@ services:
     depends_on:
       - redis
       - postgres
+
+  lb:
+    image: nginx:1.27-alpine
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./cluster/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - node1
+      - node2
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-remote-write-receiver
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.cluster.yml:/etc/prometheus/prometheus.yml:ro
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: garavito
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus

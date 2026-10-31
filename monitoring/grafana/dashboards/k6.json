@@ -694,6 +694,88 @@
         "overrides": []
       },
       "id": 12
+    },
+    {
+      "type": "timeseries",
+      "title": "Jugadores por nodo (modo cluster)",
+      "description": "Con docker-compose.cluster.yml: como reparte el balanceador las salas entre los nodos. Con un solo nodo hay una sola curva.",
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum by (node) (garavito_players)",
+          "legendFormat": "jugadores {{node}}",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        },
+        {
+          "expr": "sum by (node) (garavito_rooms)",
+          "legendFormat": "salas {{node}}",
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          }
+        },
+        "overrides": []
+      },
+      "id": 13
+    },
+    {
+      "type": "timeseries",
+      "title": "Redirecciones entre nodos",
+      "description": "Jugadores que llegaron por el balanceador a un nodo que no tenia su sala y se reconectaron al dueño (LOBBY_REDIRECT).",
+      "gridPos": {
+        "x": 12,
+        "y": 37,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(k6_redirecciones_de_nodo_total{testid=~\"$testid\"}[30s]))",
+          "legendFormat": "redirecciones por segundo",
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 8
+          },
+          "unit": "reqps"
+        },
+        "overrides": []
+      },
+      "id": 14
     }
   ]
 }

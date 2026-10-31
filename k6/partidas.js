@@ -6,6 +6,7 @@
 //
 //   k6 run k6/partidas.js
 //   k6 run -e BASE_URL=http://192.168.1.20:8080 -e PERFIL=estres k6/partidas.js
+//   k6 run -e BASE_URL=http://localhost:8080 k6/partidas.js   (balanceador del cluster)
 //
 // Para ver las metricas de k6 en Grafana junto a las del servidor (ver docs/k6):
 //   K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write \
@@ -90,6 +91,10 @@ const idaYVuelta = new Trend('ida_y_vuelta_movimiento_ms', true);
 const tamanoEstado = new Trend('tamano_estado_bytes');
 const estadosRecibidos = new Counter('estados_recibidos');
 const correcciones = new Counter('correcciones_de_posicion');
+const redirecciones = new Counter('redirecciones_de_nodo');
+// Conexiones que se cerraron antes de terminar la sesion sin ser una redireccion
+// (por ejemplo, porque se cayo el nodo donde estaba la sala).
+const sesionesCortadas = new Counter('sesiones_cortadas');
 const entradaExitosa = new Rate('entrada_exitosa');
 const entradaRechazada = new Counter('entrada_rechazada');
 
@@ -119,118 +124,139 @@ export function jugador() {
   const token = `tok-${__VU}-${__ITER}-${Date.now()}`;
   const nombre = `k6-${__VU}-${__ITER}`;
 
-  const inicio = Date.now();
-  const res = ws.connect(WS_URL, {}, (socket) => {
-    let salaOk = false;
-    let entro = false;
-    let empezo = false;
-    let pidioConSalaLlena = false;
-    let ultimoEstado = 0;
-    let pendiente = null;
-    let x = 608 + puesto * 40;
-    let dir = 1;
+  // Con varios nodos detras de un balanceador, la sala puede vivir en otro nodo: el
+  // servidor responde LOBBY_REDIRECT y el jugador se reconecta alla (una sola vez).
+  let url = WS_URL;
+  let redirigirA = null;
+  let res;
+  for (let intento = 0; intento < 2; intento += 1) {
+    redirigirA = null;
+    const inicio = Date.now();
+    res = ws.connect(url, {}, (socket) => {
+      let salaOk = false;
+      let entro = false;
+      let empezo = false;
+      let pidioConSalaLlena = false;
+      let ultimoEstado = 0;
+      let pendiente = null;
+      let x = 608 + puesto * 40;
+      let dir = 1;
 
-    const enviar = (destino, cuerpo) =>
-      socket.send(frame('SEND', { destination: `/app/game/${codigo}/${destino}`, 'content-type': 'application/json' }, JSON.stringify(cuerpo)));
-    // Todos piden iniciar; el servidor solo le hace caso al anfitrion (el primero que entro).
-    const iniciar = () => {
-      if (!empezo) enviar('start', { playerId: rol });
-    };
-    // Primero intenta crear la sala; si ya existe (code_taken), entra a la existente.
-    let crear = true;
-    const pedirSala = () => enviar('lobby', { clientId, create: crear, building: edificio, mode: 'NORMAL' });
+      const enviar = (destino, cuerpo) =>
+        socket.send(frame('SEND', { destination: `/app/game/${codigo}/${destino}`, 'content-type': 'application/json' }, JSON.stringify(cuerpo)));
+      // Todos piden iniciar; el servidor solo le hace caso al anfitrion (el primero que entro).
+      const iniciar = () => {
+        if (!empezo) enviar('start', { playerId: rol });
+      };
+      // Primero intenta crear la sala; si ya existe (code_taken), entra a la existente.
+      let crear = intento === 0;
+      const pedirSala = () => enviar('lobby', { clientId, create: crear, building: edificio, mode: 'NORMAL' });
 
-    socket.on('open', () => {
-      socket.send(frame('CONNECT', { 'accept-version': '1.2', host: 'localhost', 'heart-beat': '0,0' }));
-    });
+      socket.on('open', () => {
+        socket.send(frame('CONNECT', { 'accept-version': '1.2', host: 'localhost', 'heart-beat': '0,0' }));
+      });
 
-    socket.on('message', (raw) => {
-      if (raw === '\n') return; // latido
-      const { command, body } = parseFrame(raw);
-      if (command === 'CONNECTED') {
-        conexionStomp.add(Date.now() - inicio);
-        socket.send(frame('SUBSCRIBE', { id: 'sub-0', destination: `/topic/game/${codigo}` }));
-        // Spring puede atender el SUBSCRIBE y el primer SEND en hilos distintos: se espera
-        // un momento para no perder la respuesta, y se reintenta si igual no llega.
-        socket.setTimeout(pedirSala, 500);
-        socket.setInterval(() => {
-          if (!salaOk) pedirSala();
-        }, 3000);
-        return;
-      }
-      if (command !== 'MESSAGE') return;
-
-      const estado = JSON.parse(body);
-      const evento = estado.lastEvent;
-      if (evento) {
-        if (evento.type === 'LOBBY_OK' && evento.playerId === clientId && !salaOk) {
-          salaOk = true;
-          enviar('join', { role: rol, clientId, token, name: nombre });
-        } else if (evento.type === 'LOBBY_REJECTED' && evento.playerId === clientId) {
-          if (evento.reason === 'code_taken') {
-            crear = false;
-            pedirSala();
-          } else {
-            socket.setTimeout(pedirSala, 1000);
-          }
-        } else if (evento.type === 'JOIN_REJECTED' && evento.playerId === clientId) {
-          entradaRechazada.add(1, { motivo: evento.reason || 'desconocido' });
-        } else if (evento.type === 'POSITION_CORRECTED' && evento.playerId === rol) {
-          correcciones.add(1);
+      socket.on('message', (raw) => {
+        if (raw === '\n') return; // latido
+        const { command, body } = parseFrame(raw);
+        if (command === 'CONNECTED') {
+          conexionStomp.add(Date.now() - inicio);
+          socket.send(frame('SUBSCRIBE', { id: 'sub-0', destination: `/topic/game/${codigo}` }));
+          // Spring puede atender el SUBSCRIBE y el primer SEND en hilos distintos: se espera
+          // un momento para no perder la respuesta, y se reintenta si igual no llega.
+          socket.setTimeout(pedirSala, 500);
+          socket.setInterval(() => {
+            if (!salaOk) pedirSala();
+          }, 3000);
+          return;
         }
-      }
-      if (!estado.players) return; // rechazo suelto, sin estado
+        if (command !== 'MESSAGE') return;
 
-      // Entro si el servidor lo confirma o si ya aparece en la sala con su nombre.
-      if (!entro && ((evento && evento.type === 'JOIN_OK' && evento.itemId === clientId)
-          || estado.players.some((p) => p.playerId === rol && p.name === nombre))) {
-        entro = true;
-        // Si no se completa la sala, se inicia igual a los 15 s.
-        socket.setTimeout(iniciar, 15000);
-        socket.setTimeout(iniciar, 20000);
-      }
+        const estado = JSON.parse(body);
+        const evento = estado.lastEvent;
+        if (evento) {
+          if (evento.type === 'LOBBY_OK' && evento.playerId === clientId && !salaOk) {
+            salaOk = true;
+            enviar('join', { role: rol, clientId, token, name: nombre });
+          } else if (evento.type === 'LOBBY_REJECTED' && evento.playerId === clientId) {
+            if (evento.reason === 'code_taken') {
+              crear = false;
+              pedirSala();
+            } else {
+              socket.setTimeout(pedirSala, 1000);
+            }
+          } else if (evento.type === 'LOBBY_REDIRECT' && evento.playerId === clientId) {
+            // La sala vive en otro nodo (modo cluster): se cierra y se reconecta alla.
+            redirigirA = evento.reason;
+            socket.close();
+          } else if (evento.type === 'JOIN_REJECTED' && evento.playerId === clientId) {
+            entradaRechazada.add(1, { motivo: evento.reason || 'desconocido' });
+          } else if (evento.type === 'POSITION_CORRECTED' && evento.playerId === rol) {
+            correcciones.add(1);
+          }
+        }
+        if (!estado.players) return; // rechazo suelto, sin estado
 
-      const ahora = Date.now();
-      estadosRecibidos.add(1);
-      tamanoEstado.add(body.length);
-      if (estado.lobby && estado.lobby.started && !empezo) {
-        empezo = true;
-        ultimoEstado = 0; // el intervalo se mide desde que arranca la partida
-      }
-      // Apenas estan los 4 jugadores se pide iniciar (una vez por jugador).
-      if (entro && !pidioConSalaLlena && estado.players.length >= JUGADORES_POR_SALA) {
-        pidioConSalaLlena = true;
-        iniciar();
-      }
-      if (empezo && ultimoEstado) intervaloEstado.add(ahora - ultimoEstado);
-      ultimoEstado = ahora;
+        // Entro si el servidor lo confirma o si ya aparece en la sala con su nombre.
+        if (!entro && ((evento && evento.type === 'JOIN_OK' && evento.itemId === clientId)
+            || estado.players.some((p) => p.playerId === rol && p.name === nombre))) {
+          entro = true;
+          // Si no se completa la sala, se inicia igual a los 15 s.
+          socket.setTimeout(iniciar, 15000);
+          socket.setTimeout(iniciar, 20000);
+        }
 
-      const yo = estado.players.find((p) => p.playerId === rol);
-      if (pendiente && yo && Math.abs(yo.x - pendiente.x) < 2) {
-        idaYVuelta.add(ahora - pendiente.enviado);
-        pendiente = null;
-      }
+        const ahora = Date.now();
+        estadosRecibidos.add(1);
+        tamanoEstado.add(body.length);
+        if (estado.lobby && estado.lobby.started && !empezo) {
+          empezo = true;
+          ultimoEstado = 0; // el intervalo se mide desde que arranca la partida
+        }
+        // Apenas estan los 4 jugadores se pide iniciar (una vez por jugador).
+        if (entro && !pidioConSalaLlena && estado.players.length >= JUGADORES_POR_SALA) {
+          pidioConSalaLlena = true;
+          iniciar();
+        }
+        if (empezo && ultimoEstado) intervaloEstado.add(ahora - ultimoEstado);
+        ultimoEstado = ahora;
+
+        const yo = estado.players.find((p) => p.playerId === rol);
+        if (pendiente && yo && Math.abs(yo.x - pendiente.x) < 2) {
+          idaYVuelta.add(ahora - pendiente.enviado);
+          pendiente = null;
+        }
+      });
+
+      // Camina de lado a lado por el vestibulo a una velocidad que el servidor acepta.
+      socket.setInterval(() => {
+        if (!empezo) return;
+        if (pendiente && Date.now() - pendiente.enviado > 2000) pendiente = null; // sin respuesta: se descarta
+        x += dir * 14;
+        if (x > 1500 || x < 500) dir *= -1;
+        if (!pendiente) pendiente = { x, enviado: Date.now() };
+        enviar('move', { playerId: rol, floor: 1, x, y: 800 });
+        if (Math.random() < 0.3) enviar('attack', { playerId: rol, type: 'BASIC', x, y: 800, facing: 0 });
+      }, 100);
+
+      let termino = false;
+      socket.on('close', () => {
+        if (!termino && !redirigirA) sesionesCortadas.add(1);
+      });
+
+      socket.setTimeout(() => {
+        termino = true;
+        entradaExitosa.add(entro);
+        enviar('leave', { playerId: rol });
+        // El servidor atiende el leave por el puesto de esta conexion: se cierra un
+        // momento despues para que no llegue el cierre antes que el leave.
+        socket.setTimeout(() => socket.close(), 1000);
+      }, SESION_S * 1000);
     });
-
-    // Camina de lado a lado por el vestibulo a una velocidad que el servidor acepta.
-    socket.setInterval(() => {
-      if (!empezo) return;
-      if (pendiente && Date.now() - pendiente.enviado > 2000) pendiente = null; // sin respuesta: se descarta
-      x += dir * 14;
-      if (x > 1500 || x < 500) dir *= -1;
-      if (!pendiente) pendiente = { x, enviado: Date.now() };
-      enviar('move', { playerId: rol, floor: 1, x, y: 800 });
-      if (Math.random() < 0.3) enviar('attack', { playerId: rol, type: 'BASIC', x, y: 800, facing: 0 });
-    }, 100);
-
-    socket.setTimeout(() => {
-      entradaExitosa.add(entro);
-      enviar('leave', { playerId: rol });
-      // El servidor atiende el leave por el puesto de esta conexion: se cierra un
-      // momento despues para que no llegue el cierre antes que el leave.
-      socket.setTimeout(() => socket.close(), 1000);
-    }, SESION_S * 1000);
-  });
+    if (!redirigirA) break;
+    redirecciones.add(1);
+    url = redirigirA.replace(/^http/, 'ws').replace(/\/$/, '') + '/ws/websocket';
+  }
 
   check(res, { 'WebSocket abierto (101)': (r) => r && r.status === 101 });
   sleep(1);

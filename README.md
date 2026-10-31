@@ -44,4 +44,10 @@ Grafana (`:3000`, admin / garavito) con dos tableros: el servidor en vivo y la p
 de carga de k6. Detalles en [`docs/prometheus`](docs/prometheus/README.md),
 [`docs/grafana`](docs/grafana/README.md) y [`docs/k6`](docs/k6/README.md).
 
+## Varios nodos
+
+`docker compose -f docker-compose.cluster.yml up --build` levanta dos nodos detrás de un
+balanceador (`:8080`), con Redis, PostgreSQL, Prometheus y Grafana. La demo con k6 y el
+experimento de caída de un nodo están en [`docs/escalado`](docs/escalado/README.md).
+
 GitHub Actions corre backend, frontend y e2e en cada push y PR (`.github/workflows/ci.yml`).

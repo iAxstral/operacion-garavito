@@ -45,6 +45,8 @@ las suyas:
 | `estados_recibidos` | counter | Estados del juego recibidos. |
 | `correcciones_de_posicion` | counter | Veces que el servidor rechazó un movimiento. |
 | `entrada_rechazada{motivo}` | counter | Rechazos al entrar (`role_taken`, etc.). |
+| `redirecciones_de_nodo` | counter | Con varios nodos: veces que el jugador llegó a un nodo sin su sala y se reconectó al dueño (ver [`docs/escalado`](../escalado/README.md)). |
+| `sesiones_cortadas` | counter | Conexiones que se cerraron antes de terminar la sesión, por ejemplo porque se cayó el nodo. |
 
 ### Umbrales (criterios de aceptación)
 
