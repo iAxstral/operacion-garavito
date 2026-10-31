@@ -38,7 +38,8 @@ Nada se configura a mano en la interfaz. Grafana lee al arrancar los archivos de
 monitoring/grafana/
 ├── provisioning/
 │   ├── datasources/prometheus.yml   ← fuente de datos "Prometheus" (http://prometheus:9090)
-│   └── dashboards/garavito.yml      ← "carga los JSON de /var/lib/grafana/dashboards"
+│   ├── dashboards/garavito.yml      ← "carga los JSON de /var/lib/grafana/dashboards"
+│   └── alerting/reglas.yml          ← reglas de alerta (sección 6)
 └── dashboards/
     ├── garavito.json                ← tablero del servidor
     └── k6.json                      ← tablero de la prueba de carga
@@ -89,6 +90,7 @@ muestran las salas, jugadores y zombis del momento.*
 | Mensajes por segundo | `rate(garavito_messages_total[1m])` por `kind` | Crece con los jugadores. Casi todo es `delta`. |
 | Salas y jugadores por nodo | `garavito_rooms`, `garavito_players` por `node` | Con varios nodos, muestra si la carga se reparte. |
 | CPU y memoria del JVM | `process_cpu_usage`, heap usado / máximo | En la prueba, CPU ≤ 12 % y heap ≈ 3 %. |
+| Alertas | reglas de `alerting/reglas.yml` | Estado de cada alerta, las disparadas primero (sección 6). |
 
 ## 4. Tablero "Prueba de carga (k6)"
 
@@ -136,11 +138,82 @@ llenas más las que se están cerrando mientras los jugadores cambian de ronda.
 - La prueba de estrés, hasta 200 jugadores, y dónde empieza a degradarse están en
   [`docs/k6`](../k6/README.md).
 
-## 6. Problemas comunes
+## 6. Alertas
+
+Los tableros sirven si alguien los está mirando. Las **alertas** avisan solas cuando
+algo se sale de lo normal. Se definen en
+`monitoring/grafana/provisioning/alerting/reglas.yml` y se cargan al arrancar Grafana,
+igual que los tableros. Quedan en **Alerting → Alert rules**, carpeta *Operación
+Garavito*.
+
+| Alerta | Consulta | Se dispara si… | Durante | Severidad |
+|---|---|---|---|---|
+| Backend caído | `up{job="garavito"}` | Prometheus no puede leer un nodo (`up` < 1) | 15 s | crítica |
+| Más de 150 jugadores conectados | `sum(garavito_players)` | > 150 | 30 s | aviso |
+| El tick de una sala tarda más de 10 ms | `max by (node) (garavito_tick_seconds{quantile="0.99"})` | > 0,010 s | 30 s | aviso |
+| CPU del backend sobre 80 % | `max by (node) (process_cpu_usage)` | > 0,8 | 1 min | aviso |
+| Los jugadores reciben el estado tarde (k6) | `max(k6_intervalo_estado_ms_p95)` | > 0,25 s (el umbral de k6) | 30 s | aviso |
+
+**Por qué estos umbrales:**
+- **150 jugadores:** con k6 medimos que una máquina atiende 200 sin degradarse
+  ([`docs/k6`](../k6/README.md)). A 150 conviene preparar otro nodo.
+- **Tick de 10 ms:** el tick corre cada 66 ms y normalmente tarda menos de 1 ms, así
+  que 10 ms ya es una señal clara de saturación.
+- **"Durante":** evita alertas por picos de unos segundos. Mientras la condición se
+  cumple pero no ha pasado ese tiempo, la alerta queda en *Pending*.
+
+Las reglas que miran un nodo (`by (node)` o por `instance`) generan una instancia de
+alerta por nodo: si se cae `nodo-2`, la alerta dice cuál fue.
+
+El tablero del servidor tiene ahora un panel **Alertas** que las muestra con su
+estado, las disparadas primero.
+
+### Prueba en vivo
+
+Para comprobar que se disparan de verdad, se corrió la prueba `estres` de k6
+(200 jugadores) contra el modo de dos nodos ([`docs/escalado`](../escalado/README.md))
+el 31-10-2026. Con la alerta de capacidad ya disparada, se apagó `nodo-2` con
+`kill -9`:
+
+| Hora (UTC) | Qué pasó |
+|---|---|
+| 03:36:12 | Empieza k6. |
+| 03:38:53 | **Se dispara "Más de 150 jugadores conectados"**: superó 150 y se mantuvo 30 s. |
+| 03:39:12 | Se apaga `nodo-2`. |
+| 03:39:42 | **Se dispara "Backend caído"** para `nodo-2` (15 s de espera más el intervalo de evaluación de 10 s). |
+| 03:41:35 | Termina k6: las 650 sesiones que llegaron a terminar entraron a su sala; 92 se cortaron por la caída. |
+
+![Reglas: dos disparadas](img/07-alertas-lista.png)
+
+*Alerting → Alert rules durante la prueba: "Backend caído" y "Más de 150 jugadores"
+en Firing; las otras tres en Normal.*
+
+![Alerta de capacidad en el tablero](img/08-alerta-capacidad.png)
+
+*Momento en que se dispara la alerta de capacidad: 184 jugadores (el indicador
+"Jugadores conectados" ya está en amarillo).*
+
+![Backend caído en el tablero](img/09-alerta-backend-caido.png)
+
+*30 s después de apagar `nodo-2`: las dos alertas disparadas. En "Salas y jugadores
+por nodo" se ve cómo se cortan las curvas de `nodo-2` y `nodo-1` absorbe la carga.*
+
+**Cómo repetirlo en la presentación:** con el modo de dos nodos levantado, lanzar
+`k6 run -e PERFIL=estres -e BASE_URL=http://localhost:8080 k6/partidas.js`. Cuando se
+dispare la alerta de capacidad (unos 2,5 min), correr
+`docker compose -f docker-compose.cluster.yml stop node2`. Con un solo nodo, la
+alerta "Backend caído" se prueba simplemente deteniendo el backend.
+
+**Notificaciones:** las alertas se ven en Grafana pero no se envían a ningún lado,
+porque no hay un *contact point* configurado. Para recibirlas por correo, Slack o
+Discord se agrega uno en Alerting → Contact points; las reglas no cambian.
+
+## 7. Problemas comunes
 
 | Síntoma | Solución |
 |---|---|
 | Paneles con *No data* | En Prometheus → Targets el backend debe estar UP. Ajustar el rango de tiempo (arriba a la derecha). |
 | El tablero de k6 está vacío | k6 se corrió sin `-o experimental-prometheus-rw` (ver `docs/k6`). |
 | Cambié un JSON y no se ve | Grafana relee los archivos cada pocos segundos; si no, `docker compose -f monitoring/docker-compose.yml restart grafana`. |
+| Una alerta no aparece | Revisar `docker compose logs grafana`: un error en `reglas.yml` sale como `provisioning.alerting`. |
 | No puedo editar un panel | Entrar como `admin` / `garavito`. Los cambios hechos en la interfaz a un tablero provisionado no se guardan en el archivo: hay que exportar el JSON. |

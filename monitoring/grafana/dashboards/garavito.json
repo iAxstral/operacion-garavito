@@ -14,6 +14,9 @@
     {
       "type": "stat", "title": "Jugadores conectados", "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
       "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "description": "Amarillo desde 150 (dispara la alerta de capacidad) y rojo desde 200, lo maximo que medimos con k6 en una maquina.",
+      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
+        { "color": "green", "value": null }, { "color": "yellow", "value": 150 }, { "color": "red", "value": 200 }] } } },
       "targets": [{ "expr": "sum(garavito_players)", "refId": "A" }]
     },
     {
@@ -64,6 +67,15 @@
         { "expr": "process_cpu_usage", "legendFormat": "CPU {{node}}", "refId": "A" },
         { "expr": "sum by (node) (jvm_memory_used_bytes{area=\"heap\"}) / sum by (node) (jvm_memory_max_bytes{area=\"heap\"})", "legendFormat": "heap {{node}}", "refId": "B" }
       ]
+    },
+    {
+      "type": "alertlist", "title": "Alertas", "gridPos": { "x": 0, "y": 21, "w": 24, "h": 12 },
+      "description": "Reglas de monitoring/grafana/provisioning/alerting/reglas.yml. Rojo: disparada; amarillo: pendiente (se cumple la condicion pero aun no pasa el tiempo minimo).",
+      "options": {
+        "viewMode": "list", "groupMode": "default", "showInstances": false, "maxItems": 20, "sortOrder": 3,
+        "stateFilter": { "firing": true, "pending": true, "noData": true, "normal": true, "error": true },
+        "alertInstanceLabelFilter": "", "folder": null, "dashboardAlerts": false
+      }
     }
   ]
 }
