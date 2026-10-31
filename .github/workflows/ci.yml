@@ -1,5 +1,7 @@
 # Integracion continua: en cada push y PR corre las pruebas del backend, el lint,
-# las pruebas y el build del frontend, y las pruebas de punta a punta (Playwright).
+# las pruebas y el build del frontend, las pruebas de punta a punta (Playwright) y una
+# prueba de carga corta con k6 que falla si el juego se pone lento (umbrales en
+# k6/partidas.js, ver docs/k6).
 name: CI
 
 on:
@@ -84,3 +86,61 @@ jobs:
         with:
           name: playwright-report
           path: frontend/test-results
+
+  carga:
+    name: Carga (k6, perfil humo)
+    runs-on: ubuntu-latest
+    needs: [backend]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Levantar backend (perfil dev)
+        working-directory: backend
+        run: |
+          ./mvnw -B -q package -DskipTests
+          nohup java -jar target/*.jar --spring.profiles.active=dev > ../backend.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/actuator/health && exit 0
+            sleep 2
+          done
+          cat ../backend.log
+          exit 1
+      - name: Instalar k6
+        run: |
+          curl -sSfL https://github.com/grafana/k6/releases/download/v0.54.0/k6-v0.54.0-linux-amd64.tar.gz | tar xz
+          sudo mv k6-v0.54.0-linux-amd64/k6 /usr/local/bin/k6
+          k6 version
+      # Si no se cumple algun umbral (k6/partidas.js), k6 sale con codigo 99 y el job falla.
+      - name: Prueba de carga
+        run: k6 run -e PERFIL=humo -e SESION_S=30 --summary-export=k6-resumen.json k6/partidas.js
+      - name: Resumen en la pagina del job
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json, os
+          if not os.path.exists('k6-resumen.json'):
+              print('k6 no genero resumen.'); raise SystemExit
+          m = json.load(open('k6-resumen.json'))['metrics']
+          def fila(nombre, clave, valor, umbral):
+              ok = all(not v for v in m.get(clave, {}).get('thresholds', {}).values())
+              print(f"| {nombre} | {valor} | {umbral} | {'✅' if ok else '❌'} |")
+          print('### Prueba de carga (k6, perfil humo)\n')
+          print('| Medida | Valor | Umbral | |\n|---|---|---|---|')
+          e = m['entrada_exitosa']
+          fila('Jugadores que entraron', 'entrada_exitosa', f"{e['value']*100:.0f} % ({e['passes']} de {e['passes']+e['fails']})", '> 95 %')
+          fila('Intervalo de estado p95', 'intervalo_estado_ms', f"{m['intervalo_estado_ms']['p(95)']:.0f} ms", '< 250 ms')
+          fila('Ida y vuelta del movimiento p95', 'ida_y_vuelta_movimiento_ms', f"{m['ida_y_vuelta_movimiento_ms']['p(95)']:.0f} ms", '< 300 ms')
+          fila('Errores HTTP', 'http_req_failed', f"{m['http_req_failed']['value']*100:.1f} %", '< 1 %')
+          PY
+      - name: Reporte y log del backend
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: k6-humo
+          path: |
+            k6-resumen.json
+            backend.log

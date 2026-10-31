@@ -118,6 +118,20 @@ k6 run -e BASE_URL=http://192.168.1.20:8080 k6/partidas.js
 - `K6_PROMETHEUS_RW_TREND_STATS` dice qué percentiles enviar. Llegan a Prometheus como
   `k6_<métrica>_p95`, etc., en **segundos**.
 
+### En el CI
+
+En cada push y PR, GitHub Actions corre el job **Carga (k6, perfil humo)**
+(`.github/workflows/ci.yml`): levanta el backend con el perfil `dev`, corre
+`k6 run -e PERFIL=humo -e SESION_S=30 k6/partidas.js` y deja una tabla con los
+resultados en la página del job. **Si no se cumple algún umbral, k6 termina con
+código 99 y el PR queda en rojo.** Así, un cambio que vuelva lento el juego se detecta
+antes de fusionarlo. El resumen JSON y el log del backend quedan como artefacto
+`k6-humo`.
+
+El perfil `humo` es chico (una sala de 4 jugadores, ~45 s) a propósito: el CI comparte
+máquina con otros jobs, así que no mide la capacidad máxima. Solo verifica que el
+flujo completo (conectar, entrar, jugar, recibir el estado a tiempo) siga funcionando.
+
 ## 5. Resultados
 
 Ambiente: el backend (perfil `dev`, H2), Prometheus, Grafana y k6 corrieron **en la
