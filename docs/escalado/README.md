@@ -156,10 +156,22 @@ Salida completa de k6: [`k6-caida-nodo.txt`](k6-caida-nodo.txt).
 4. Durante la prueba: `docker compose -f docker-compose.cluster.yml stop node2`. La
    curva de `nodo-2` se corta y `nodo-1` absorbe a los nuevos jugadores.
 
-> **Nota sobre cómo se midió:** en la máquina de pruebas no se pudo construir la
-> imagen del backend (Docker Hub limitó las descargas). Por eso los dos nodos
-> corrieron como procesos Java (`SPRING_PROFILES_ACTIVE=cluster`, puertos 8081 y
-> 8082). Redis, PostgreSQL, nginx, Prometheus y Grafana corrieron en Docker con estos
-> mismos archivos de configuración, cambiando solo los nombres de host
-> (`node1`/`node2` por `localhost`). Conviene correr el `docker compose` completo una
-> vez antes de la presentación.
+> **Nota sobre cómo se midió:** las mediciones de las secciones 3 y 4 se hicieron con
+> los dos nodos corriendo como procesos Java (`SPRING_PROFILES_ACTIVE=cluster`, puertos
+> 8081 y 8082) y el resto en Docker, cambiando solo los nombres de host
+> (`node1`/`node2` por `localhost`).
+>
+> Después se validó el `docker compose -f docker-compose.cluster.yml up` completo,
+> con los nombres de servicio reales: el balanceador alterna entre `nodo-1` y
+> `nodo-2`, Prometheus los lee a los dos y Grafana carga tableros y alertas. Con k6
+> corriendo, `docker compose ... stop node2` disparó "Backend caído" a los 30 s. Las
+> peticiones HTTP por el balanceador siguieron respondiendo 200 y los 492 jugadores
+> que terminaron su sesión habían entrado. Hubo 6 conexiones fallidas: jugadores
+> redirigidos al nodo caído antes de que caducara su registro en Redis. Además, de
+> vez en cuando una petición tarda ~2 s: nginx intenta el nodo apagado, espera el
+> `proxy_connect_timeout` y pasa al otro.
+>
+> Lo único que no se pudo probar en la máquina de pruebas es la etapa de compilación
+> del `backend/Dockerfile`, porque Docker Hub limitó la descarga de la imagen del JRE.
+> Para la validación se usó una imagen equivalente con el jar ya compilado. Conviene
+> correr `up --build` una vez en el equipo de la presentación.
