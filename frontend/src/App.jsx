@@ -38,6 +38,7 @@ import { leaveGame, resumeSession } from './game/gameSync';
 import { startAmbience } from './game/ambience';
 import './App.css';
 import './halloween.css';
+import './navidad.css';
 import './minigames.css';
 
 

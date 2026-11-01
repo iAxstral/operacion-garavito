@@ -3,7 +3,9 @@ import { generateLobbyCode, openLobby } from '../game/gameSync';
 import { DAILY_RULES, MODES, fetchDailyChallenge } from '../game/gameModes';
 import { buildingLabel } from '../game/mapLayout';
 import { playSfx } from '../game/sfx';
-import HalloweenCreatures from './HalloweenCreatures';
+import TemporadaCreatures from './TemporadaCreatures';
+import useTemporada from './useTemporada';
+import RegaloMaldito from './RegaloMaldito';
 
 const ERROR_MESSAGES = {
   lobby_not_found: 'No existe una sala con ese código.',
@@ -24,6 +26,8 @@ const SPOTS = {
   code: [800, 503, 966, 557],
 };
 const EYES = [[690, 123], [744, 123]];
+// La calabaza junto a "Crear": en Navidad la tapa un regalo maldito.
+const PUMPKIN = [366, 576, 462, 672];
 
 // En pantallas verticales se muestra solo la franja central (la de los paneles) para
 // que los botones queden de un tamano que se pueda tocar.
@@ -56,6 +60,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [mode, setMode] = useState('NORMAL');
+  const temporada = useTemporada();
   const [daily, setDaily] = useState(null);
   useEffect(() => {
     let cancelled = false;
@@ -130,6 +135,11 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
               style={{ left: `${((x - cx) / cw) * 100}%`, top: `${((y - cy) / ch) * 100}%` }}
             />
           ))}
+          {temporada.id === 'NAVIDAD' && (
+            <span className="lobby-gift" aria-hidden="true" style={boxStyle(PUMPKIN, [cx, cy, cw, ch])}>
+              <RegaloMaldito />
+            </span>
+          )}
           <span className="lobby-building-tag">{buildingLabel(building)}</span>
 
           <button
@@ -200,7 +210,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
         {' '}<small>(solo al crear la sala; al unirte juegas el modo de esa sala)</small>
       </p>
 
-      <HalloweenCreatures bats={3} spiders={0} />
+      <TemporadaCreatures bats={3} spiders={0} />
 
       <p className={`lobby-status${error ? ' lobby-status--error' : ''}`} role={error ? 'alert' : undefined}>
         {busy

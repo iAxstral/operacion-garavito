@@ -1,0 +1,361 @@
+/*
+ * Tema de Navidad (la temporada por defecto). Va despues de halloween.css y solo
+ * reemplaza la apariencia cuando <html data-temporada="navidad">: Halloween queda
+ * intacto para quien elija ese evento. Sigue siendo de miedo: noche helada, sangre
+ * sobre la nieve y luces que fallan.
+ */
+
+:root[data-temporada='navidad'] {
+  --hw-ink: #03060b;
+  --hw-panel: rgba(6, 12, 20, 0.95);
+  --hw-panel-2: rgba(10, 18, 28, 0.95);
+  --hw-bone: #e6f0f5;
+  --hw-bone-dim: rgba(220, 234, 242, 0.72);
+  --hw-blood: #b3140c;
+  --hw-blood-bright: #ef3b2b;
+  --hw-blood-dark: #3d0505;
+  --hw-border: rgba(150, 196, 226, 0.38);
+  --hw-ghost: #8fe3ff;
+  --hw-gold: #e8c34a;
+}
+
+/* ---------- Menu principal: el campus de noche, nevando ---------- */
+
+/* Se agranda desde abajo para que no se vea el titulo de la ilustracion. */
+:root[data-temporada='navidad'] .start-campus {
+  object-position: 50% 100%;
+  transform-origin: 62% 100%;
+}
+
+:root[data-temporada='navidad'] .start-screen--menu .start-video {
+  filter: brightness(0.5) saturate(0.4) contrast(1.15) hue-rotate(190deg);
+  animation: xm-campus-drift 30s ease-in-out infinite alternate;
+}
+
+@keyframes xm-campus-drift {
+  from { transform: scale(1.42) translate(0, 0); }
+  to { transform: scale(1.52) translate(-1.5%, 0.5%); }
+}
+
+:root[data-temporada='navidad'] .start-screen {
+  background: #03060b;
+  color: #e6f0f5;
+}
+
+:root[data-temporada='navidad'] .start-shade {
+  background:
+    linear-gradient(90deg, rgba(2, 5, 10, 0.96) 0%, rgba(3, 8, 16, 0.78) 34%, rgba(6, 14, 26, 0.25) 70%),
+    linear-gradient(0deg, rgba(2, 5, 10, 0.95) 0%, rgba(2, 5, 10, 0) 45%),
+    linear-gradient(180deg, rgba(2, 5, 10, 0.85) 0%, rgba(2, 5, 10, 0) 28%),
+    radial-gradient(ellipse at 65% 45%, rgba(0, 0, 0, 0) 35%, rgba(0, 0, 0, 0.85) 100%);
+}
+
+/* Ventisca baja en vez de neblina. */
+:root[data-temporada='navidad'] .start-fog {
+  background:
+    radial-gradient(ellipse 20% 35% at 15% 80%, rgba(200, 225, 245, 0.16), transparent 70%),
+    radial-gradient(ellipse 26% 30% at 50% 90%, rgba(190, 215, 240, 0.18), transparent 70%),
+    radial-gradient(ellipse 22% 32% at 85% 75%, rgba(200, 225, 245, 0.14), transparent 70%);
+}
+
+/* El relampago pasa a ser un destello frio, como una luz de alarma lejana. */
+:root[data-temporada='navidad'] .start-flash {
+  background: radial-gradient(ellipse at 70% 10%, rgba(200, 230, 255, 0.4), rgba(120, 170, 220, 0.1) 60%);
+}
+
+/* Las brasas que suben se vuelven ceniza helada que cae. */
+:root[data-temporada='navidad'] .start-embers span {
+  top: -12px;
+  bottom: auto;
+  width: 4px;
+  height: 4px;
+  background: #f4fbff;
+  box-shadow: 0 0 6px 1px rgba(190, 225, 255, 0.6);
+  animation-name: xm-ember-fall;
+}
+
+@keyframes xm-ember-fall {
+  0% { transform: translate(0, 0); opacity: 0; }
+  10% { opacity: 0.9; }
+  100% { transform: translate(-30px, 105vh); opacity: 0; }
+}
+
+:root[data-temporada='navidad'] .start-kicker {
+  color: #8fd3ff;
+}
+
+:root[data-temporada='navidad'] .start-title span:first-child {
+  color: #a9bcc8;
+}
+
+/* Sangre sobre nieve: arriba escarcha, abajo rojo oscuro. */
+:root[data-temporada='navidad'] .start-title-big {
+  background: linear-gradient(180deg, #f2fbff 0%, #f2fbff 18%, #e0281a 34%, #8e0b0b 70%, #3d0303 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  filter: drop-shadow(0 5px 0 #05080e) drop-shadow(0 0 22px rgba(130, 190, 255, 0.35));
+}
+
+:root[data-temporada='navidad'] .start-tagline {
+  color: rgba(214, 228, 236, 0.8);
+}
+
+:root[data-temporada='navidad'] .start-btn {
+  color: #e6f0f5;
+  background: rgba(4, 10, 18, 0.78);
+  border-color: rgba(150, 196, 226, 0.35);
+}
+
+:root[data-temporada='navidad'] .start-btn:hover,
+:root[data-temporada='navidad'] .start-btn:focus-visible {
+  background: rgba(60, 8, 10, 0.85);
+  border-color: #ef3b2b;
+  box-shadow: 0 0 18px rgba(200, 20, 10, 0.4), inset 0 0 12px rgba(160, 210, 255, 0.12);
+}
+
+:root[data-temporada='navidad'] .start-btn--primary {
+  background: linear-gradient(180deg, #c41c12, #5e0606);
+  box-shadow: 0 6px 0 #250202, 0 0 30px rgba(200, 20, 10, 0.45), inset 0 3px 0 rgba(240, 250, 255, 0.35);
+}
+
+/* ---------- Seleccion de edificio y sala: la misma noche, helada ---------- */
+
+/* Las mismas fallas de luz de Halloween, pero con la imagen helada (sin perder el rojo). */
+:root[data-temporada='navidad'] .building-select-map {
+  animation-name: xm-map-flicker;
+}
+
+:root[data-temporada='navidad'] .lobby-stage-art {
+  animation-name: xm-lobby-flicker;
+}
+
+@keyframes xm-map-flicker {
+  0%, 100% { filter: saturate(0.55) brightness(0.9) contrast(1.08); }
+  61% { filter: saturate(0.55) brightness(0.74) contrast(1.08); }
+  62% { filter: saturate(0.55) brightness(0.9) contrast(1.08); }
+  64% { filter: saturate(0.55) brightness(0.63) contrast(1.08); }
+  65% { filter: saturate(0.55) brightness(0.9) contrast(1.08); }
+}
+
+@keyframes xm-lobby-flicker {
+  0%, 100% { filter: saturate(0.5) brightness(0.92); }
+  47% { filter: saturate(0.5) brightness(0.7); }
+  48% { filter: saturate(0.5) brightness(0.97); }
+  49.5% { filter: saturate(0.5) brightness(0.55); }
+  50.5% { filter: saturate(0.5) brightness(0.92); }
+}
+
+/* Un velo azul helado encima de la ilustracion: enfria la escena sin volver azul la sangre. */
+:root[data-temporada='navidad'] .building-select-stage::before,
+:root[data-temporada='navidad'] .lobby-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(150, 195, 240, 0.55), rgba(120, 165, 220, 0.6));
+  mix-blend-mode: multiply;
+}
+
+/* El regalo maldito tapa la calabaza de la esquina de la ilustracion. */
+/* Debajo del velo helado (z-index 0), para que quede en la misma luz de la escena. */
+.building-select-gift {
+  position: absolute;
+  z-index: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.8)) brightness(0.7) saturate(0.8);
+  animation: xm-gift-shiver 7s ease-in-out infinite;
+}
+
+:root[data-temporada='navidad'] .lobby-screen {
+  background: radial-gradient(ellipse at 50% 35%, #0f1a26 0%, #03060b 75%);
+}
+
+/* Los ojos de la ilustracion de la sala brillan en rojo. */
+:root[data-temporada='navidad'] .lobby-eye {
+  z-index: 2;
+  background: radial-gradient(circle, rgba(255, 210, 190, 0.95) 0%, rgba(255, 50, 30, 0.6) 40%, transparent 72%);
+}
+
+.regalo-ojo {
+  animation: xm-regalo-blink 4.2s steps(1) infinite;
+}
+
+@keyframes xm-regalo-blink {
+  0%, 100% { fill: #ff3b30; }
+  88% { fill: #2a0303; }
+  90% { fill: #ff3b30; }
+}
+
+.lobby-gift {
+  position: absolute;
+  z-index: 2;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.7));
+  animation: xm-gift-shiver 6s ease-in-out infinite;
+}
+
+/* Cada tanto el regalo tiembla, como si algo se moviera adentro. */
+@keyframes xm-gift-shiver {
+  0%, 86%, 100% { transform: rotate(0); }
+  88% { transform: rotate(-4deg); }
+  90% { transform: rotate(4deg); }
+  92% { transform: rotate(-3deg); }
+  94% { transform: rotate(0); }
+}
+
+/* ---------- Nieve, guirnalda y esferas rotas (NavidadCreatures) ---------- */
+
+.xm-creatures {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.xm-snow {
+  position: absolute;
+  top: -10px;
+  left: var(--x);
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: rgba(244, 251, 255, 0.92);
+  box-shadow: 0 0 4px rgba(200, 230, 255, 0.7);
+  animation: xm-snow-fall var(--dur) linear infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes xm-snow-fall {
+  0% { transform: translate(0, 0); opacity: 0; }
+  8% { opacity: 1; }
+  50% { transform: translate(var(--sway), 52vh); }
+  100% { transform: translate(0, 106vh); opacity: 0.2; }
+}
+
+/* Guirnalda de luces de lado a lado: el cable cuelga y algunos bombillos fallan. */
+.xm-garland {
+  position: absolute;
+  top: 0;
+  left: -2%;
+  right: -2%;
+  height: 46px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 0 1%;
+  background:
+    radial-gradient(ellipse 52% 60% at 50% -20%, transparent 96%, rgba(20, 30, 24, 0.95) 97%, rgba(20, 30, 24, 0.95) 99%, transparent 100%);
+}
+
+.xm-bulb {
+  position: relative;
+  /* Sigue la curva del cable: mas abajo hacia el centro. */
+  top: calc(6px + 20px * sin(calc(var(--i) / 21 * 3.1416rad)));
+  width: 9px;
+  height: 14px;
+  border-radius: 50% 50% 45% 45%;
+  background: var(--color);
+  box-shadow: 0 0 10px 3px color-mix(in srgb, var(--color) 60%, transparent);
+  animation: xm-bulb-glow 2.4s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+.xm-bulb::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 2px;
+  width: 5px;
+  height: 6px;
+  border-radius: 1px;
+  background: #1b231d;
+}
+
+@keyframes xm-bulb-glow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.xm-bulb--broken {
+  --color: #ff2a1a;
+  animation: xm-bulb-fail 3.1s steps(1) infinite;
+}
+
+@keyframes xm-bulb-fail {
+  0%, 100% { opacity: 1; }
+  12% { opacity: 0.08; }
+  14% { opacity: 1; }
+  16% { opacity: 0.1; }
+  48% { opacity: 0.1; }
+  50% { opacity: 1; }
+}
+
+/* Esferas que bajan de su hilo, como las aranas de Halloween. */
+.xm-ornament {
+  position: absolute;
+  top: 0;
+  left: var(--x);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  animation: xm-ornament-drop var(--dur) ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+.xm-ornament-thread {
+  width: 1px;
+  height: var(--drop);
+  background: linear-gradient(180deg, rgba(220, 235, 245, 0), rgba(220, 235, 245, 0.6));
+}
+
+.xm-ornament-svg {
+  margin-top: -1px;
+  filter: drop-shadow(0 0 6px rgba(0, 0, 0, 0.8));
+  animation: xm-ornament-swing 3.6s ease-in-out infinite alternate;
+  transform-origin: 50% 0;
+}
+
+@keyframes xm-ornament-drop {
+  0%, 100% { transform: translateY(-60%); }
+  45%, 60% { transform: translateY(0); }
+}
+
+@keyframes xm-ornament-swing {
+  from { transform: rotate(-7deg); }
+  to { transform: rotate(7deg); }
+}
+
+.xm-ornament-cap { fill: #b8a25a; }
+.xm-ornament-shine { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 2; stroke-linecap: round; }
+.xm-ornament-crack { fill: none; stroke: #050505; stroke-width: 1.6; stroke-linejoin: round; }
+
+.xm-ornament-eye {
+  fill: #ffe9a8;
+  animation: xm-eye-blink 5s steps(1) infinite;
+}
+
+@keyframes xm-eye-blink {
+  0%, 100% { fill: #ffe9a8; }
+  91% { fill: #1a0505; }
+  93% { fill: #ffe9a8; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .xm-creatures,
+  .lobby-gift,
+  .building-select-gift {
+    animation: none;
+  }
+
+  .xm-snow,
+  .xm-ornament {
+    display: none;
+  }
+
+  :root[data-temporada='navidad'] .start-screen--menu .start-video {
+    animation: none;
+    transform: scale(1.42);
+  }
+}

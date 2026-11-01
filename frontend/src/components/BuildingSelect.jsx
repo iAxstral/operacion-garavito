@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import HalloweenCreatures from './HalloweenCreatures';
+import TemporadaCreatures from './TemporadaCreatures';
+import RegaloMaldito from './RegaloMaldito';
+import useTemporada from './useTemporada';
 import { playSfx } from '../game/sfx';
 import { buildingLabel } from '../game/mapLayout';
 
@@ -7,6 +9,8 @@ import { buildingLabel } from '../game/mapLayout';
 // en pixeles de esa imagen y se pasan a porcentajes para que escalen con ella.
 const IMAGE_W = 1647;
 const IMAGE_H = 955;
+// La calabaza de la esquina de la ilustracion: en Navidad la tapa un regalo en la nieve.
+const PUMPKIN = [0, 730, 190, 940];
 
 const BUILDINGS = [
   {
@@ -48,6 +52,7 @@ function toStyle([x0, y0, x1, y1]) {
 
 export default function BuildingSelect({ onSelect, onBack }) {
   const [notice, setNotice] = useState(null);
+  const temporada = useTemporada();
   const [hovered, setHovered] = useState(null);
   // Cambia en cada clic a un edificio cerrado para reiniciar la sacudida del aviso.
   const [lockedTry, setLockedTry] = useState(0);
@@ -79,6 +84,20 @@ export default function BuildingSelect({ onSelect, onBack }) {
         />
         <div className="building-select-fog" aria-hidden="true" />
         <div className="building-select-flash" aria-hidden="true" />
+        {temporada.id === 'NAVIDAD' && (
+          <span
+            className="building-select-gift"
+            aria-hidden="true"
+            style={{
+              left: `${(PUMPKIN[0] / IMAGE_W) * 100}%`,
+              top: `${(PUMPKIN[1] / IMAGE_H) * 100}%`,
+              width: `${((PUMPKIN[2] - PUMPKIN[0]) / IMAGE_W) * 100}%`,
+              height: `${((PUMPKIN[3] - PUMPKIN[1]) / IMAGE_H) * 100}%`,
+            }}
+          >
+            <RegaloMaldito conNieve />
+          </span>
+        )}
 
         {BUILDINGS.flatMap((building) => {
           const spots = [building.button, building.marker, ...(building.extra ?? [])];
@@ -104,7 +123,7 @@ export default function BuildingSelect({ onSelect, onBack }) {
         })}
       </div>
 
-      <HalloweenCreatures />
+      <TemporadaCreatures />
       <div className="building-select-vignette" aria-hidden="true" />
 
       <div className="building-select-bar">
