@@ -118,63 +118,384 @@
   box-shadow: 0 6px 0 #250202, 0 0 30px rgba(200, 20, 10, 0.45), inset 0 3px 0 rgba(240, 250, 255, 0.35);
 }
 
-/* ---------- Seleccion de edificio y sala: la misma noche, helada ---------- */
+/* ---------- Seleccion de edificio: calendario de adviento maldito ---------- */
 
-/* Las mismas fallas de luz de Halloween, pero con la imagen helada (sin perder el rojo). */
-:root[data-temporada='navidad'] .building-select-map {
-  animation-name: xm-map-flicker;
+.xa-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(10px, 2.4vh, 22px);
+  padding: 32px 0 16px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(120, 20, 16, 0.35), transparent 55%),
+    radial-gradient(ellipse at 50% 110%, rgba(40, 80, 120, 0.35), transparent 60%),
+    #04070d;
 }
 
-:root[data-temporada='navidad'] .lobby-stage-art {
-  animation-name: xm-lobby-flicker;
+.xa-header {
+  position: relative;
+  z-index: 3;
+  text-align: center;
 }
 
-@keyframes xm-map-flicker {
-  0%, 100% { filter: saturate(0.55) brightness(0.9) contrast(1.08); }
-  61% { filter: saturate(0.55) brightness(0.74) contrast(1.08); }
-  62% { filter: saturate(0.55) brightness(0.9) contrast(1.08); }
-  64% { filter: saturate(0.55) brightness(0.63) contrast(1.08); }
-  65% { filter: saturate(0.55) brightness(0.9) contrast(1.08); }
+.xa-kicker {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #8fd3ff;
 }
 
-@keyframes xm-lobby-flicker {
-  0%, 100% { filter: saturate(0.5) brightness(0.92); }
-  47% { filter: saturate(0.5) brightness(0.7); }
-  48% { filter: saturate(0.5) brightness(0.97); }
-  49.5% { filter: saturate(0.5) brightness(0.55); }
-  50.5% { filter: saturate(0.5) brightness(0.92); }
+.xa-title {
+  margin: 4px 0 6px;
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: clamp(36px, 6vw, 66px);
+  line-height: 1;
+  color: #f2fbff;
+  text-shadow: 0 0 22px rgba(140, 200, 255, 0.4), 0 4px 0 #000;
 }
 
-/* Un velo azul helado encima de la ilustracion: enfria la escena sin volver azul la sangre. */
-:root[data-temporada='navidad'] .building-select-stage::before,
-:root[data-temporada='navidad'] .lobby-stage::before {
+.xa-sub {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(220, 234, 242, 0.7);
+}
+
+/* El tablero del calendario: madera oscura con nieve arriba. */
+.xa-calendar {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: clamp(10px, 2vw, 22px);
+  width: min(880px, calc(100vw - 32px));
+  margin-top: 14px;
+  flex-shrink: 0;
+  padding: clamp(14px, 2.4vw, 28px);
+  background:
+    repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.12) 0 2px, transparent 2px 60px),
+    linear-gradient(180deg, #4a2a14, #2c170a);
+  border: 4px solid #1a0d05;
+  border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 0 2px rgba(255, 210, 150, 0.12);
+}
+
+.xa-calendar::before {
   content: '';
   position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: linear-gradient(180deg, rgba(150, 195, 240, 0.55), rgba(120, 165, 220, 0.6));
-  mix-blend-mode: multiply;
+  top: -14px;
+  left: -8px;
+  right: -8px;
+  height: 22px;
+  border-radius: 14px 14px 8px 8px;
+  background: linear-gradient(180deg, #f4f9fc, #cbdbe6);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, 0.35);
 }
 
-/* El regalo maldito tapa la calabaza de la esquina de la ilustracion. */
-/* Debajo del velo helado (z-index 0), para que quede en la misma luz de la escena. */
-.building-select-gift {
-  position: absolute;
-  z-index: 0;
-  pointer-events: none;
-  filter: drop-shadow(0 6px 10px rgba(0, 0, 0, 0.8)) brightness(0.7) saturate(0.8);
-  animation: xm-gift-shiver 7s ease-in-out infinite;
+.xa-door {
+  position: relative;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+  perspective: 700px;
+  font-family: inherit;
 }
+
+/* Lo que hay detras de la puerta: oscuridad y dos ojos. */
+.xa-inside {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 8px;
+  background: radial-gradient(circle at 50% 45%, #2a0606, #050102 70%);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, 0.9);
+}
+
+.xa-eyes {
+  display: flex;
+  gap: 16px;
+}
+
+.xa-eyes span {
+  width: 14px;
+  height: 8px;
+  border-radius: 50%;
+  background: #ff2a1a;
+  box-shadow: 0 0 14px 4px rgba(255, 30, 20, 0.7);
+  animation: xa-blink 3.6s steps(1) infinite;
+}
+
+@keyframes xa-blink {
+  0%, 100% { transform: scaleY(1); }
+  90% { transform: scaleY(0.1); }
+  93% { transform: scaleY(1); }
+}
+
+.xa-enter {
+  font-weight: bold;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  font-size: 13px;
+  color: #ffd2c8;
+}
+
+/* La hoja de la puerta: se entreabre al pasar por encima. */
+.xa-leaf {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  justify-items: center;
+  padding: 8px 6px 10px;
+  border-radius: 8px;
+  background:
+    radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.14), transparent 40%),
+    linear-gradient(160deg, #a31810, #5e0a07);
+  border: 3px solid #e8c34a;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.6), inset 0 0 0 2px rgba(0, 0, 0, 0.35);
+  transform-origin: 0 50%;
+  transition: transform 0.45s cubic-bezier(0.3, 1.3, 0.5, 1);
+  backface-visibility: hidden;
+}
+
+.xa-door:nth-child(even) .xa-leaf {
+  background:
+    radial-gradient(circle at 85% 15%, rgba(255, 255, 255, 0.14), transparent 40%),
+    linear-gradient(160deg, #1c5a38, #0b2a1a);
+}
+
+.xa-door--open .xa-leaf,
+.xa-door:focus-visible .xa-leaf {
+  transform: rotateY(-62deg);
+}
+
+.xa-door:focus-visible {
+  outline: 2px solid #8fd3ff;
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.xa-day {
+  justify-self: start;
+  min-width: 26px;
+  padding: 1px 6px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #3b2a06;
+  background: #e8c34a;
+}
+
+.xa-letter {
+  align-self: center;
+  font-family: 'Blockstepped', 'Impact', sans-serif;
+  font-size: clamp(30px, 5vw, 56px);
+  line-height: 1;
+  color: #f2fbff;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+.xa-name {
+  font-size: clamp(11px, 1.3vw, 14px);
+  font-weight: bold;
+  color: #f8ecd0;
+}
+
+.xa-info {
+  font-size: 11px;
+  color: rgba(248, 236, 208, 0.7);
+}
+
+.xa-door--locked .xa-leaf {
+  filter: grayscale(0.8) brightness(0.6);
+}
+
+@media (max-width: 560px) {
+  .xa-calendar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ---------- Sala de juego: dos cartas sobre la nieve ---------- */
 
 :root[data-temporada='navidad'] .lobby-screen {
-  background: radial-gradient(ellipse at 50% 35%, #0f1a26 0%, #03060b 75%);
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(120, 20, 16, 0.3), transparent 55%),
+    radial-gradient(ellipse at 50% 35%, #0f1a26 0%, #03060b 75%);
 }
 
-/* Los ojos de la ilustracion de la sala brillan en rojo. */
-:root[data-temporada='navidad'] .lobby-eye {
-  z-index: 2;
-  background: radial-gradient(circle, rgba(255, 210, 190, 0.95) 0%, rgba(255, 50, 30, 0.6) 40%, transparent 72%);
+.xl-board {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: clamp(12px, 2.4vh, 22px);
+  width: min(860px, calc(100vw - 32px));
+  margin-top: clamp(30px, 7vh, 70px);
+}
+
+.xl-header {
+  text-align: center;
+}
+
+.xl-building {
+  position: static;
+  display: inline-block;
+}
+
+.xl-title {
+  margin: 6px 0 10px;
+  line-height: 1;
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: clamp(36px, 6vw, 64px);
+  color: #f2fbff;
+  text-shadow: 0 0 22px rgba(140, 200, 255, 0.4), 0 4px 0 #000;
+}
+
+.xl-sub {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(220, 234, 242, 0.7);
+}
+
+.xl-cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: clamp(12px, 2.4vw, 26px);
+  width: 100%;
+}
+
+/* Cada carta: papel viejo con un sello de cera, como una carta a Papa Noel. */
+.xl-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 26px 20px 22px;
+  text-align: center;
+  color: #2b1a0c;
+  background:
+    radial-gradient(circle at 15% 20%, rgba(120, 70, 20, 0.18), transparent 35%),
+    radial-gradient(circle at 85% 85%, rgba(120, 20, 10, 0.25), transparent 30%),
+    linear-gradient(180deg, #efe2c4, #d8c49a);
+  border-radius: 6px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.75);
+  transform: rotate(-1.2deg);
+}
+
+.xl-card--join {
+  transform: rotate(1.4deg);
+}
+
+.xl-card::before {
+  /* Sello de cera rojo arriba. */
+  content: '';
+  position: absolute;
+  top: -14px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #d4271a, #6e0606);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.6);
+}
+
+.xl-card h2 {
+  margin: 0;
+  font-family: var(--hw-title-font);
+  font-weight: normal;
+  font-size: clamp(24px, 3vw, 34px);
+  color: #5e0a07;
+}
+
+.xl-card p {
+  margin: 0;
+  font-size: 14px;
+  color: #4a3420;
+}
+
+.xl-card-gift {
+  position: absolute;
+  left: -18px;
+  bottom: -14px;
+  width: 64px;
+  height: 64px;
+  filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.7));
+  animation: xm-gift-shiver 6s ease-in-out infinite;
+}
+
+.xl-btn {
+  min-width: 160px;
+  padding: 12px 26px;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #f2fbff;
+  background: linear-gradient(180deg, #1f5a3a, #0b2a1a);
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 5px 0 #06170e, inset 0 3px 0 rgba(240, 250, 255, 0.3);
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease;
+}
+
+.xl-btn--primary {
+  background: linear-gradient(180deg, #c41c12, #5e0606);
+  box-shadow: 0 5px 0 #2a0202, inset 0 3px 0 rgba(240, 250, 255, 0.35);
+}
+
+.xl-btn:hover:not(:disabled),
+.xl-btn:focus-visible {
+  transform: translateY(-2px);
+  filter: brightness(1.15);
+  outline: none;
+}
+
+.xl-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.xl-code {
+  width: 150px;
+  padding: 8px 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 26px;
+  font-weight: bold;
+  letter-spacing: 8px;
+  text-align: center;
+  text-transform: uppercase;
+  color: #2b1a0c;
+  background: rgba(255, 250, 235, 0.7);
+  border: 2px dashed #7a5a30;
+  border-radius: 6px;
+}
+
+.xl-code:focus {
+  outline: 2px solid #c41c12;
+}
+
+.xl-back {
+  margin-top: 4px;
+}
+
+@media (max-width: 560px) {
+  .xl-cards {
+    grid-template-columns: 1fr;
+  }
 }
 
 .regalo-ojo {
@@ -185,14 +506,6 @@
   0%, 100% { fill: #ff3b30; }
   88% { fill: #2a0303; }
   90% { fill: #ff3b30; }
-}
-
-.lobby-gift {
-  position: absolute;
-  z-index: 2;
-  pointer-events: none;
-  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.7));
-  animation: xm-gift-shiver 6s ease-in-out infinite;
 }
 
 /* Cada tanto el regalo tiembla, como si algo se moviera adentro. */
@@ -344,14 +657,21 @@
 
 @media (prefers-reduced-motion: reduce) {
   .xm-creatures,
-  .lobby-gift,
-  .building-select-gift {
+  .xl-card-gift {
     animation: none;
   }
 
   .xm-snow,
   .xm-ornament {
     display: none;
+  }
+
+  .xa-leaf {
+    transition: none;
+  }
+
+  .xa-eyes span {
+    animation: none;
   }
 
   :root[data-temporada='navidad'] .start-screen--menu .start-video {

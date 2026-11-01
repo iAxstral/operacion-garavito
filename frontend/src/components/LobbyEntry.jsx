@@ -26,8 +26,6 @@ const SPOTS = {
   code: [800, 503, 966, 557],
 };
 const EYES = [[690, 123], [744, 123]];
-// La calabaza junto a "Crear": en Navidad la tapa un regalo maldito.
-const PUMPKIN = [366, 576, 462, 672];
 
 // En pantallas verticales se muestra solo la franja central (la de los paneles) para
 // que los botones queden de un tamano que se pueda tocar.
@@ -110,80 +108,130 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
 
   return (
     <div className="lobby-screen">
-      <div className="lobby-stage-slot">
-        <form
-          className={`lobby-stage${busy ? ' lobby-stage--busy' : ''}`}
-          style={{ aspectRatio: `${cw} / ${ch}`, '--stage-ratio': cw / ch }}
-          onSubmit={handleJoin}
-        >
-          <img
-            className="lobby-stage-art"
-            src="/mapa/crear-sala-halloween.jpg"
-            alt="Sala de juego: crear sala o unirse con código"
-            draggable={false}
-            style={{
-              width: `${(IMAGE_W / cw) * 100}%`,
-              left: `${(-cx / cw) * 100}%`,
-              top: `${(-cy / ch) * 100}%`,
-            }}
-          />
-          {EYES.map(([x, y]) => (
-            <span
-              key={x}
-              className="lobby-eye"
-              aria-hidden="true"
-              style={{ left: `${((x - cx) / cw) * 100}%`, top: `${((y - cy) / ch) * 100}%` }}
-            />
-          ))}
-          {temporada.id === 'NAVIDAD' && (
-            <span className="lobby-gift" aria-hidden="true" style={boxStyle(PUMPKIN, [cx, cy, cw, ch])}>
-              <RegaloMaldito />
-            </span>
-          )}
-          <span className="lobby-building-tag">{buildingLabel(building)}</span>
-
+      {temporada.id === 'NAVIDAD' ? (
+        <form className="xl-board" onSubmit={handleJoin}>
+          <header className="xl-header">
+            <span className="lobby-building-tag xl-building">{buildingLabel(building)}</span>
+            <h1 className="xl-title">Sala de juego</h1>
+            <p className="xl-sub">Nadie sale de la ECI esta Nochebuena sin su equipo.</p>
+          </header>
+          <div className="xl-cards">
+            <section className="xl-card xl-card--create">
+              <span className="xl-card-gift" aria-hidden="true"><RegaloMaldito /></span>
+              <h2>Crear sala</h2>
+              <p>Genera un código para compartir con tu equipo.</p>
+              <button type="button" className="xl-btn xl-btn--primary" disabled={busy} onClick={handleCreate} aria-label="Crear sala">
+                Crear
+              </button>
+            </section>
+            <section className="xl-card xl-card--join">
+              <h2>Unirse con código</h2>
+              <p>Pídele las 4 letras a quien creó la sala.</p>
+              <input
+                className="xl-code"
+                value={code}
+                maxLength={4}
+                placeholder="ABCD"
+                aria-label="Código de la sala"
+                autoCapitalize="characters"
+                autoComplete="off"
+                autoCorrect="off"
+                spellCheck={false}
+                onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+              />
+              <button
+                type="submit"
+                className="xl-btn"
+                disabled={busy || code.trim().length < 4}
+                aria-label="Entrar"
+                title={code.trim().length < 4 ? 'Escribe el código de 4 letras' : 'Entrar a la sala'}
+              >
+                Entrar
+              </button>
+            </section>
+          </div>
           <button
             type="button"
-            className="lobby-hotspot"
-            style={boxStyle(SPOTS.create, crop)}
-            disabled={busy}
-            onClick={handleCreate}
-            aria-label="Crear sala"
-            title="Crear una sala nueva"
-          />
-          <input
-            className="lobby-code-field"
-            style={boxStyle(SPOTS.code, crop)}
-            value={code}
-            maxLength={4}
-            placeholder="ABCD"
-            aria-label="Código de la sala"
-            autoCapitalize="characters"
-            autoComplete="off"
-            autoCorrect="off"
-            spellCheck={false}
-            onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
-          />
-          <button
-            type="submit"
-            className="lobby-hotspot"
-            style={boxStyle(SPOTS.join, crop)}
-            disabled={busy || code.trim().length < 4}
-            aria-label="Entrar"
-            title={code.trim().length < 4 ? 'Escribe el código de 4 letras' : 'Entrar a la sala'}
-          />
-          <button
-            type="button"
-            className="lobby-hotspot lobby-hotspot--back"
-            style={boxStyle(SPOTS.back, crop)}
+            className="screen-back-btn xl-back"
             onClick={() => {
               playSfx('click');
               onBack();
             }}
-            aria-label="Volver"
-          />
+          >
+            Volver
+          </button>
         </form>
-      </div>
+      ) : (
+        <div className="lobby-stage-slot">
+          <form
+            className={`lobby-stage${busy ? ' lobby-stage--busy' : ''}`}
+            style={{ aspectRatio: `${cw} / ${ch}`, '--stage-ratio': cw / ch }}
+            onSubmit={handleJoin}
+          >
+            <img
+              className="lobby-stage-art"
+              src="/mapa/crear-sala-halloween.jpg"
+              alt="Sala de juego: crear sala o unirse con código"
+              draggable={false}
+              style={{
+                width: `${(IMAGE_W / cw) * 100}%`,
+                left: `${(-cx / cw) * 100}%`,
+                top: `${(-cy / ch) * 100}%`,
+              }}
+            />
+            {EYES.map(([x, y]) => (
+              <span
+                key={x}
+                className="lobby-eye"
+                aria-hidden="true"
+                style={{ left: `${((x - cx) / cw) * 100}%`, top: `${((y - cy) / ch) * 100}%` }}
+              />
+            ))}
+            <span className="lobby-building-tag">{buildingLabel(building)}</span>
+
+            <button
+              type="button"
+              className="lobby-hotspot"
+              style={boxStyle(SPOTS.create, crop)}
+              disabled={busy}
+              onClick={handleCreate}
+              aria-label="Crear sala"
+              title="Crear una sala nueva"
+            />
+            <input
+              className="lobby-code-field"
+              style={boxStyle(SPOTS.code, crop)}
+              value={code}
+              maxLength={4}
+              placeholder="ABCD"
+              aria-label="Código de la sala"
+              autoCapitalize="characters"
+              autoComplete="off"
+              autoCorrect="off"
+              spellCheck={false}
+              onChange={(event) => setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''))}
+            />
+            <button
+              type="submit"
+              className="lobby-hotspot"
+              style={boxStyle(SPOTS.join, crop)}
+              disabled={busy || code.trim().length < 4}
+              aria-label="Entrar"
+              title={code.trim().length < 4 ? 'Escribe el código de 4 letras' : 'Entrar a la sala'}
+            />
+            <button
+              type="button"
+              className="lobby-hotspot lobby-hotspot--back"
+              style={boxStyle(SPOTS.back, crop)}
+              onClick={() => {
+                playSfx('click');
+                onBack();
+              }}
+              aria-label="Volver"
+            />
+          </form>
+        </div>
+      )}
 
       <div className="lobby-modes" role="radiogroup" aria-label="Modo de la sala nueva">
         {Object.entries(MODES).map(([id, info]) => (
