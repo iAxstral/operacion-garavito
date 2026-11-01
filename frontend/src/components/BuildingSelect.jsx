@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import TemporadaCreatures from './TemporadaCreatures';
-import RegaloMaldito from './RegaloMaldito';
 import useTemporada from './useTemporada';
 import { playSfx } from '../game/sfx';
 import { buildingLabel } from '../game/mapLayout';
@@ -9,8 +8,6 @@ import { buildingLabel } from '../game/mapLayout';
 // en pixeles de esa imagen y se pasan a porcentajes para que escalen con ella.
 const IMAGE_W = 1647;
 const IMAGE_H = 955;
-// La calabaza de la esquina de la ilustracion: en Navidad la tapa un regalo en la nieve.
-const PUMPKIN = [0, 730, 190, 940];
 
 const BUILDINGS = [
   {
@@ -40,6 +37,15 @@ const BUILDINGS = [
 ];
 
 const DEFAULT_NOTICE = 'Elige un edificio para comenzar la operación.';
+// Navidad: cada edificio es una puerta del calendario de adviento (dia y apodo).
+const ADVIENTO = {
+  F: { dia: 19, apodo: 'El de las aulas' },
+  G: { dia: 20, apodo: 'Ingeniería' },
+  A: { dia: 21, apodo: 'Administrativo' },
+  B: { dia: 22, apodo: 'Ciencias Básicas' },
+  C: { dia: 23, apodo: 'Laboratorios' },
+  BIBLIOTECA: { dia: 24, apodo: 'Nochebuena' },
+};
 
 function toStyle([x0, y0, x1, y1]) {
   return {
@@ -73,6 +79,62 @@ export default function BuildingSelect({ onSelect, onBack }) {
     ? `${hoveredBuilding.info}${hoveredBuilding.enabled ? ' — clic para entrar' : ''}`
     : (notice ?? DEFAULT_NOTICE);
 
+  const bar = (
+    <div className="building-select-bar">
+      <button type="button" className="screen-back-btn" onClick={onBack}>
+        Volver
+      </button>
+      <span key={lockedTry} className={`building-select-notice${lockedTry && notice && !hoveredBuilding ? ' building-select-notice--locked' : ''}`}>
+        {message}
+      </span>
+    </div>
+  );
+
+  // Navidad: un calendario de adviento maldito hecho por codigo (sin la ilustracion
+  // de Halloween). Cada puerta es un edificio; al pasar por encima se entreabre.
+  if (temporada.id === 'NAVIDAD') {
+    return (
+      <div className="building-select xa-screen">
+        <TemporadaCreatures />
+        <header className="xa-header">
+          <p className="xa-kicker">Calendario de adviento · ECI</p>
+          <h1 className="xa-title">Elige tu edificio</h1>
+          <p className="xa-sub">Cada puerta abre un edificio. Ninguna trae chocolates.</p>
+        </header>
+        <div className="xa-calendar">
+          {BUILDINGS.map((building) => {
+            const { dia, apodo } = ADVIENTO[building.id];
+            return (
+              <button
+                key={building.id}
+                type="button"
+                className={`xa-door${building.enabled ? '' : ' xa-door--locked'}${hovered === building.id ? ' xa-door--open' : ''}`}
+                onClick={() => handleClick(building)}
+                onMouseEnter={() => setHovered(building.id)}
+                onMouseLeave={() => setHovered(null)}
+                onFocus={() => setHovered(building.id)}
+                onBlur={() => setHovered(null)}
+                aria-label={building.enabled ? buildingLabel(building.id) : `${buildingLabel(building.id)} (no disponible)`}
+              >
+                <span className="xa-inside" aria-hidden="true">
+                  <span className="xa-eyes"><span /><span /></span>
+                  <span className="xa-enter">Entrar</span>
+                </span>
+                <span className="xa-leaf" aria-hidden="true">
+                  <span className="xa-day">{dia}</span>
+                  <span className="xa-letter">{building.id === 'BIBLIOTECA' ? 'Bib' : building.id}</span>
+                  <span className="xa-name">{apodo}</span>
+                  <span className="xa-info">{building.info.split(' · ').at(-1)}</span>
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        {bar}
+      </div>
+    );
+  }
+
   return (
     <div className="building-select">
       <div className="building-select-stage">
@@ -84,20 +146,6 @@ export default function BuildingSelect({ onSelect, onBack }) {
         />
         <div className="building-select-fog" aria-hidden="true" />
         <div className="building-select-flash" aria-hidden="true" />
-        {temporada.id === 'NAVIDAD' && (
-          <span
-            className="building-select-gift"
-            aria-hidden="true"
-            style={{
-              left: `${(PUMPKIN[0] / IMAGE_W) * 100}%`,
-              top: `${(PUMPKIN[1] / IMAGE_H) * 100}%`,
-              width: `${((PUMPKIN[2] - PUMPKIN[0]) / IMAGE_W) * 100}%`,
-              height: `${((PUMPKIN[3] - PUMPKIN[1]) / IMAGE_H) * 100}%`,
-            }}
-          >
-            <RegaloMaldito conNieve />
-          </span>
-        )}
 
         {BUILDINGS.flatMap((building) => {
           const spots = [building.button, building.marker, ...(building.extra ?? [])];
@@ -126,14 +174,7 @@ export default function BuildingSelect({ onSelect, onBack }) {
       <TemporadaCreatures />
       <div className="building-select-vignette" aria-hidden="true" />
 
-      <div className="building-select-bar">
-        <button type="button" className="screen-back-btn" onClick={onBack}>
-          Volver
-        </button>
-        <span key={lockedTry} className={`building-select-notice${lockedTry && notice && !hoveredBuilding ? ' building-select-notice--locked' : ''}`}>
-          {message}
-        </span>
-      </div>
+      {bar}
     </div>
   );
 }
