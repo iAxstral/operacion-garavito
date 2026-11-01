@@ -220,7 +220,7 @@ export default function MainMenu({ onPlay }) {
               <Icon name="star" /> Logros
             </button>
             <button type="button" className="start-btn" onClick={() => open('costumes')}>
-              <Icon name="pumpkin" /> Disfraces
+              <Icon name={temporada.moneda.icono} /> Disfraces
             </button>
             <button type="button" className="start-btn" onClick={() => open('profile')}>
               <Icon name="skull" /> Perfil

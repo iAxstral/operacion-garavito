@@ -3,6 +3,7 @@ import { COSTUMES, buyCostume, equipCostume, getBag } from '../game/costumes';
 import { COSTUME_SIZE, drawCostume } from '../game/costumeArt';
 import { playSfx } from '../game/sfx';
 import Icon from './Icon';
+import useTemporada from './useTemporada';
 
 function Preview({ id }) {
   const ref = useRef(null);
@@ -12,8 +13,9 @@ function Preview({ id }) {
   return <canvas ref={ref} width={COSTUME_SIZE} height={COSTUME_SIZE} className="costume-preview" aria-hidden="true" />;
 }
 
-/** Tienda de disfraces: se pagan con los dulces que suelta la horda. */
+/** Tienda de disfraces: se pagan con lo que suelta la horda (dulces o regalos, segun la temporada). */
 export default function CostumeShop({ onClose }) {
+  const { moneda } = useTemporada();
   const [bag, setBag] = useState(getBag);
 
   useEffect(() => {
@@ -40,11 +42,11 @@ export default function CostumeShop({ onClose }) {
     <div className="settings-overlay" onPointerDown={(event) => event.target === event.currentTarget && onClose()}>
       <div className="settings-panel costume-panel" role="dialog" aria-modal="true" aria-labelledby="costume-title">
         <header className="settings-header">
-          <h2 id="costume-title"><Icon name="pumpkin" /> Disfraces</h2>
+          <h2 id="costume-title"><Icon name={moneda.icono} /> Disfraces</h2>
           <button type="button" className="settings-close" onClick={onClose} aria-label="Cerrar"><Icon name="close" /></button>
         </header>
         <p className="costume-bag">
-          Tienes <strong>{bag.candies}</strong> dulces. Algunos zombis los sueltan al morir; se suman al terminar cada corrida.
+          Tienes <strong>{bag.candies}</strong> {moneda.plural}. Algunos zombis los sueltan al morir; se suman al terminar cada corrida.
         </p>
         <div className="costume-grid">
           {COSTUMES.map((costume) => {
@@ -62,7 +64,7 @@ export default function CostumeShop({ onClose }) {
                 <strong>{costume.name}</strong>
                 <small>{costume.description}</small>
                 <span className="costume-action">
-                  {worn ? 'Puesto (quitar)' : owned ? 'Ponérselo' : <><Icon name="pumpkin" /> {costume.price}</>}
+                  {worn ? 'Puesto (quitar)' : owned ? 'Ponérselo' : <><Icon name={moneda.icono} /> {costume.price}</>}
                 </span>
               </button>
             );

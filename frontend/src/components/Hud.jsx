@@ -25,6 +25,7 @@ import {
 } from '../game/gameSync';
 import SettingsPanel from './SettingsPanel';
 import Icon, { Glyph } from './Icon';
+import useTemporada from './useTemporada';
 import { playSfx } from '../game/sfx';
 import { MISSIONS_PER_KINDER, missionType } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
@@ -209,6 +210,7 @@ function toastFor(event) {
 }
 
 export default function Hud({ onExit }) {
+  const { moneda } = useTemporada();
   const [state, setState] = useState({ players: [], claimedItemIds: [], lastEvent: null });
   const [panelOpen, setPanelOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -512,8 +514,8 @@ export default function Hud({ onExit }) {
         <div className="hud-stats-row">
           <div className="hud-garavitos"><Icon name="coin" /> {garavitos} Garavitos</div>
           {(me?.candies ?? 0) > 0 && (
-            <div className="hud-candies" title="Dulces de esta corrida: al terminar van a tu bolsa">
-              <Icon name="pumpkin" /> {me.candies}
+            <div className="hud-candies" title={`Tus ${moneda.plural} de esta corrida: al terminar van a tu bolsa`}>
+              <Icon name={moneda.icono} /> {me.candies}
             </div>
           )}
           <div className="hud-floor">{role.name} — Piso {floor}</div>

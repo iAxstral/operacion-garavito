@@ -4,6 +4,7 @@ import { nameWithRole } from '../game/profile';
 import { playSfx } from '../game/sfx';
 import RankingPanel from './RankingPanel';
 import Icon from './Icon';
+import useTemporada from './useTemporada';
 import { earnAchievements } from '../game/achievements';
 import { creditRun } from '../game/costumes';
 import Credits from './Credits';
@@ -48,6 +49,7 @@ const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 
 
 /** Pantalla de resultados al ganar o al caer todo el equipo, con las estadisticas de la corrida. */
 export default function GameOverScreen({ onExitToMenu }) {
+  const { moneda } = useTemporada();
   const [outcome, setOutcome] = useState(null);
   const [summary, setSummary] = useState(null);
   const [showRanking, setShowRanking] = useState(false);
@@ -148,7 +150,7 @@ export default function GameOverScreen({ onExitToMenu }) {
         )}
 
         {candies > 0 && (
-          <p className="results-candies"><Icon name="pumpkin" /> +{candies} dulces a tu bolsa: cámbialos por disfraces en el menú</p>
+          <p className="results-candies"><Icon name={moneda.icono} /> +{candies} {moneda.plural} a tu bolsa: cámbialos por disfraces en el menú</p>
         )}
 
         {earned.length > 0 && (
