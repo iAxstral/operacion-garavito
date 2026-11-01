@@ -1,7 +1,8 @@
 import { useEffect, useRef } from 'react';
 import NavidadCreatures from './NavidadCreatures';
 import { playIntroCues } from './introNavidadAudio';
-import { BULBS, BULB_COLORS, CUES, EYES, T, ZOMBIES } from './introNavidadTiempos';
+import { BULBS, BULB_COLORS, CUES, EYES, GOLPES, T, ZOMBIES } from './introNavidadTiempos';
+import { CandidataEscarcha, CandidatoNochebueno, PlacaDecanatura } from './CandidatosDecanatura';
 import './introNavidad.css';
 
 const CAMPUS_SRC = '/mapa/seleccion-edificio-halloween.jpg';
@@ -26,9 +27,10 @@ function ZombieSilhouette() {
 }
 
 /**
- * Intro animada de la temporada de Navidad (~17 s): la noche del 24 en la ECI, las
- * luces que se apagan, ojos en la oscuridad, la horda con gorros, los cuatro roles
- * bajo una linterna y el titulo. Se puede saltar; con `soundOn` suena sincronizada.
+ * Intro animada de la temporada de Navidad (~20 s): la noche del 24 en la ECI, dos
+ * candidatos (ficticios) se pelean por la Decanatura y, mientras tanto, se apagan las
+ * luces y llega la horda; los cuatro roles bajo una linterna y el titulo. Se puede
+ * saltar; con `soundOn` suena sincronizada.
  */
 export default function IntroNavidad({ onEnd, soundOn = false }) {
   const startedAt = useRef(0);
@@ -82,8 +84,58 @@ export default function IntroNavidad({ onEnd, soundOn = false }) {
         <p className="xi-type xi-type--time" style={{ ...at(1.25), '--chars': 23 }}>24 de diciembre · 23:58</p>
       </div>
 
-      <p className="xi-caption" style={{ ...at(T.apagon + 0.3), '--hasta': `${T.linterna - 0.2}s` }}>
-        Algo se quedó en la universidad.
+      {/* Escena 2: la pelea por la Decanatura. */}
+      <div className="xd-stage" style={{ '--apagon': `${T.apagon}s` }}>
+        <div className="xd-sign" style={{ ...at(T.cartel), '--hasta': `${T.apagon}s` }}>
+          <span className="xd-sign-small">Elecciones a la</span>
+          <span className="xd-sign-big">Decanatura</span>
+        </div>
+
+        <div className="xd-noche" style={{ ...at(T.entrada), '--pelea': `${T.pelea}s`, '--gana': `${T.gana}s` }}>
+          <div className="xd-pose xd-pose--antes"><CandidatoNochebueno /></div>
+          <div className="xd-pose xd-pose--gana"><CandidatoNochebueno brazoArriba /></div>
+          <span className="xd-name">Candidato Nochebueno</span>
+        </div>
+        <div className="xd-escarcha" style={{ ...at(T.entrada), '--pelea': `${T.pelea}s`, '--gana': `${T.gana}s` }}>
+          <CandidataEscarcha />
+          <span className="xd-name">Candidata Escarcha</span>
+        </div>
+
+        <div className="xd-placa" style={{ ...at(T.agarran), '--pelea': `${T.pelea}s`, '--gana': `${T.gana}s` }}>
+          <PlacaDecanatura />
+        </div>
+
+        {/* La nube de pelea de caricatura, con brazos, piernas y onomatopeyas. */}
+        <div className="xd-cloud" style={{ ...at(T.pelea), '--gana': `${T.gana}s` }}>
+          <span className="xd-puff" style={{ '--px': '22%', '--py': '40%', '--ps': 1 }} />
+          <span className="xd-puff" style={{ '--px': '50%', '--py': '30%', '--ps': 1.25 }} />
+          <span className="xd-puff" style={{ '--px': '76%', '--py': '42%', '--ps': 1.05 }} />
+          <span className="xd-puff" style={{ '--px': '38%', '--py': '64%', '--ps': 1.1 }} />
+          <span className="xd-puff" style={{ '--px': '64%', '--py': '66%', '--ps': 1.15 }} />
+          <span className="xd-limb xd-limb--rojo" style={{ '--lx': '8%', '--ly': '46%', '--lr': '-30deg' }} />
+          <span className="xd-limb xd-limb--verde" style={{ '--lx': '84%', '--ly': '34%', '--lr': '25deg' }} />
+          <span className="xd-limb xd-limb--bota" style={{ '--lx': '30%', '--ly': '84%', '--lr': '70deg' }} />
+          <span className="xd-limb xd-limb--rojo" style={{ '--lx': '66%', '--ly': '8%', '--lr': '-80deg' }} />
+          {GOLPES.map(([texto, x, y, giro, cuando]) => (
+            <span
+              key={texto}
+              className="xd-pow"
+              style={{ ...at(T.pelea + cuando), left: `${x}%`, top: `${y}%`, '--giro': `${giro}deg` }}
+            >
+              {texto}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <p className="xi-caption xi-caption--pelea" style={{ ...at(T.agarran), '--hasta': `${T.pelea + 1.2}s` }}>
+        Dos candidatos. Una sola Decanatura.
+      </p>
+      <p className="xi-caption xi-caption--pelea" style={{ ...at(T.gana + 0.4), '--hasta': `${T.apagon - 0.5}s` }}>
+        Ganó el Candidato Nochebueno…
+      </p>
+      <p className="xi-caption xi-caption--pelea" style={{ ...at(T.apagon - 0.3), '--hasta': `${T.linterna - 0.2}s` }}>
+        …y nadie vigiló las luces.
       </p>
 
       {/* Escena 3: ojos y la horda. */}

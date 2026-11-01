@@ -1,17 +1,23 @@
 // Linea de tiempo y elementos de la intro de Navidad (IntroNavidad.jsx). Aparte del
 // componente para que la usen tambien el sonido y la grabacion del video.
+import { WE_WISH } from '../game/villancico';
 
-// Tiempos (segundos). La usan el CSS (variables --at) y el sonido: asi nunca
-// se desincronizan.
+// Tiempos (segundos). Los usan el CSS (variables --at) y el sonido: asi nunca se
+// desincronizan.
 export const T = Object.freeze({
   campus: 2.8,
-  luces: 3.4,
-  apagon: 7.0,
-  ojos: 7.6,
-  zombis: 8.2,
-  linterna: 10.6,
-  titulo: 13.4,
-  fin: 17.2,
+  luces: 3.0,
+  cartel: 3.4,
+  entrada: 4.0,
+  agarran: 5.2,
+  pelea: 5.9,
+  gana: 8.6,
+  apagon: 10.4,
+  ojos: 11.0,
+  zombis: 11.6,
+  linterna: 14.0,
+  titulo: 16.8,
+  fin: 20.6,
 });
 
 export const BULBS = 18;
@@ -24,19 +30,31 @@ export const EYES = [
 // Zombis que cruzan: retraso, duracion del cruce, escala y altura.
 export const ZOMBIES = [[0, 7.5, 1, 0], [1.1, 8.5, 0.82, 4], [2.0, 7, 1.12, -2], [2.9, 9, 0.9, 6]];
 
-// "Jingle Bells" en La menor (1857, dominio publico): [segundo dentro de la frase, Hz].
-const MELODY = [
-  [0, 523.25], [0.3, 523.25], [0.6, 523.25],
-  [1.2, 523.25], [1.5, 523.25], [1.8, 523.25],
-  [2.4, 523.25], [2.7, 659.25], [3.0, 440], [3.3, 493.88], [3.6, 523.25],
+// Onomatopeyas de la pelea: texto, posicion (% de la nube), giro y cuando aparecen.
+export const GOLPES = [
+  ['¡ZAS!', 8, 18, -12, 0.15],
+  ['¡PUM!', 62, 6, 10, 0.6],
+  ['¡CRAC!', 30, 58, -6, 1.1],
+  ['¡AY!', 70, 52, 14, 1.5],
+  ['¡PAF!', 4, 48, 8, 1.95],
+  ['¡TOMA!', 46, 2, -9, 2.3],
 ];
+
+// La entrada de los candidatos con "We wish you a merry Christmas, we wish you a merry
+// Christmas" (dominio publico), a 0,3 s la negra: las primeras 10 negras.
+const ENTRADA_NEGRA_S = 0.3;
+const MELODIA_ENTRADA = WE_WISH.filter(([beat]) => beat < 10);
 
 export const CUES = [
   [0.2, 'wind', T.fin - 0.4],
   ...[0.4, 0.9, 1.4, 1.9, 2.4].map((at) => [at, 'tick']),
-  ...MELODY.map(([at, freq]) => [T.campus + 0.4 + at, 'box', freq]),
-  [T.luces + 0.9, 'bells'],
-  [T.luces + 2.2, 'bells'],
+  ...MELODIA_ENTRADA.map(([beat, freq]) => [T.campus + 0.3 + beat * ENTRADA_NEGRA_S, 'box', freq]),
+  [T.luces + 0.6, 'bells'],
+  [T.cartel + 0.35, 'thud'],
+  ...GOLPES.map(([, , , , at]) => [T.pelea + at, 'punch']),
+  [T.gana, 'whoosh'],
+  [T.gana + 0.5, 'bells'],
+  [T.gana + 0.8, 'bells'],
   [T.apagon, 'spark'],
   [T.ojos + 0.6, 'groan'],
   [T.zombis + 1.6, 'bells'],
@@ -44,4 +62,3 @@ export const CUES = [
   [T.titulo, 'thunder'],
   [T.titulo + 0.08, 'thud'],
 ];
-
