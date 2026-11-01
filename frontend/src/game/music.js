@@ -1,6 +1,7 @@
 import { audio } from './sfx';
 import { channelVolume, onSettingsChange } from './settings';
 import { getTemporada } from './temporada';
+import { WE_WISH } from './villancico';
 
 // Musica generada en vivo con Web Audio (el proyecto no tiene pistas grabadas).
 // Tres capas que se suman segun la intensidad:
@@ -25,18 +26,10 @@ const CHORDS = [
 const BASS = [55.0, 43.65, 36.71, 41.2];
 const BELLS = [440, 523.25, 659.25, 587.33, 493.88, 392];
 
-// Navidad: caja de musica desafinada con "Jingle Bells" (1857, dominio publico) en La
-// menor, una nota cada corchea marcada en dos compases: [corchea, frecuencia].
-const C5 = 523.25;
-const E5 = 659.25;
-const A4 = 440;
-const B4 = 493.88;
-const JINGLE = [
-  [[0, C5], [2, C5], [4, C5], [8, C5], [10, C5], [12, C5]],
-  [[0, C5], [2, E5], [4, A4], [6, B4], [8, C5]],
-];
-// Cada cuanto se repite la melodia (en compases): deja silencios largos entre vuelta y vuelta.
-const JINGLE_EVERY_BARS = 4;
+// Navidad: "We Wish You a Merry Christmas" (dominio publico) en La menor armonica.
+// Un paso = una corchea: la melodia dura 48 corcheas y despues hay 16 de silencio.
+const VILLANCICO_LOOP = 64;
+const VILLANCICO = new Map(WE_WISH.map(([beat, freq, beats]) => [Math.round(beat * 2), { freq, eighths: beats * 2 }]));
 
 let master = null;
 let layers = null;
@@ -200,11 +193,20 @@ function scheduleBeat(ctx, time, step) {
   }
   const navidad = getTemporada() === 'NAVIDAD';
   if (navidad) {
-    // La caja de musica: dos compases de melodia y dos de silencio.
-    const phrase = JINGLE[Math.floor(step / 16) % JINGLE_EVERY_BARS];
-    phrase?.forEach(([at, freq]) => {
-      if (at === inBar) musicBox(ctx, time, freq);
-    });
+    const note = VILLANCICO.get(step % VILLANCICO_LOOP);
+    if (note) {
+      const eighth = 60 / tempoFor(intensity) / 2;
+      // Calma: la caja de musica rota.
+      musicBox(ctx, time, note.freq);
+      // Kinder: un coro grave una octava abajo que arrastra cada nota.
+      envelopeNote(ctx, layers[1], {
+        type: 'triangle', freq: note.freq / 2, start: time, duration: note.eighths * eighth * 1.3, gain: 0.05, attack: 0.08,
+      });
+      // Peligro: el eco desafinado medio tono arriba.
+      envelopeNote(ctx, layers[2], {
+        type: 'sawtooth', freq: note.freq * 1.0595, start: time + eighth / 2, duration: 0.25, gain: 0.015, attack: 0.005,
+      });
+    }
     // Cascabeles del trineo en cada pulso mientras corre el Kinder.
     if (inBar % 4 === 0) sleighBells(ctx, time);
   }
