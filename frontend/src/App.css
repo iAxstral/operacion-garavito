@@ -2988,6 +2988,72 @@ body {
   color: rgba(225, 210, 205, 0.78);
 }
 
+/* Selector de evento (temporada): como las listas de juego por evento. */
+.start-season {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: min(420px, 100%);
+}
+
+.start-season-option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  align-items: center;
+  flex: 1 1 170px;
+  padding: 8px 12px;
+  font-family: inherit;
+  text-align: left;
+  color: rgba(239, 227, 220, 0.75);
+  background: rgba(10, 8, 12, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 10px;
+  cursor: pointer;
+  backdrop-filter: blur(5px);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.start-season-option svg {
+  grid-row: span 2;
+  width: 22px;
+  height: 22px;
+}
+
+.start-season-name {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.start-season-tag {
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+
+.start-season-option:hover,
+.start-season-option:focus-visible {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.45);
+  outline: none;
+}
+
+.start-season-option--active.start-season-option--navidad {
+  color: #f2fbff;
+  background: linear-gradient(135deg, rgba(120, 12, 10, 0.75), rgba(10, 40, 60, 0.75));
+  border-color: #8fd3ff;
+  box-shadow: 0 0 16px rgba(143, 211, 255, 0.3);
+}
+
+.start-season-option--active.start-season-option--halloween {
+  color: #fff3e0;
+  background: linear-gradient(135deg, rgba(140, 50, 0, 0.75), rgba(60, 6, 8, 0.75));
+  border-color: #ff8a1f;
+  box-shadow: 0 0 16px rgba(255, 138, 31, 0.3);
+}
+
 .start-actions {
   display: flex;
   flex-direction: column;

@@ -237,6 +237,22 @@ const PATHS = {
       <path d="M7.5 11.5l2 1.5-2 .5zM16.5 11.5l-2 1.5 2 .5zM7.5 16c2 1.5 7 1.5 9 0l-1.5 1.5-1.5-1-1.5 1-1.5-1-1.5 1z" fill="#120708" />
     </>
   ),
+  gift: (
+    <>
+      <path d="M3.5 9.5h17v4h-17zM5 13.5h14V21H5z" fill="currentColor" />
+      <path d="M12 9.5V21" stroke="#120708" strokeWidth="2" />
+      <path
+        d="M12 9.5C10.5 6 7 5 6.5 7.3 6 9.3 9.5 9.5 12 9.5zM12 9.5c1.5-3.5 5-4.5 5.5-2.2.5 2-3 2.2-5.5 2.2z"
+        fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"
+      />
+    </>
+  ),
+  snowflake: (
+    <path
+      d="M12 2v20M3.3 7l17.4 10M3.3 17L20.7 7M9.5 3.5L12 6l2.5-2.5M9.5 20.5L12 18l2.5 2.5M4 10.5l3.3-.9-.9-3.3M20 13.5l-3.3.9.9 3.3M4 13.5l3.3.9-.9 3.3M20 10.5l-3.3-.9.9-3.3"
+      fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"
+    />
+  ),
   eye: (
     <>
       <path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z" fill="none" stroke="currentColor" strokeWidth="2" />
