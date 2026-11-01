@@ -157,6 +157,20 @@ recurso defensivo antes del hacha.
 - **App instalable** (PWA): manifiesto, íconos y service worker solo en
   producción; el WebSocket y la API nunca pasan por la caché.
 
+## 9. Temporada de Navidad (y Halloween como evento)
+
+- **Temporadas**: la sala tiene una temporada (`Temporada.java`: `NAVIDAD` por
+  defecto, `HALLOWEEN` como evento) que elige quien la crea y viaja en
+  `LobbyState.temporada`. Solo cambia la ambientación, no las reglas. El
+  jugador elige su evento preferido en el menú; dentro de una sala manda la de
+  la sala.
+- **Navidad sangrienta**: menús con el campus nevado y luces que fallan, árboles
+  marchitos y regalos rotos en el edificio, carámbanos, nieve, oscuridad azul,
+  zombis con gorro de Papá Noel, caja de música desafinada y cascabeles. La
+  moneda de la horda se llama "regalos". Tres disfraces nuevos: gorro de Papá
+  Noel, cornamenta de reno y Krampus.
+- Detalles y capturas en `docs/temporadas`.
+
 ## Fuera de alcance
 
 - ~~Validación de movimiento en el servidor (anti-cheat).~~ Hecho:

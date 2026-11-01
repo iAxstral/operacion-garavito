@@ -12,6 +12,7 @@ Juego cooperativo de decisión bajo presión, ambientado en la ECI — Proyecto 
 - backend/ — Spring Boot · Java 21 · WebSocket/STOMP
 - frontend/ — React · Vite
 - docs/ESCALABILIDAD.md — mediciones de carga y propuesta para escalar
+- docs/temporadas — temporada de Navidad (la actual) y Halloween como evento, con capturas
 - docs/k6, docs/prometheus, docs/grafana — pruebas de carga y monitoreo, con capturas y resultados
 - k6/ — script de prueba de carga · monitoring/ — Prometheus y Grafana con los tableros ya configurados
 
