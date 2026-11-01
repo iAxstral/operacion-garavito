@@ -43,3 +43,13 @@ test('una bolsa guardada con basura no rompe nada', () => {
   store.set('garavito.candy.v1', JSON.stringify({ candies: -4, owned: ['HACK', 'BRUJA'], equipped: 'HACK' }));
   assert.deepEqual(getBag(), { candies: 0, owned: ['BRUJA'], equipped: null, credited: [] });
 });
+
+test('la tienda muestra primero los disfraces de la temporada que se juega', async () => {
+  const { costumesFor } = await import('./costumes.js');
+  const navidad = costumesFor('NAVIDAD');
+  const halloween = costumesFor('HALLOWEEN');
+  assert.equal(navidad.length, COSTUMES.length);
+  assert.ok(navidad.slice(0, 3).every((c) => c.temporada === 'NAVIDAD'));
+  assert.equal(halloween[0].temporada, 'HALLOWEEN');
+  assert.equal(new Set(halloween.map((c) => c.id)).size, COSTUMES.length, 'sin repetidos');
+});

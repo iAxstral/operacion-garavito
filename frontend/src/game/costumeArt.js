@@ -14,7 +14,96 @@ export const COSTUME_LAYOUT = {
   VAMPIRO: { anchor: 'neck', scale: 1.2, dy: 10 },
   CALAVERA: { anchor: 'head', scale: 0.6, dy: 2 },
   FANTASMA: { anchor: 'body', scale: 1.75, dy: -8 },
+  GORRO_NAVIDAD: { anchor: 'head', scale: 0.85, dy: -16 },
+  CORNAMENTA: { anchor: 'head', scale: 0.95, dy: -16 },
+  KRAMPUS: { anchor: 'head', scale: 0.7, dy: 0 },
 };
+
+// Gorro de Papa Noel caido hacia un lado, rasgado y manchado.
+function santaHat(ctx) {
+  ctx.fillStyle = '#a31212';
+  ctx.beginPath();
+  ctx.moveTo(10, 48);
+  ctx.quadraticCurveTo(22, 6, 46, 10);
+  ctx.lineTo(56, 22);
+  ctx.quadraticCurveTo(44, 22, 52, 48);
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#5c0808';
+  ctx.fillRect(24, 26, 6, 4);
+  ctx.fillRect(38, 34, 4, 6);
+  // Rasgon: se ve oscuro por dentro.
+  ctx.fillStyle = '#1a0505';
+  ctx.beginPath();
+  ctx.moveTo(30, 36); ctx.lineTo(35, 31); ctx.lineTo(33, 40); ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#e8e2d4';
+  ctx.fillRect(6, 44, 50, 12);
+  ctx.fillStyle = 'rgba(110, 20, 10, 0.75)';
+  ctx.fillRect(14, 50, 8, 6);
+  ctx.fillRect(40, 47, 5, 4);
+  ctx.beginPath();
+  ctx.fillStyle = '#f0ebe0';
+  ctx.arc(55, 23, 7, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Cornamenta de reno de rama seca, con una lucecita roja apagada.
+function antlers(ctx) {
+  ctx.strokeStyle = '#6b4a2a';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 5;
+  [[1, 20], [-1, 44]].forEach(([dir, x]) => {
+    ctx.beginPath();
+    ctx.moveTo(x, 56);
+    ctx.lineTo(x - dir * 4, 32);
+    ctx.lineTo(x - dir * 14, 10);
+    ctx.moveTo(x - dir * 5, 36);
+    ctx.lineTo(x - dir * 16, 30);
+    ctx.moveTo(x - dir * 9, 22);
+    ctx.lineTo(x + dir * 2, 12);
+    ctx.stroke();
+  });
+  ctx.fillStyle = '#3d2a14';
+  ctx.fillRect(8, 54, 48, 6);
+  ctx.fillStyle = '#5e0a0a';
+  ctx.beginPath();
+  ctx.arc(32, 52, 5, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Mascara de Krampus: cara roja oscura, cuernos de cabra y la lengua afuera.
+function krampus(ctx) {
+  ctx.fillStyle = '#1c1210';
+  [[1, 14], [-1, 50]].forEach(([dir, x]) => {
+    ctx.beginPath();
+    ctx.moveTo(x, 20);
+    ctx.quadraticCurveTo(x - dir * 14, 6, x - dir * 4, -2);
+    ctx.quadraticCurveTo(x - dir * 2, 10, x + dir * 8, 20);
+    ctx.closePath();
+    ctx.fill();
+  });
+  const face = ctx.createRadialGradient(32, 34, 4, 32, 36, 26);
+  face.addColorStop(0, '#7a1a12');
+  face.addColorStop(1, '#2a0806');
+  ctx.fillStyle = face;
+  ctx.beginPath();
+  ctx.ellipse(32, 36, 22, 24, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#ffd34d';
+  ctx.beginPath();
+  ctx.moveTo(18, 30); ctx.lineTo(28, 33); ctx.lineTo(19, 35); ctx.closePath(); ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(46, 30); ctx.lineTo(36, 33); ctx.lineTo(45, 35); ctx.closePath(); ctx.fill();
+  ctx.fillStyle = '#0d0505';
+  ctx.fillRect(20, 44, 24, 6);
+  ctx.fillStyle = '#efe6d2';
+  [21, 27, 33, 39].forEach((x) => ctx.fillRect(x, 44, 3, 3));
+  ctx.fillStyle = '#c2304a';
+  ctx.beginPath();
+  ctx.ellipse(34, 56, 5, 8, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+}
 
 function pumpkin(ctx) {
   ctx.fillStyle = '#3b5a1c';
@@ -127,7 +216,17 @@ function sheet(ctx) {
   });
 }
 
-const DRAW = { CALABAZA: pumpkin, BRUJA: witchHat, DIABLO: horns, VAMPIRO: cape, CALAVERA: skull, FANTASMA: sheet };
+const DRAW = {
+  CALABAZA: pumpkin,
+  BRUJA: witchHat,
+  DIABLO: horns,
+  VAMPIRO: cape,
+  CALAVERA: skull,
+  FANTASMA: sheet,
+  GORRO_NAVIDAD: santaHat,
+  CORNAMENTA: antlers,
+  KRAMPUS: krampus,
+};
 
 /** Dibuja el disfraz `id` en un contexto 2D de COSTUME_SIZE x COSTUME_SIZE. */
 export function drawCostume(ctx, id) {

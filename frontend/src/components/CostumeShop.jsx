@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { COSTUMES, buyCostume, equipCostume, getBag } from '../game/costumes';
+import { buyCostume, costumesFor, equipCostume, getBag } from '../game/costumes';
 import { COSTUME_SIZE, drawCostume } from '../game/costumeArt';
 import { playSfx } from '../game/sfx';
 import Icon from './Icon';
@@ -15,7 +15,7 @@ function Preview({ id }) {
 
 /** Tienda de disfraces: se pagan con lo que suelta la horda (dulces o regalos, segun la temporada). */
 export default function CostumeShop({ onClose }) {
-  const { moneda } = useTemporada();
+  const { id: temporada, moneda } = useTemporada();
   const [bag, setBag] = useState(getBag);
 
   useEffect(() => {
@@ -49,7 +49,7 @@ export default function CostumeShop({ onClose }) {
           Tienes <strong>{bag.candies}</strong> {moneda.plural}. Algunos zombis los sueltan al morir; se suman al terminar cada corrida.
         </p>
         <div className="costume-grid">
-          {COSTUMES.map((costume) => {
+          {costumesFor(temporada).map((costume) => {
             const owned = bag.owned.includes(costume.id);
             const worn = bag.equipped === costume.id;
             const affordable = bag.candies >= costume.price;
