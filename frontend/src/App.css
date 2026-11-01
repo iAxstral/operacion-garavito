@@ -2889,6 +2889,7 @@ body {
 
 .start-intro-controls {
   position: absolute;
+  z-index: 10;
   right: calc(18px + env(safe-area-inset-right));
   bottom: calc(18px + env(safe-area-inset-bottom));
   display: flex;

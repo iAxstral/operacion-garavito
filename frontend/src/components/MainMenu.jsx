@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import SettingsPanel from './SettingsPanel';
 import HowToPlay from './HowToPlay';
 import RankingPanel from './RankingPanel';
@@ -7,11 +7,12 @@ import AchievementsPanel from './AchievementsPanel';
 import CostumeShop from './CostumeShop';
 import ProfilePanel from './ProfilePanel';
 import TemporadaCreatures from './TemporadaCreatures';
+import IntroNavidad from './IntroNavidad';
 import Icon from './Icon';
 import { playSfx } from '../game/sfx';
 import { channelVolume, onSettingsChange } from '../game/settings';
 import { startMusic, stopMusic } from '../game/music';
-import { TEMPORADAS, getTemporada, setTemporadaPreferida } from '../game/temporada';
+import { TEMPORADAS, setTemporadaPreferida } from '../game/temporada';
 import useTemporada from './useTemporada';
 
 const VIDEO_SRC = '/video/inicio.mp4';
@@ -48,12 +49,13 @@ export default function MainMenu({ onPlay }) {
   const videoRef = useRef(null);
   const temporada = useTemporada();
   const halloween = temporada.id === 'HALLOWEEN';
-  // La intro en video es de Halloween: en Navidad se entra directo al menu.
-  const [phase, setPhase] = useState(() => (introAlreadySeen() || getTemporada() !== 'HALLOWEEN' ? 'menu' : 'intro'));
+  // La primera vez en la sesion se ve la intro: el video en Halloween, la animacion en Navidad.
+  const [phase, setPhase] = useState(() => (introAlreadySeen() ? 'menu' : 'intro'));
   const [soundOn, setSoundOn] = useState(false);
   const [panel, setPanel] = useState(null);
 
-  const showMenu = () => {
+  // Estable (useCallback): la intro animada la usa como fin de su temporizador.
+  const showMenu = useCallback(() => {
     markIntroSeen();
     startMusic(0);
     const video = videoRef.current;
@@ -62,15 +64,15 @@ export default function MainMenu({ onPlay }) {
       video.currentTime = MENU_FRAME_S;
     }
     setPhase('menu');
-  };
+  }, []);
 
   const replayIntro = () => {
     playSfx('click');
-    const video = videoRef.current;
-    if (!video) return;
-    video.currentTime = 0;
     stopMusic();
+    const video = videoRef.current;
     setPhase('intro');
+    if (!video) return; // Navidad: la animacion arranca sola al montarse.
+    video.currentTime = 0;
     video.play().catch(showMenu);
   };
 
@@ -114,8 +116,7 @@ export default function MainMenu({ onPlay }) {
 
   const toggleSound = () => {
     const video = videoRef.current;
-    if (!video) return;
-    video.muted = soundOn;
+    if (video) video.muted = soundOn;
     setSoundOn(!soundOn);
   };
 
@@ -154,6 +155,8 @@ export default function MainMenu({ onPlay }) {
           <span key={i} style={{ '--i': i, '--x': `${(i * 37) % 100}%`, '--d': `${6 + (i % 5) * 1.3}s` }} />
         ))}
       </div>
+
+      {phase === 'intro' && !halloween && <IntroNavidad onEnd={showMenu} soundOn={soundOn} />}
 
       {phase === 'intro' && (
         <div className="start-intro-controls">
@@ -230,11 +233,9 @@ export default function MainMenu({ onPlay }) {
             </button>
           </nav>
 
-          {halloween && (
-            <button type="button" className="start-link" onClick={replayIntro}>
-              Ver la intro otra vez
-            </button>
-          )}
+          <button type="button" className="start-link" onClick={replayIntro}>
+            Ver la intro otra vez
+          </button>
         </main>
       )}
 
