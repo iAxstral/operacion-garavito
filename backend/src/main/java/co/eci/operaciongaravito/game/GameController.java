@@ -23,7 +23,7 @@ public class GameController {
         }
         if (request.create()) {
             session = sessionService.create(gameId, Building.parseOrDefault(request.building()),
-                    GameMode.parseOrDefault(request.mode()));
+                    GameMode.parseOrDefault(request.mode()), Temporada.parseOrDefault(request.temporada()));
             if (session == null) {
                 sessionService.broadcastRejected(gameId, LastEvent.lobbyRejected(request.clientId(), "code_taken"));
                 return;

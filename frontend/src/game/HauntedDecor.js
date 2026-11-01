@@ -23,7 +23,7 @@ const DEPTH_DUST = 4995;
 const WALLISH = new Set(['wall', 'glass']);
 
 // Aleatorio con semilla: todos los jugadores ven las mismas calabazas y telaranas.
-function seeded(seedText) {
+export function seeded(seedText) {
   let seed = 0;
   for (const ch of seedText) seed = (seed * 31 + ch.charCodeAt(0)) % 2147483647;
   seed = seed || 1;
@@ -33,7 +33,7 @@ function seeded(seedText) {
   };
 }
 
-function canvasTexture(scene, key, w, h, draw) {
+export function canvasTexture(scene, key, w, h, draw) {
   if (scene.textures.exists(key)) return;
   const texture = scene.textures.createCanvas(key, w, h);
   draw(texture.context, w, h);

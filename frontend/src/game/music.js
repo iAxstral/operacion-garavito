@@ -1,5 +1,7 @@
 import { audio } from './sfx';
 import { channelVolume, onSettingsChange } from './settings';
+import { getTemporada } from './temporada';
+import { WE_WISH } from './villancico';
 
 // Musica generada en vivo con Web Audio (el proyecto no tiene pistas grabadas).
 // Tres capas que se suman segun la intensidad:
@@ -23,6 +25,11 @@ const CHORDS = [
 ];
 const BASS = [55.0, 43.65, 36.71, 41.2];
 const BELLS = [440, 523.25, 659.25, 587.33, 493.88, 392];
+
+// Navidad: "We Wish You a Merry Christmas" (dominio publico) en La menor armonica.
+// Un paso = una corchea: la melodia dura 48 corcheas y despues hay 16 de silencio.
+const VILLANCICO_LOOP = 64;
+const VILLANCICO = new Map(WE_WISH.map(([beat, freq, beats]) => [Math.round(beat * 2), { freq, eighths: beats * 2 }]));
 
 let master = null;
 let layers = null;
@@ -128,6 +135,34 @@ function kick(ctx, start, gain) {
   osc.stop(start + 0.3);
 }
 
+// Nota de caja de musica: seno con un armonico metalico y una cola larga, algo desafinada.
+function musicBox(ctx, start, freq) {
+  const detune = 1 + (Math.random() - 0.5) * 0.012;
+  envelopeNote(ctx, layers[0], { type: 'sine', freq: freq * detune, start, duration: 1.6, gain: 0.05, attack: 0.004 });
+  envelopeNote(ctx, layers[0], { type: 'sine', freq: freq * 2.76 * detune, start, duration: 0.5, gain: 0.012, attack: 0.002 });
+}
+
+// Cascabeles de trineo: ruido agudo filtrado en tres golpecitos rapidos.
+function sleighBells(ctx, start) {
+  const length = Math.floor(ctx.sampleRate * 0.09);
+  const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < length; i += 1) {
+    const shake = Math.sin((i / length) * Math.PI * 6) > 0 ? 1 : 0.3;
+    data[i] = (Math.random() * 2 - 1) * shake * (1 - i / length);
+  }
+  const src = ctx.createBufferSource();
+  const filter = ctx.createBiquadFilter();
+  const env = ctx.createGain();
+  src.buffer = buffer;
+  filter.type = 'bandpass';
+  filter.frequency.value = 7200;
+  filter.Q.value = 2.5;
+  env.gain.value = 0.16;
+  src.connect(filter).connect(env).connect(layers[1]);
+  src.start(start);
+}
+
 function hat(ctx, start) {
   const length = Math.floor(ctx.sampleRate * 0.05);
   const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
@@ -156,8 +191,27 @@ function scheduleBeat(ctx, time, step) {
       type: 'triangle', freq, start: time, duration: 3.6, gain: 0.05, attack: 0.8,
     }));
   }
+  const navidad = getTemporada() === 'NAVIDAD';
+  if (navidad) {
+    const note = VILLANCICO.get(step % VILLANCICO_LOOP);
+    if (note) {
+      const eighth = 60 / tempoFor(intensity) / 2;
+      // Calma: la caja de musica rota.
+      musicBox(ctx, time, note.freq);
+      // Kinder: un coro grave una octava abajo que arrastra cada nota.
+      envelopeNote(ctx, layers[1], {
+        type: 'triangle', freq: note.freq / 2, start: time, duration: note.eighths * eighth * 1.3, gain: 0.05, attack: 0.08,
+      });
+      // Peligro: el eco desafinado medio tono arriba.
+      envelopeNote(ctx, layers[2], {
+        type: 'sawtooth', freq: note.freq * 1.0595, start: time + eighth / 2, duration: 0.25, gain: 0.015, attack: 0.005,
+      });
+    }
+    // Cascabeles del trineo en cada pulso mientras corre el Kinder.
+    if (inBar % 4 === 0) sleighBells(ctx, time);
+  }
   // Campanita lejana de vez en cuando (calma).
-  if (inBar === 10 && Math.random() < 0.55) {
+  if (!navidad && inBar === 10 && Math.random() < 0.55) {
     envelopeNote(ctx, layers[0], {
       type: 'sine', freq: BELLS[Math.floor(Math.random() * BELLS.length)], start: time, duration: 2.2, gain: 0.035,
     });

@@ -77,7 +77,9 @@ public class Player {
 
     /** Disfraces que existen: el cliente los vende y los dibuja; aqui solo se valida el id. */
     public static final java.util.Set<String> COSTUMES = java.util.Set.of(
-            "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA");
+            "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA",
+            // Navidad
+            "GORRO_NAVIDAD", "CORNAMENTA", "KRAMPUS");
 
     /** Llego a la salida en el escape final: ya no lo ven ni lo dañan. */
     private volatile boolean escaped = false;

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ACHIEVEMENTS, unlockedAchievements } from '../game/achievements';
 import { getBag } from '../game/costumes';
+import useTemporada from './useTemporada';
 import { favoriteRole, getProfileStats } from '../game/playerStats';
 import { MAX_NICKNAME, cleanNickname, getNickname, setNickname } from '../game/profile';
 import { roleInfo } from '../game/roleCatalog';
@@ -16,6 +17,7 @@ const formatDate = (iso) => new Date(iso).toLocaleDateString('es-CO', { day: '2-
 
 /** Perfil del jugador en este navegador: apodo, rol favorito, totales e historial. */
 export default function ProfilePanel({ onClose }) {
+  const { moneda } = useTemporada();
   const [stats] = useState(getProfileStats);
   const [name, setName] = useState(getNickname);
   const unlocked = unlockedAchievements();
@@ -41,7 +43,7 @@ export default function ProfilePanel({ onClose }) {
     ['Revividas', stats.revives],
     ['Garavitos ganados', stats.garavitosEarned],
     ['Caídas', stats.downs],
-    ['Dulces', getBag().candies],
+    [`${moneda.plural[0].toUpperCase()}${moneda.plural.slice(1)}`, getBag().candies],
     ['Logros', `${achievements}/${ACHIEVEMENTS.length}`],
     ['Tiempo jugado', formatHours(stats.secondsPlayed)],
   ];

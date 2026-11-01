@@ -3,7 +3,7 @@ import { ROLE_CATALOG } from '../game/roleCatalog';
 import { MAX_NICKNAME, cleanNickname, getNickname, setNickname } from '../game/profile';
 import MissionSummary from './MissionSummary';
 import { getLobbyCode, getMyBuilding, joinAs, onStateChange } from '../game/gameSync';
-import HalloweenCreatures from './HalloweenCreatures';
+import TemporadaCreatures from './TemporadaCreatures';
 import { buildingLabel } from '../game/mapLayout';
 
 const ERROR_MESSAGES = {
@@ -36,7 +36,7 @@ export default function RoleSelect({ onJoined, onBack }) {
   return (
     <div className="role-select">
       <div className="main-menu-vignette" />
-      <HalloweenCreatures bats={4} spiders={2} />
+      <TemporadaCreatures bats={4} spiders={2} />
       <div className="role-select-content">
         <p className="main-menu-kicker">{buildingLabel(getMyBuilding())} — Sala {getLobbyCode()}</p>
         <h2 className="role-select-title">Elige tu rol</h2>

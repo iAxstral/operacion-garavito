@@ -1,0 +1,722 @@
+/*
+ * Intro animada de Navidad (IntroNavidad.jsx). Cada pieza arranca oculta y entra en su
+ * momento con animation-delay: var(--at). Los tiempos vienen de T en el componente.
+ */
+
+.xi-root {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  overflow: hidden;
+  background: #000;
+  color: #e6f0f5;
+}
+
+/* ---------- Campus ---------- */
+
+.xi-campus-wrap {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  filter: saturate(0.45) hue-rotate(190deg) brightness(0.55) contrast(1.1);
+  animation:
+    xi-fade-in 1.6s ease-out var(--campus) both,
+    xi-blackout 0.5s steps(4, end) var(--apagon) forwards,
+    xi-title-bg 1.2s ease-out var(--titulo) forwards;
+}
+
+.xi-campus {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 100%;
+  transform-origin: 60% 100%;
+  animation: xi-push 18s linear both;
+}
+
+@keyframes xi-push {
+  from { transform: scale(1.42); }
+  to { transform: scale(1.62) translate(-2%, 1%); }
+}
+
+@keyframes xi-blackout {
+  0% { filter: saturate(0.45) hue-rotate(190deg) brightness(0.55) contrast(1.1); }
+  30% { filter: saturate(0.45) hue-rotate(190deg) brightness(0.9) contrast(1.1); }
+  60% { filter: saturate(0.3) hue-rotate(190deg) brightness(0.2) contrast(1.1); }
+  100% { filter: saturate(0.2) hue-rotate(190deg) brightness(0.06) contrast(1.2); }
+}
+
+@keyframes xi-title-bg {
+  from { filter: saturate(0.2) hue-rotate(190deg) brightness(0.06) contrast(1.2); }
+  to { filter: saturate(0.5) hue-rotate(190deg) brightness(0.32) contrast(1.15); }
+}
+
+.xi-snow {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  animation: xi-fade-in 2s ease var(--at) both;
+}
+
+/* ---------- Guirnalda que se enciende y se apaga ---------- */
+
+.xi-garland {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 2%;
+  right: 2%;
+  display: flex;
+  justify-content: space-between;
+}
+
+.xi-bulb {
+  position: relative;
+  top: calc(8px + 26px * sin(calc(var(--i) / 17 * 3.1416rad)));
+  width: 11px;
+  height: 17px;
+  border-radius: 50% 50% 45% 45%;
+  background: #1c2226;
+  animation:
+    xi-bulb-on 0.25s ease-out var(--at) forwards,
+    xi-bulb-off 0.12s linear var(--apagon) forwards;
+}
+
+.xi-bulb::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 3px;
+  width: 5px;
+  height: 6px;
+  border-radius: 1px;
+  background: #1b231d;
+}
+
+@keyframes xi-bulb-on {
+  to {
+    background: var(--color);
+    box-shadow: 0 0 14px 4px color-mix(in srgb, var(--color) 65%, transparent);
+  }
+}
+
+@keyframes xi-bulb-off {
+  to { background: #111518; box-shadow: none; }
+}
+
+/* El bombillo que falla chispea justo antes del apagon. */
+.xi-bulb--spark {
+  animation:
+    xi-bulb-on 0.25s ease-out var(--at) forwards,
+    xi-spark 0.7s steps(1) calc(var(--apagon) - 0.7s),
+    xi-bulb-off 0.12s linear var(--apagon) forwards;
+}
+
+@keyframes xi-spark {
+  0%, 40%, 70% { background: #fff6c8; box-shadow: 0 0 30px 10px rgba(255, 240, 180, 0.9); }
+  20%, 55%, 85% { background: #222; box-shadow: none; }
+}
+
+/* ---------- La hora, a maquina de escribir ---------- */
+
+.xi-dateline {
+  position: absolute;
+  z-index: 5;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-family: 'Courier New', monospace;
+  animation: xi-fade-out 0.7s ease 2.7s forwards;
+}
+
+.xi-type {
+  margin: 0;
+  width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: clamp(14px, 2.2vw, 22px);
+  letter-spacing: 1px;
+  color: rgba(220, 234, 242, 0.85);
+  border-right: 2px solid rgba(220, 234, 242, 0.85);
+  animation:
+    xi-type 0.95s steps(var(--chars)) var(--at) forwards,
+    xi-caret 0.6s steps(1) infinite;
+}
+
+.xi-type--time {
+  font-size: clamp(18px, 3vw, 30px);
+  color: #ff5a4a;
+  border-right-color: #ff5a4a;
+}
+
+/* Cada caracter ocupa 1ch mas el espaciado entre letras (1px). */
+@keyframes xi-type {
+  to { width: calc(var(--chars) * (1ch + 1px) + 3px); }
+}
+
+@keyframes xi-caret {
+  50% { border-right-color: transparent; }
+}
+
+/* ---------- Textos de escena ---------- */
+
+.xi-caption {
+  position: absolute;
+  z-index: 6;
+  left: 0;
+  right: 0;
+  top: 18%;
+  margin: 0;
+  text-align: center;
+  font-family: var(--hw-title-font, 'Pirata One', Georgia, serif);
+  font-size: clamp(22px, 3.6vw, 42px);
+  letter-spacing: 1px;
+  color: #e6f0f5;
+  text-shadow: 0 0 18px rgba(140, 200, 255, 0.45), 0 3px 0 #000;
+  opacity: 0;
+  animation:
+    xi-fade-in 0.9s ease var(--at) both,
+    xi-fade-out 0.5s ease var(--hasta) forwards;
+}
+
+.xi-caption--team {
+  top: auto;
+  bottom: 8%;
+  font-size: clamp(18px, 2.8vw, 32px);
+}
+
+/* ---------- Ojos en la oscuridad ---------- */
+
+.xi-eyes {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  animation: xi-fade-out 0.6s ease var(--hasta) forwards;
+}
+
+.xi-eye-pair {
+  position: absolute;
+  display: flex;
+  gap: calc(14px * var(--s));
+  transform: scaleY(0);
+  animation:
+    xi-eye-open 0.35s ease-out var(--at) forwards,
+    xi-eye-blink 4.5s steps(1) calc(var(--at) + 1s) infinite;
+}
+
+.xi-eye-pair span {
+  width: calc(10px * var(--s));
+  height: calc(6px * var(--s));
+  border-radius: 50%;
+  background: #ff2a1a;
+  box-shadow: 0 0 calc(12px * var(--s)) calc(3px * var(--s)) rgba(255, 30, 20, 0.7);
+}
+
+@keyframes xi-eye-open {
+  to { transform: scaleY(1); }
+}
+
+@keyframes xi-eye-blink {
+  0%, 100% { transform: scaleY(1); }
+  92% { transform: scaleY(0.1); }
+  95% { transform: scaleY(1); }
+}
+
+/* ---------- La horda con gorros ---------- */
+
+.xi-horde {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  animation: xi-fade-out 0.4s ease var(--hasta) forwards;
+}
+
+.xi-zombie {
+  position: absolute;
+  bottom: calc(3vh + var(--dy));
+  left: 0;
+  height: calc(34vh * var(--scale));
+  aspect-ratio: 1 / 2;
+  transform: translateX(110vw);
+  animation: xi-shamble var(--dur) linear var(--at) forwards;
+}
+
+.xi-zombie-svg {
+  width: 100%;
+  height: 100%;
+  animation: xi-lurch 0.9s ease-in-out infinite alternate;
+  transform-origin: 50% 100%;
+}
+
+.xi-zombie-eye {
+  fill: #ff2a1a;
+}
+
+@keyframes xi-shamble {
+  from { transform: translateX(110vw); }
+  to { transform: translateX(-30vw); }
+}
+
+@keyframes xi-lurch {
+  from { transform: rotate(-4deg) translateY(0); }
+  to { transform: rotate(5deg) translateY(-2%); }
+}
+
+/* ---------- Linterna y los cuatro roles ---------- */
+
+.xi-team {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: 14%;
+  display: flex;
+  align-items: flex-end;
+  gap: 2vw;
+  transform: translateX(-50%);
+  opacity: 0;
+  animation:
+    xi-show 0.01s linear var(--at) forwards,
+    xi-fade-out 0.3s ease var(--hasta) forwards;
+}
+
+.xi-hero {
+  height: 40vh;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.9));
+}
+
+/* Cada uno mira hacia un lado distinto, espalda con espalda. */
+.xi-hero:nth-child(odd) {
+  transform: scaleX(-1);
+}
+
+.xi-flashlight {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  bottom: 0;
+  left: -100vw;
+  width: 300vw;
+  pointer-events: none;
+  /* El haz alcanza a iluminar a los cuatro cuando queda centrado. */
+  background: radial-gradient(
+    ellipse 34vw 48vh at 50% 64%,
+    rgba(255, 244, 210, 0.1) 0%,
+    rgba(255, 244, 210, 0.04) 55%,
+    rgba(0, 0, 0, 0.97) 100%
+  );
+  opacity: 0;
+  animation:
+    xi-show 0.01s linear var(--at) forwards,
+    xi-sweep 1.9s ease-in-out var(--at) forwards,
+    xi-fade-out 0.25s ease var(--hasta) forwards;
+}
+
+@keyframes xi-sweep {
+  0% { transform: translateX(-45vw); }
+  45% { transform: translateX(35vw); }
+  100% { transform: translateX(0); }
+}
+
+/* ---------- Relampago y titulo ---------- */
+
+.xi-flash {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  background: radial-gradient(ellipse at 50% 30%, #f4fbff, rgba(190, 220, 255, 0.6));
+  opacity: 0;
+  pointer-events: none;
+  animation: xi-lightning 0.9s linear var(--at) both;
+}
+
+@keyframes xi-lightning {
+  0% { opacity: 0; }
+  8% { opacity: 1; }
+  20% { opacity: 0.1; }
+  30% { opacity: 0.8; }
+  100% { opacity: 0; }
+}
+
+.xi-title {
+  position: absolute;
+  z-index: 8;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: 'Blockstepped', 'Impact', sans-serif;
+  text-transform: uppercase;
+  opacity: 0;
+  animation: xi-slam 0.7s cubic-bezier(0.2, 1.4, 0.4, 1) var(--at) both;
+}
+
+.xi-title-small {
+  font-size: clamp(24px, 4vw, 44px);
+  letter-spacing: 6px;
+  color: #a9bcc8;
+  text-shadow: 0 3px 0 #000;
+}
+
+.xi-title-big {
+  font-size: clamp(64px, 13vw, 170px);
+  line-height: 0.9;
+  background: linear-gradient(180deg, #f2fbff 0%, #f2fbff 18%, #e0281a 34%, #8e0b0b 70%, #3d0303 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 6px 0 #05080e) drop-shadow(0 0 30px rgba(130, 190, 255, 0.4));
+}
+
+.xi-title-sub {
+  font-family: var(--hw-title-font, 'Pirata One', Georgia, serif);
+  font-size: clamp(22px, 3.4vw, 40px);
+  text-transform: none;
+  letter-spacing: 3px;
+  color: #ff5a4a;
+  text-shadow: 0 0 16px rgba(255, 40, 20, 0.6), 0 3px 0 #000;
+  opacity: 0;
+  animation: xi-fade-in 0.8s ease calc(var(--at) + 0.9s) both;
+}
+
+@keyframes xi-slam {
+  0% { opacity: 0; transform: scale(2.4); filter: blur(10px); }
+  60% { opacity: 1; transform: scale(0.96); filter: blur(0); }
+  100% { opacity: 1; transform: scale(1); filter: blur(0); }
+}
+
+.xi-fadeout {
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  background: #000;
+  opacity: 0;
+  pointer-events: none;
+  animation: xi-fade-in 0.7s ease calc(var(--fin) - 0.7s) forwards;
+}
+
+/* ---------- Comunes ---------- */
+
+@keyframes xi-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes xi-fade-out {
+  to { opacity: 0; }
+}
+
+@keyframes xi-show {
+  to { opacity: 1; }
+}
+
+/* ---------- La pelea por la Decanatura (personajes ficticios) ---------- */
+
+/* Los textos de la pelea van debajo del cartel, encima de los candidatos. */
+.xi-caption--pelea {
+  top: 30%;
+}
+
+.xd-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  /* Cuando se apagan las luces, la escena queda a oscuras y desaparece. */
+  animation: xd-apagado 1.2s ease-out var(--apagon) forwards;
+}
+
+@keyframes xd-apagado {
+  0% { filter: brightness(1); opacity: 1; }
+  12% { filter: brightness(0.06); opacity: 1; }
+  100% { filter: brightness(0.04); opacity: 0; }
+}
+
+.xd-sprite {
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 8px 10px rgba(0, 0, 0, 0.85));
+}
+
+/* Cartel de madera con nieve encima que cae del cielo. */
+.xd-sign {
+  position: absolute;
+  top: 7vh;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.2vh 3.4vh 1.6vh;
+  background: linear-gradient(180deg, #5a3a1e, #3b2410);
+  border: 3px solid #241406;
+  border-radius: 6px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.7), inset 0 0 0 2px rgba(255, 220, 160, 0.15);
+  transform: translate(-50%, -60vh);
+  animation:
+    xd-sign-drop 0.9s cubic-bezier(0.3, 1.5, 0.5, 1) var(--at) forwards,
+    xd-sign-swing 2.4s ease-in-out calc(var(--at) + 0.9s) infinite alternate;
+  transform-origin: 50% -20vh;
+}
+
+.xd-sign::before {
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: -4px;
+  right: -4px;
+  height: 14px;
+  border-radius: 10px 10px 4px 4px;
+  background: #eef5fa;
+  box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
+}
+
+.xd-sign-small,
+.xd-sign-big {
+  line-height: 1.05;
+}
+
+.xd-sign-small {
+  margin-bottom: 0.6vh;
+  font-family: var(--hw-title-font, 'Pirata One', Georgia, serif);
+  font-size: clamp(14px, 2.2vw, 24px);
+  color: #f3e3c2;
+}
+
+.xd-sign-big {
+  font-family: 'Blockstepped', 'Impact', sans-serif;
+  font-size: clamp(26px, 5.2vw, 64px);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #e8c34a;
+  text-shadow: 0 3px 0 #241406, 0 0 18px rgba(232, 195, 74, 0.45);
+}
+
+@keyframes xd-sign-drop {
+  to { transform: translate(-50%, 0); }
+}
+
+@keyframes xd-sign-swing {
+  from { transform: translate(-50%, 0) rotate(-1.5deg); }
+  to { transform: translate(-50%, 0) rotate(1.5deg); }
+}
+
+/* Los candidatos: misma altura, a cada lado del centro. */
+.xd-noche,
+.xd-escarcha {
+  position: absolute;
+  bottom: 8vh;
+  left: 50%;
+  width: 22.6vh;
+  height: 34vh;
+  opacity: 0;
+}
+
+.xd-noche {
+  margin-left: -28vh;
+  animation:
+    xd-entra-izq 1.2s ease-out var(--at) forwards,
+    xd-pelea-oculta calc(var(--gana) - var(--pelea)) steps(1, end) var(--pelea) forwards,
+    xd-salto 0.4s ease-out var(--gana) 4 alternate;
+}
+
+.xd-escarcha {
+  margin-left: 5.4vh;
+  animation:
+    xd-entra-der 1.2s ease-out var(--at) forwards,
+    xd-pelea-oculta calc(var(--gana) - var(--pelea)) steps(1, end) var(--pelea) forwards,
+    xd-vuela 1.5s ease-in var(--gana) forwards;
+}
+
+.xd-pose {
+  position: absolute;
+  inset: 0;
+}
+
+.xd-pose--gana {
+  opacity: 0;
+  animation: xi-show 0.01s linear var(--gana) forwards;
+}
+
+.xd-pose--antes {
+  animation: xd-oculta 0.01s linear var(--gana) forwards;
+}
+
+.xd-name {
+  position: absolute;
+  left: 50%;
+  bottom: -4.4vh;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: clamp(11px, 1.4vw, 15px);
+  font-weight: bold;
+  letter-spacing: 1px;
+  color: #f2fbff;
+  text-shadow: 0 2px 0 #000;
+  animation: xd-oculta 0.2s linear var(--pelea) forwards;
+}
+
+@keyframes xd-entra-izq {
+  0% { opacity: 1; transform: translateX(-70vw); }
+  20%, 60% { transform: translate(-50vw, -1.2vh); }
+  40%, 80% { transform: translate(-30vw, 0); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes xd-entra-der {
+  0% { opacity: 1; transform: translateX(70vw); }
+  20%, 60% { transform: translate(50vw, -1.2vh); }
+  40%, 80% { transform: translate(30vw, 0); }
+  100% { opacity: 1; transform: translateX(0); }
+}
+
+/* Mientras dura la nube no se ven; al final de la animacion vuelven. */
+@keyframes xd-pelea-oculta {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes xd-salto {
+  from { transform: translateY(0); }
+  to { transform: translateY(-5vh); }
+}
+
+@keyframes xd-vuela {
+  0% { transform: translate(0, 0) rotate(0) scale(1); }
+  100% { transform: translate(55vw, -85vh) rotate(1080deg) scale(0.25); opacity: 0.6; }
+}
+
+@keyframes xd-oculta {
+  to { opacity: 0; }
+}
+
+/* La placa: aparece entre los dos, la jalan, se pierde en la nube y termina en alto. */
+.xd-placa {
+  position: absolute;
+  left: 50%;
+  bottom: 21vh;
+  width: 15vh;
+  margin-left: -7.5vh;
+  opacity: 0;
+  animation:
+    xi-fade-in 0.3s ease var(--at) both,
+    xd-tiron 0.35s ease-in-out var(--at) 2 alternate,
+    xd-oculta 0.01s linear var(--pelea) forwards,
+    xd-placa-gana 0.6s cubic-bezier(0.3, 1.6, 0.5, 1) var(--gana) forwards,
+    xd-brillo 0.8s ease-in-out calc(var(--gana) + 0.6s) infinite alternate;
+}
+
+.xd-placa-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+@keyframes xd-tiron {
+  from { transform: translateX(-2vh) rotate(-4deg); }
+  to { transform: translateX(2vh) rotate(4deg); }
+}
+
+@keyframes xd-placa-gana {
+  from { opacity: 0; transform: translate(-9.7vh, -10vh); }
+  to { opacity: 1; transform: translate(-9.7vh, -19vh); }
+}
+
+@keyframes xd-brillo {
+  from { opacity: 1; transform: translate(-9.7vh, -19vh); filter: drop-shadow(0 0 4px rgba(255, 220, 120, 0.5)); }
+  to { opacity: 1; transform: translate(-9.7vh, -19.6vh); filter: drop-shadow(0 0 18px rgba(255, 220, 120, 1)); }
+}
+
+/* Nube de pelea de caricatura. */
+.xd-cloud {
+  position: absolute;
+  left: 50%;
+  bottom: 6vh;
+  width: 56vh;
+  height: 40vh;
+  margin-left: -28vh;
+  opacity: 0;
+  transform: scale(0);
+  animation:
+    xd-nube-entra 0.3s cubic-bezier(0.3, 1.6, 0.5, 1) var(--at) forwards,
+    xd-nube-sale 0.4s ease-out var(--gana) forwards;
+}
+
+.xd-puff {
+  position: absolute;
+  left: var(--px);
+  top: var(--py);
+  width: calc(20vh * var(--ps));
+  height: calc(17vh * var(--ps));
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(circle at 40% 35%, #f4f7fa 0%, #c9d3dc 55%, #8e9aa6 100%);
+  box-shadow: 0 0 0 3px #1a1f24;
+  animation: xd-puff 0.22s ease-in-out infinite alternate;
+}
+
+.xd-puff:nth-child(2n) {
+  animation-duration: 0.17s;
+}
+
+@keyframes xd-puff {
+  from { transform: translate(-50%, -50%) scale(0.94) rotate(-4deg); }
+  to { transform: translate(-50%, -50%) scale(1.06) rotate(4deg); }
+}
+
+@keyframes xd-nube-entra {
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes xd-nube-sale {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.5); }
+}
+
+/* Brazos y piernas que asoman de la nube. */
+.xd-limb {
+  position: absolute;
+  left: var(--lx);
+  top: var(--ly);
+  width: 7vh;
+  height: 2.6vh;
+  border: 2px solid #120c0a;
+  border-radius: 3px;
+  transform: rotate(var(--lr));
+  transform-origin: 0 50%;
+  animation: xd-limb 0.3s ease-in-out infinite alternate;
+}
+
+.xd-limb--rojo { background: linear-gradient(90deg, #7a1410 75%, #16110e 75%); }
+.xd-limb--verde { background: linear-gradient(90deg, #123d27 80%, #d7e4ea 80%); }
+.xd-limb--bota { background: linear-gradient(90deg, #2a1c16 70%, #0d0907 70%); }
+
+@keyframes xd-limb {
+  from { transform: rotate(var(--lr)) translateX(-0.8vh); }
+  to { transform: rotate(calc(var(--lr) + 18deg)) translateX(0.8vh); }
+}
+
+/* Onomatopeyas de comic. */
+.xd-pow {
+  position: absolute;
+  z-index: 1;
+  padding: 1.4vh 2.2vh;
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: clamp(18px, 3vw, 38px);
+  color: #c8140c;
+  background: #ffd34d;
+  clip-path: polygon(50% 0%, 61% 18%, 82% 6%, 79% 30%, 100% 34%, 84% 52%, 98% 72%, 74% 72%, 70% 96%, 52% 80%, 34% 100%, 30% 76%, 6% 82%, 16% 60%, 0% 42%, 20% 32%, 12% 10%, 36% 18%);
+  text-shadow: 2px 2px 0 #fff4c4;
+  opacity: 0;
+  transform: rotate(var(--giro)) scale(0);
+  animation: xd-pow 0.45s cubic-bezier(0.3, 1.8, 0.5, 1) var(--at) forwards;
+}
+
+@keyframes xd-pow {
+  to { opacity: 1; transform: rotate(var(--giro)) scale(1); }
+}

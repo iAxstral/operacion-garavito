@@ -118,6 +118,10 @@ public class GameSessionService {
     }
 
     public GameSession create(String gameId, Building building, GameMode mode) {
+        return create(gameId, building, mode, Temporada.NAVIDAD);
+    }
+
+    public GameSession create(String gameId, Building building, GameMode mode, Temporada temporada) {
         if (!isValidCode(gameId)) {
             return null;
         }
@@ -129,6 +133,7 @@ public class GameSessionService {
         GameSession session = sessions.computeIfAbsent(gameId, id -> {
             created[0] = true;
             GameSession fresh = new GameSession(id, building, bossConfig, Difficulty.forMode(mode));
+            fresh.setTemporada(temporada);
             startTicking(id);
             return fresh;
         });

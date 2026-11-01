@@ -68,6 +68,8 @@ import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
 import Lighting from './Lighting';
 import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY, LOCKER_KEY } from './HauntedDecor';
+import { bakeNavidadTextures, decorateFloorNavidad, startSnow } from './NavidadDecor';
+import { getTemporada } from './temporada';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
 const DASH_SPEED = 420;
@@ -550,7 +552,10 @@ export default class MainScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
     this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
-    if (!getSettings().lowPerf) startDust(this, this.player);
+    if (!getSettings().lowPerf) {
+      if (getTemporada() === 'NAVIDAD') startSnow(this, this.player);
+      else startDust(this, this.player);
+    }
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
@@ -1744,6 +1749,7 @@ export default class MainScene extends Phaser.Scene {
     this.layoutGrid = layout.grid;
     this.lighting = new Lighting(this);
     bakeHauntedTextures(this);
+    bakeNavidadTextures(this);
     this.gore = new GoreFx(this, { lowPerf: getSettings().lowPerf });
     renderOutside(this, layout.grid, this.lighting, getMyBuilding());
     this.renderGridTiles(layout.grid);
@@ -1751,7 +1757,22 @@ export default class MainScene extends Phaser.Scene {
     this.renderFurniture(layout.furniture);
     this.renderLabels(layout.labels);
     this.addInteriorLights(layout);
-    decorateFloor(this, layout.grid, this.lighting, { building: getMyBuilding(), floor: this.floor });
+    // La decoracion es la de la temporada de la sala: todos los de adentro ven la misma.
+    const decorate = getTemporada() === 'NAVIDAD' ? decorateFloorNavidad : decorateFloor;
+    decorate(this, layout.grid, this.lighting, { building: getMyBuilding(), floor: this.floor });
+    if (getTemporada() === 'NAVIDAD') {
+      // Velo azul helado sobre todo el mapa (debajo de la oscuridad): enfria el piso y
+      // las luces calidas sin borrar el rojo de la sangre.
+      // El multiply oscurece lo calido; el ADD suma un poco de azul para que se sienta frio.
+      this.add.rectangle(-MAP_PIXEL_WIDTH, -MAP_PIXEL_HEIGHT, MAP_PIXEL_WIDTH * 3, MAP_PIXEL_HEIGHT * 3, 0xc4d4ee)
+        .setOrigin(0, 0)
+        .setBlendMode(Phaser.BlendModes.MULTIPLY)
+        .setDepth(4989);
+      this.add.rectangle(-MAP_PIXEL_WIDTH, -MAP_PIXEL_HEIGHT, MAP_PIXEL_WIDTH * 3, MAP_PIXEL_HEIGHT * 3, 0x08162c)
+        .setOrigin(0, 0)
+        .setBlendMode(Phaser.BlendModes.ADD)
+        .setDepth(4989.5);
+    }
 
     [
       { kind: 'up', stairs: layout.upStairs },

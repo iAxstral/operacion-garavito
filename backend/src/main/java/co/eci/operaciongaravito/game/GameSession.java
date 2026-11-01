@@ -184,6 +184,16 @@ public class GameSession {
     }
 
     private final Difficulty difficulty;
+    // Solo ambientacion: la elige quien crea la sala y la ven igual todos los de adentro.
+    private volatile Temporada temporada = Temporada.NAVIDAD;
+
+    public Temporada getTemporada() {
+        return temporada;
+    }
+
+    public void setTemporada(Temporada temporada) {
+        this.temporada = temporada == null ? Temporada.NAVIDAD : temporada;
+    }
 
     public Difficulty getDifficulty() {
         return difficulty;
@@ -296,7 +306,7 @@ public class GameSession {
     }
 
     public LobbyState lobbyState() {
-        return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule());
+        return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule(), temporada);
     }
 
     public synchronized PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
