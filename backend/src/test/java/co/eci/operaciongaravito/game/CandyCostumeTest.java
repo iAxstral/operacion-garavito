@@ -32,6 +32,17 @@ class CandyCostumeTest {
     }
 
     @Test
+    @DisplayName("los disfraces de Navidad tambien se aceptan")
+    void christmasCostumes() {
+        GameSession session = new GameSession("NAVI", Building.F, BossConfig.defaults());
+        session.joinPlayer("SALUD", "t");
+        for (String costume : new String[] {"GORRO_NAVIDAD", "CORNAMENTA", "KRAMPUS"}) {
+            session.setPlayerCostume("SALUD", costume);
+            assertEquals(costume, session.playerStates().get(0).costume());
+        }
+    }
+
+    @Test
     @DisplayName("los dulces de la corrida van en el resumen y se reinician")
     void candiesInSummary() {
         Player player = new Player("SALUD");
