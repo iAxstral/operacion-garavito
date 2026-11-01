@@ -65,6 +65,36 @@ menú (preferida, localStorage) ──crear sala──▶ /app/game/{código}/lo
 
 ![Elegir rol](img/05-rol-navidad.jpg)
 
+### Intro animada
+
+La primera vez en la sesión, Navidad abre con una intro animada de ~20 s (Halloween
+conserva su video). Se puede saltar, y con "Activar sonido" suena sincronizada:
+
+1. "Escuela Colombiana de Ingeniería · 24 de diciembre · 23:58", escrito a máquina.
+2. El campus nevado. Las luces se encienden y cae el cartel **"Elecciones a la
+   Decanatura"**.
+3. Dos candidatos **inventados** (el Candidato Nochebueno y la Candidata Escarcha) se
+   pelean por la placa de la Decanatura en una nube de caricatura ("¡ZAS!", "¡PUM!",
+   "¡CRAC!"). Gana Nochebueno y Escarcha sale volando.
+4. "…y nadie vigiló las luces": apagón, ojos rojos en la oscuridad y la horda con
+   gorros.
+5. Una linterna encuentra a los cuatro roles y cae el título "Nochebuena maldita".
+
+Video de la intro (con audio): [`intro-navidad.mp4`](intro-navidad.mp4).
+
+![Intro de Navidad](img/10-intro-navidad.png)
+
+Todo está hecho con código: `IntroNavidad.jsx` (escenas), `introNavidad.css`
+(animación), `CandidatosDecanatura.jsx` (personajes en pixel art con SVG),
+`introNavidadTiempos.js` (la línea de tiempo que comparten la animación y el sonido)
+e `introNavidadAudio.js` (efectos con Web Audio). Los personajes son ficticios y no
+representan a nadie real.
+
+La música de Navidad, en el menú, en la partida y en la intro, es **"We Wish You a
+Merry Christmas"** (villancico tradicional en inglés, de dominio público) en La menor
+armónica: la caja de música rota, un coro grave durante el Kinder y un eco desafinado
+cuando hay peligro (`game/villancico.js`).
+
 ### Partida
 
 - **Decorado** (`game/NavidadDecor.js`): arbolitos de Navidad marchitos con luces que
@@ -87,10 +117,9 @@ Halloween dentro de la partida sigue exactamente igual que antes:
 
 ### Sonido
 
-En la música generada (`game/music.js`), Navidad agrega una **caja de música
-desafinada** que toca "Jingle Bells" en La menor, dos compases cada cuatro. Durante el
-Kinder suman **cascabeles de trineo** al pulso. La melodía es de 1857 y es de dominio
-público.
+En la música generada (`game/music.js`), Navidad toca "We Wish You a Merry
+Christmas" en tono de terror (ver arriba). Durante el Kinder suman **cascabeles de
+trineo** al pulso.
 
 ### Moneda y disfraces
 
