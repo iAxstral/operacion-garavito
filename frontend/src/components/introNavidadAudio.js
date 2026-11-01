@@ -87,6 +87,16 @@ const CUES = {
     src.connect(filter).connect(gain).connect(out);
     src.start(start);
   },
+  // Golpe de pelea de caricatura: un "pum" seco con chasquido.
+  punch: (ctx, out, start) => {
+    tone(ctx, out, { start, freq: 160, to: 60, gain: 0.45, attack: 0.002, decay: 0.16 });
+    noise(ctx, out, { start, gain: 0.3, decay: 0.08, freq: 1800, q: 0.7 });
+  },
+  // Silbido de alguien que sale volando.
+  whoosh: (ctx, out, start) => {
+    tone(ctx, out, { start, freq: 300, to: 1400, type: 'triangle', gain: 0.12, attack: 0.05, decay: 0.9 });
+    noise(ctx, out, { start, gain: 0.18, decay: 0.9, freq: 2500, q: 0.6 });
+  },
   // Cascabeles de trineo distorsionados.
   bells: (ctx, out, start) => {
     [0, 0.07, 0.15].forEach((d) => noise(ctx, out, { start: start + d, gain: 0.12, decay: 0.08, freq: 7000, q: 3 }));
