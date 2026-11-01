@@ -2,6 +2,37 @@ import Phaser from 'phaser';
 import { SHADOW_KEY } from './HauntedDecor';
 import { bakeZombieSheets, ZOMBIE_FRAMES } from './zombieArt';
 import { getSettings, onSettingsChange } from './settings';
+import { getTemporada } from './temporada';
+
+// En Navidad cada zombi lleva un gorro de Papa Noel rasgado y manchado.
+const HAT_KEY = 'xm_zombie_hat';
+
+function bakeHat(scene) {
+  if (scene.textures.exists(HAT_KEY)) return;
+  const texture = scene.textures.createCanvas(HAT_KEY, 26, 22);
+  const ctx = texture.context;
+  ctx.fillStyle = '#9c1010';
+  ctx.beginPath();
+  ctx.moveTo(3, 17);
+  ctx.quadraticCurveTo(10, 1, 20, 4);
+  ctx.lineTo(23, 9);
+  ctx.quadraticCurveTo(17, 8, 21, 17);
+  ctx.closePath();
+  ctx.fill();
+  // Manchas oscuras y un rasgon.
+  ctx.fillStyle = '#4a0606';
+  ctx.fillRect(9, 9, 3, 2);
+  ctx.fillRect(15, 12, 2, 3);
+  ctx.fillStyle = '#d8d2c4';
+  ctx.fillRect(2, 15, 21, 5);
+  ctx.fillStyle = 'rgba(90, 20, 10, 0.7)';
+  ctx.fillRect(7, 17, 4, 3);
+  ctx.beginPath();
+  ctx.fillStyle = '#e4ded0';
+  ctx.arc(22, 9, 3, 0, Math.PI * 2);
+  ctx.fill();
+  texture.refresh();
+}
 
 const TEXTURE = 'zombie';
 const TOUGH_TEXTURE = 'zombie-teso';
@@ -189,6 +220,10 @@ export default class ZombieLayer {
       walkMs: Math.random() * 1000,
       shape: null,
     };
+    if (getTemporada() === 'NAVIDAD') {
+      bakeHat(this.scene);
+      entry.hat = this.scene.add.image(state.x, state.y, HAT_KEY).setOrigin(0.4, 0.9).setScale(tough ? 1.25 : 1);
+    }
     const shapeFrame = SHAPES[tough ? 'TOUGH' : kind];
     if (shapeFrame !== undefined) {
       entry.shape = this.scene.add.image(state.x, state.y, SHAPE_KEY, shapeFrame).setVisible(false);
@@ -342,6 +377,20 @@ export default class ZombieLayer {
     this.scene.tweens.killTweensOf(entry.offset);
     entry.outline?.destroy();
     entry.outline = null;
+    if (entry.hat) {
+      // El gorro sale volando y queda tirado un momento.
+      const hat = entry.hat;
+      entry.hat = null;
+      this.scene.tweens.add({
+        targets: hat,
+        x: hat.x + (Math.random() - 0.5) * 40,
+        y: entry.y + 14,
+        angle: (Math.random() - 0.5) * 160,
+        duration: 380,
+        ease: 'Quad.easeIn',
+        onComplete: () => this.scene.tweens.add({ targets: hat, alpha: 0, delay: 1500, duration: 700, onComplete: () => hat.destroy() }),
+      });
+    }
     this.scene.tweens.add({ targets: entry.shadow, alpha: 0, duration: 260, onComplete: () => entry.shadow.destroy() });
 
     if (entry.deathStyle === 'corpse') {
@@ -414,6 +463,16 @@ export default class ZombieLayer {
           .setDepth(sprite.depth - 0.5);
       }
       if (Math.abs(entry.targetX - previousX) > 0.5) sprite.setFlipX(entry.targetX < previousX);
+      if (entry.hat) {
+        entry.hat
+          // La coronilla esta ~38 px debajo del borde de la textura (deja espacio para los brazos).
+          .setPosition(sprite.x + (sprite.flipX ? 2 : -2), sprite.getTopCenter().y + 38 * sprite.scaleY)
+          .setAngle(sprite.angle + (sprite.flipX ? 12 : -12))
+          .setFlipX(sprite.flipX)
+          .setAlpha(sprite.alpha)
+          .setScale((entry.tough ? 1.25 : 1) * sprite.scaleX, (entry.tough ? 1.25 : 1) * sprite.scaleY)
+          .setDepth(sprite.depth + 0.4);
+      }
       entry.shadow.setPosition(entry.x, entry.y + (entry.tough ? 20 : 16));
 
       if (entry.shape) {
@@ -445,6 +504,7 @@ export default class ZombieLayer {
       entry.shadow.destroy();
       entry.outline?.destroy();
       entry.shape?.destroy();
+      entry.hat?.destroy();
     });
     this.sprites.clear();
     this.offSettings?.();
