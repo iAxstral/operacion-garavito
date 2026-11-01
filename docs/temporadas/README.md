@@ -54,16 +54,28 @@ menú (preferida, localStorage) ──crear sala──▶ /app/game/{código}/lo
 - **Criaturas:** donde Halloween tiene murciélagos y arañas, Navidad tiene copos de
   nieve y esferas rotas que bajan de su hilo con ojos adentro
   (`NavidadCreatures.jsx`).
-- **Ilustraciones:** la selección de edificio y la sala usan las mismas imágenes con
-  un velo helado. Las calabazas dibujadas quedan tapadas por un **regalo maldito** que
-  tiembla y parpadea (`RegaloMaldito.jsx`). En la sala, los ojos de la profesora
-  brillan en rojo.
+- **Pantallas propias de Navidad**, hechas con código (sin las ilustraciones de
+  Halloween, que siguen intactas en su evento):
+  - **Selección de edificio:** un **calendario de adviento maldito**. Cada edificio es
+    una puerta del 19 al 24 de diciembre; al pasar por encima se entreabre y adentro
+    asoman ojos rojos.
+  - **Sala de juego:** dos **cartas a Papá Noel** con sello de cera, una para crear la
+    sala y otra para unirse con el código, y un regalo que tiembla.
+  - **Elegir rol:** cada rol es una **caja de regalo** con lazo dorado que se destapa
+    al pasar por encima.
+  - **Sala de espera:** cada puesto ocupado se envuelve como regalo. El código brilla
+    entre azul helado y rojo.
+  - **Resultados:** panel frío con nieve acumulada encima.
 
 ![Selección de edificio](img/03-edificios-navidad.jpg)
+
+![Selección de edificio en celular](img/12-edificios-celular.jpg)
 
 ![Sala de juego](img/04-sala-navidad.jpg)
 
 ![Elegir rol](img/05-rol-navidad.jpg)
+
+![Sala de espera](img/11-espera-navidad.jpg)
 
 ### Intro animada
 
