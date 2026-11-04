@@ -7,7 +7,6 @@ import AchievementsPanel from './AchievementsPanel';
 import CostumeShop from './CostumeShop';
 import ProfilePanel from './ProfilePanel';
 import TemporadaCreatures from './TemporadaCreatures';
-import IntroNavidad from './IntroNavidad';
 import Icon from './Icon';
 import { playSfx } from '../game/sfx';
 import { channelVolume, onSettingsChange } from '../game/settings';
@@ -16,9 +15,11 @@ import { TEMPORADAS, setTemporadaPreferida } from '../game/temporada';
 import useTemporada from './useTemporada';
 
 const VIDEO_SRC = '/video/inicio.mp4';
-// En Navidad no hay video (el de la intro es de Halloween): el fondo es el campus de noche.
-const CAMPUS_SRC = '/mapa/seleccion-edificio-halloween.jpg';
 const POSTER_SRC = '/video/inicio-poster.jpg';
+// Navidad tiene su propio video de intro; despues, el menu queda sobre el campus de noche.
+const NAVIDAD_VIDEO_SRC = '/video/intro-navidad.mp4';
+const NAVIDAD_POSTER_SRC = '/video/intro-navidad-poster.jpg';
+const CAMPUS_SRC = '/mapa/seleccion-edificio-halloween.jpg';
 // En este segundo del video no esta el texto "Happy Halloween": ahi queda quieto de fondo.
 const MENU_FRAME_S = 4.0;
 const INTRO_SEEN_KEY = 'garavito.introSeen';
@@ -49,12 +50,11 @@ export default function MainMenu({ onPlay }) {
   const videoRef = useRef(null);
   const temporada = useTemporada();
   const halloween = temporada.id === 'HALLOWEEN';
-  // La primera vez en la sesion se ve la intro: el video en Halloween, la animacion en Navidad.
+  // La primera vez en la sesion se ve la intro: cada temporada tiene su video.
   const [phase, setPhase] = useState(() => (introAlreadySeen() ? 'menu' : 'intro'));
   const [soundOn, setSoundOn] = useState(false);
   const [panel, setPanel] = useState(null);
 
-  // Estable (useCallback): la intro animada la usa como fin de su temporizador.
   const showMenu = useCallback(() => {
     markIntroSeen();
     startMusic(0);
@@ -71,7 +71,7 @@ export default function MainMenu({ onPlay }) {
     stopMusic();
     const video = videoRef.current;
     setPhase('intro');
-    if (!video) return; // Navidad: la animacion arranca sola al montarse.
+    if (!video) return; // Navidad: el video se monta con la intro y arranca solo (autoPlay).
     video.currentTime = 0;
     video.play().catch(showMenu);
   };
@@ -127,24 +127,26 @@ export default function MainMenu({ onPlay }) {
 
   return (
     <div className={`start-screen start-screen--${phase}`}>
-      {halloween ? (
+      {!halloween && <img className="start-video start-campus" src={CAMPUS_SRC} alt="" aria-hidden="true" />}
+      {(halloween || phase === 'intro') && (
         <video
           ref={videoRef}
-          className="start-video"
-          src={VIDEO_SRC}
-          poster={POSTER_SRC}
+          key={temporada.id}
+          className={`start-video${halloween ? '' : ' start-video--navidad'}`}
+          src={halloween ? VIDEO_SRC : NAVIDAD_VIDEO_SRC}
+          poster={halloween ? POSTER_SRC : NAVIDAD_POSTER_SRC}
           muted={!soundOn}
           playsInline
+          autoPlay={!halloween}
           preload="auto"
           onEnded={showMenu}
+          onError={halloween ? undefined : showMenu}
           onLoadedMetadata={(event) => {
             // Al volver a Halloween desde el menu, el video queda en su cuadro quieto.
-            if (phase === 'menu') event.currentTarget.currentTime = MENU_FRAME_S;
+            if (halloween && phase === 'menu') event.currentTarget.currentTime = MENU_FRAME_S;
           }}
           aria-hidden="true"
         />
-      ) : (
-        <img className="start-video start-campus" src={CAMPUS_SRC} alt="" aria-hidden="true" />
       )}
       <div className="start-shade" />
       <div className="start-fog" aria-hidden="true" />
@@ -155,8 +157,6 @@ export default function MainMenu({ onPlay }) {
           <span key={i} style={{ '--i': i, '--x': `${(i * 37) % 100}%`, '--d': `${6 + (i % 5) * 1.3}s` }} />
         ))}
       </div>
-
-      {phase === 'intro' && !halloween && <IntroNavidad onEnd={showMenu} soundOn={soundOn} />}
 
       {phase === 'intro' && (
         <div className="start-intro-controls">

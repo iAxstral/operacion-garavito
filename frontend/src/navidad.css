@@ -27,6 +27,14 @@
   transform-origin: 62% 100%;
 }
 
+/* La intro de Navidad es un video con sus propios titulos: se ve entero, sin velos. */
+.start-video--navidad {
+  z-index: 3;
+  object-fit: contain;
+  background: #000;
+  filter: none !important;
+}
+
 :root[data-temporada='navidad'] .start-screen--menu .start-video {
   filter: brightness(0.5) saturate(0.4) contrast(1.15) hue-rotate(190deg);
   animation: xm-campus-drift 30s ease-in-out infinite alternate;
