@@ -101,6 +101,10 @@ function kinderStatus(wave, boss) {
     const health = boss ? ` (${boss.health}/${boss.maxHealth})` : '';
     return `Kinder ${wave.number}/${wave.total} — ¡Derroten al Ingeniero de Sistemas!${health}`;
   }
+  if (boss?.kind === 'PAPA_NOEL' && wave.restingSeconds === 0) {
+    const zombies = wave.remaining > 0 ? `${wave.kills}/${wave.quota} zombis · ` : '';
+    return `Kinder ${wave.number}/${wave.total} — ${zombies}¡Derriben a Papá Noel malvado! (${boss.health}/${boss.maxHealth})`;
+  }
   if (wave.restingSeconds > 0) {
     return wave.number === 0
       ? `Prepárate — Kinder 1 en ${wave.restingSeconds}s`
@@ -406,17 +410,21 @@ export default function Hud({ onExit }) {
   const kinderActive = !!state.wave && state.wave.restingSeconds === 0 && !state.wave.victory && kinderNumber > 0;
   const kinderQuota = state.wave?.quota ?? 0;
   const bossStage = !!state.wave?.bossStage;
+  const santaStage = state.boss?.kind === 'PAPA_NOEL';
   useEffect(() => {
     if (kinderNumber < announcedWaveRef.current) announcedWaveRef.current = 0; // la corrida se reinicio
     if (!kinderActive || kinderNumber <= announcedWaveRef.current) return undefined;
 
     announcedWaveRef.current = kinderNumber;
-    setWaveBanner(bossStage
-      ? { boss: true, title: `Kinder ${kinderNumber}`, big: 'El Ingeniero de Sistemas', sub: 'viene por ustedes' }
-      : { boss: false, title: `Kinder ${kinderNumber}`, big: `Kinder ${kinderNumber}`, sub: `Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno` });
-    playSfx(bossStage ? 'bossStinger' : 'kinderStinger');
+    let banner = { boss: false, title: `Kinder ${kinderNumber}`, big: `Kinder ${kinderNumber}`, sub: `Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno` };
+    if (bossStage) banner = { boss: true, title: `Kinder ${kinderNumber}`, big: 'El Ingeniero de Sistemas', sub: 'viene por ustedes' };
+    else if (santaStage) banner = { boss: true, title: `Kinder ${kinderNumber}`, big: 'Papá Noel malvado', sub: `trae regalos… y ${kinderQuota} zombis. Derríbenlo para pasar` };
+    setWaveBanner(banner);
+    playSfx(banner.boss ? 'bossStinger' : 'kinderStinger');
     const timeout = setTimeout(() => setWaveBanner(null), 3600);
     return () => clearTimeout(timeout);
+    // santaStage se lee al anunciar: el jefe llega en el mismo tick que arranca el Kinder.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kinderNumber, kinderActive, kinderQuota, bossStage]);
 
   const me = state.players.find((p) => p.playerId === getMyRole());

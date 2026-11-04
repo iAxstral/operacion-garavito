@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 
 /**
- * Dibuja al jefe "Ingeniero de Sistemas" que manda el servidor (Kinder 5).
+ * Dibuja al jefe que manda el servidor: el "Ingeniero de Sistemas" (Kinder 5) o, en
+ * Navidad, "Papa Noel malvado" (Kinder 3). Cada uno tiene su atlas con el mismo formato.
  *
  * Igual que ZombieLayer, el cliente no decide nada: interpola hacia la posicion del
  * ultimo paquete y deduce hacia donde mira con atan2 entre dos posiciones seguidas,
@@ -13,6 +14,13 @@ import Phaser from 'phaser';
  */
 
 export const BOSS_TEXTURE = 'boss_ingeniero';
+/** Atlas por tipo de jefe (BossKind del servidor). */
+const TEXTURES = {
+  INGENIERO: BOSS_TEXTURE,
+  PAPA_NOEL: 'boss_santa', // generado con tools/sprites/boss_santa.py
+};
+/** Cada cuanto Papa Noel suelta su risa. */
+const LAUGH_EVERY_MS = 5200;
 const CELL = 256;
 const COLUMNS = 8;
 const WALK_FRAMES = 6;
@@ -31,7 +39,13 @@ const BAR_OFFSET_Y = -200;
 const OCTANT_TO_SHEET = [2, 1, 0, 7, 6, 5, 4, 3];
 
 export function preloadBoss(scene) {
-  scene.load.spritesheet(BOSS_TEXTURE, '/bosses/boss_ingeniero.png', { frameWidth: CELL, frameHeight: CELL });
+  Object.values(TEXTURES).forEach((texture) => {
+    scene.load.spritesheet(texture, `/bosses/${texture}.png`, { frameWidth: CELL, frameHeight: CELL });
+  });
+}
+
+function textureFor(boss) {
+  return TEXTURES[boss.kind] ?? BOSS_TEXTURE;
 }
 
 /** Direccion del atlas (0-7) mas cercana al vector (dx, dy) en pantalla. */
@@ -40,8 +54,8 @@ export function sheetDirection(dx, dy) {
   return OCTANT_TO_SHEET[octant];
 }
 
-function walkKey(direction) {
-  return `boss_walk_${direction}`;
+function walkKey(texture, direction) {
+  return `${texture}_walk_${direction}`;
 }
 
 export default class BossLayer {
@@ -49,20 +63,23 @@ export default class BossLayer {
     this.scene = scene;
     this.entry = null;
 
-    for (let direction = 0; direction < COLUMNS; direction += 1) {
-      const key = walkKey(direction);
-      if (scene.anims.exists(key)) continue;
-      const row = 1 + direction;
-      scene.anims.create({
-        key,
-        frames: scene.anims.generateFrameNumbers(BOSS_TEXTURE, {
-          start: row * COLUMNS,
-          end: row * COLUMNS + WALK_FRAMES - 1,
-        }),
-        frameRate: 10,
-        repeat: -1,
-      });
-    }
+    Object.values(TEXTURES).forEach((texture) => {
+      if (!scene.textures.exists(texture)) return;
+      for (let direction = 0; direction < COLUMNS; direction += 1) {
+        const key = walkKey(texture, direction);
+        if (scene.anims.exists(key)) continue;
+        const row = 1 + direction;
+        scene.anims.create({
+          key,
+          frames: scene.anims.generateFrameNumbers(texture, {
+            start: row * COLUMNS,
+            end: row * COLUMNS + WALK_FRAMES - 1,
+          }),
+          frameRate: texture === BOSS_TEXTURE ? 10 : 8,
+          repeat: -1,
+        });
+      }
+    });
   }
 
   /** Reconcilia con el jefe que llego del servidor (o null si no hay / esta en otro piso). */
@@ -96,7 +113,8 @@ export default class BossLayer {
   }
 
   spawn(boss) {
-    const sprite = this.scene.add.sprite(boss.x, boss.y, BOSS_TEXTURE, 0);
+    const texture = this.scene.textures.exists(textureFor(boss)) ? textureFor(boss) : BOSS_TEXTURE;
+    const sprite = this.scene.add.sprite(boss.x, boss.y, texture, 0);
     sprite.setOrigin(0.5, 0.95).setScale(SCALE * 0.4).setDepth(boss.y);
     this.scene.tweens.add({ targets: sprite, scale: SCALE, duration: 420, ease: 'Back.easeOut' });
 
@@ -114,8 +132,13 @@ export default class BossLayer {
       .setOrigin(0.5)
       .setDepth(9000);
 
+    if (boss.kind === 'PAPA_NOEL') this.laugh(sprite);
+
     return {
       id: boss.id,
+      texture,
+      santa: boss.kind === 'PAPA_NOEL',
+      nextLaughAt: this.scene.time.now + LAUGH_EVERY_MS,
       sprite,
       shadow,
       bar,
@@ -135,6 +158,30 @@ export default class BossLayer {
     entry.sprite.setTint(0xff5555).setTintMode(Phaser.TintModes.FILL);
     this.scene.time.delayedCall(90, () => {
       if (entry.sprite.active) entry.sprite.clearTint().setTintMode(Phaser.TintModes.MULTIPLY);
+    });
+  }
+
+  /** "¡JO, JO, JO!" que sube y se desvanece sobre Papa Noel. */
+  laugh(sprite) {
+    const text = this.scene.add
+      .text(sprite.x, sprite.y + BAR_OFFSET_Y - 34, '¡JO, JO, JO!', {
+        fontFamily: 'sans-serif',
+        fontSize: '18px',
+        fontStyle: 'bold',
+        color: '#ffe9e9',
+        stroke: '#5c0008',
+        strokeThickness: 5,
+      })
+      .setOrigin(0.5)
+      .setDepth(9001);
+    this.scene.tweens.add({
+      targets: text,
+      y: text.y - 36,
+      alpha: 0,
+      angle: Phaser.Math.Between(-6, 6),
+      duration: 1500,
+      ease: 'Sine.easeOut',
+      onComplete: () => text.destroy(),
     });
   }
 
@@ -165,7 +212,7 @@ export default class BossLayer {
     const stunned = entry.state === 'ATURDIDO';
     const moving = !stunned && this.scene.time.now - entry.lastMovedAt < IDLE_AFTER_MS;
     if (moving) {
-      sprite.anims.play(walkKey(entry.direction), true);
+      sprite.anims.play(walkKey(entry.texture, entry.direction), true);
     } else {
       sprite.anims.stop();
       sprite.setFrame(entry.direction);
@@ -175,6 +222,11 @@ export default class BossLayer {
       entry.stunTinted = stunned;
       if (stunned) sprite.setTint(0xfff2a0);
       else sprite.clearTint();
+    }
+
+    if (entry.santa && this.scene.time.now >= entry.nextLaughAt) {
+      entry.nextLaughAt = this.scene.time.now + LAUGH_EVERY_MS;
+      this.laugh(sprite);
     }
 
     const barX = sprite.x - BAR_WIDTH / 2;

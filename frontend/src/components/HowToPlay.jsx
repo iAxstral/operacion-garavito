@@ -141,6 +141,7 @@ export default function HowToPlay({ onClose }) {
               <li><strong>Corredor</strong> (gris azulado, desde el Kinder 2): muy rápido pero cae de un golpe.</li>
               <li><strong>Escupidor</strong> (verde, desde el Kinder 3): escupe ácido de lejos; se pone verde antes: muévete.</li>
               <li><strong>Ingeniero de Sistemas</strong>: el jefe del Kinder 5.</li>
+              <li><strong>Papá Noel malvado</strong> (Navidad): aparece en el Kinder 3. Es más débil que el Ingeniero, pero sin derribarlo no se pasa ese Kinder.</li>
             </ul>
             <h3>Armas (máquina del piso 2)</h3>
             <ul>

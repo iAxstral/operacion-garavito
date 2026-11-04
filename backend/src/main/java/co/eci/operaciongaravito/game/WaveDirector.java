@@ -50,6 +50,11 @@ public class WaveDirector {
     private boolean waitingForMissions;
     private long escapeEndsAt;
     private Difficulty difficulty = Difficulty.NORMAL;
+    /**
+     * Kinder con un jefe intermedio (0 = ninguno): ese Kinder se pasa con la cuota y,
+     * ademas, derribando al jefe (Papa Noel malvado en Navidad).
+     */
+    private int midBossKinder;
 
     public WaveDirector(long now, long startDelayMs, List<FloorGrid> floors) {
         this.nextEventAt = now + startDelayMs;
@@ -64,6 +69,16 @@ public class WaveDirector {
                 restingSeconds(now), bossStage, phase == Phase.VICTORY,
                 phase == Phase.ACTIVE && waitingForMissions, 0, 0,
                 phase == Phase.ESCAPE, escapeSecondsLeft(now));
+    }
+
+    /** Kinder del jefe intermedio, o 0 para no tener ninguno. Rige desde el proximo Kinder. */
+    public synchronized void setMidBossKinder(int kinder) {
+        this.midBossKinder = kinder > 0 && kinder < WaveCurve.KINDER_COUNT ? kinder : 0;
+    }
+
+    /** True si el Kinder en curso es el del jefe intermedio. */
+    public synchronized boolean isMidBossKinder() {
+        return blueprint != null && midBossKinder > 0 && kinder == midBossKinder && !blueprint.boss();
     }
 
     /** True si hay un Kinder en curso (no respiro ni victoria). */
@@ -144,7 +159,8 @@ public class WaveDirector {
                 }
             }
             case ACTIVE -> {
-                boolean goalMet = blueprint.boss() ? bossDefeated : kills >= blueprint.killQuota();
+                boolean goalMet = blueprint.boss() ? bossDefeated
+                        : kills >= blueprint.killQuota() && (!isMidBossKinder() || bossDefeated);
                 waitingForMissions = goalMet && !missionsDone;
                 if (goalMet && missionsDone) {
                     finishKinder(now);
@@ -176,9 +192,9 @@ public class WaveDirector {
         }
     }
 
-    /** El jefe del ultimo Kinder cayo: se gana la corrida. */
+    /** Cayo el jefe del Kinder en curso (el del ultimo o el intermedio). */
     public synchronized void onBossDefeated(long now) {
-        if (phase == Phase.ACTIVE && blueprint.boss()) {
+        if (phase == Phase.ACTIVE && (blueprint.boss() || isMidBossKinder())) {
             // Se cierra en el proximo update, cuando tambien esten las misiones.
             bossDefeated = true;
         }
@@ -217,7 +233,7 @@ public class WaveDirector {
         kills = 0;
         phase = Phase.ACTIVE;
         nextEventAt = now;
-        bossDue = blueprint.boss();
+        bossDue = blueprint.boss() || isMidBossKinder();
         bossDefeated = false;
         waitingForMissions = false;
     }

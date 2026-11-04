@@ -180,6 +180,7 @@ public class GameSession {
 
         this.waveDirector = new WaveDirector(System.currentTimeMillis(), FIRST_WAVE_PREP_MS, floors);
         this.waveDirector.setDifficulty(difficulty);
+        this.waveDirector.setMidBossKinder(PAPA_NOEL_KINDER);
         this.missionBoard = new MissionBoard(building, java.util.random.RandomGenerator.getDefault());
     }
 
@@ -191,8 +192,12 @@ public class GameSession {
         return temporada;
     }
 
+    /** En Navidad, Papa Noel malvado aparece en este Kinder. */
+    static final int PAPA_NOEL_KINDER = 3;
+
     public void setTemporada(Temporada temporada) {
         this.temporada = temporada == null ? Temporada.NAVIDAD : temporada;
+        waveDirector.setMidBossKinder(this.temporada == Temporada.NAVIDAD ? PAPA_NOEL_KINDER : 0);
     }
 
     public Difficulty getDifficulty() {
@@ -1094,14 +1099,18 @@ public class GameSession {
         return pendingEvents.poll();
     }
 
-    /** El jefe aparece en el piso con mas jugadores vivos, lejos de ellos. */
+    /**
+     * El jefe aparece en el piso con mas jugadores vivos, lejos de ellos: el Ingeniero en
+     * el ultimo Kinder, Papa Noel malvado en el intermedio de Navidad.
+     */
     private void spawnBoss(long now) {
+        BossKind kind = waveDirector.isMidBossKinder() ? BossKind.PAPA_NOEL : BossKind.INGENIERO;
         int floor = busiestFloor();
         List<Player> onFloor = players.values().stream()
                 .filter(p -> p.isAlive() && p.getFloor() == floor).toList();
         FloorGrid.SpawnPoint point = WaveDirector.pickSpawnPoint(floorGrid(floor).spawnPoints(), onFloor,
                 java.util.concurrent.ThreadLocalRandom.current());
-        boss = new BossZombie("boss" + (++bossSequence), floor, point.x(), point.y(), bossConfig,
+        boss = new BossZombie("boss" + (++bossSequence), kind, floor, point.x(), point.y(), bossConfig,
                 java.util.random.RandomGenerator.getDefault());
         bossAloneSince = 0;
     }
