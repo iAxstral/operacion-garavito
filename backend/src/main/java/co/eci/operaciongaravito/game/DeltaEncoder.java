@@ -91,6 +91,7 @@ public class DeltaEncoder {
                 sameEvent ? null : full.event(),
                 full.puddles(),
                 full.blasts(),
+                full.travesuras(),
                 unchanged,
                 false);
     }

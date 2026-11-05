@@ -36,7 +36,9 @@ class CandyCostumeTest {
     void christmasCostumes() {
         GameSession session = new GameSession("NAVI", Building.F, BossConfig.defaults());
         session.joinPlayer("SALUD", "t");
-        for (String costume : new String[] {"GORRO_NAVIDAD", "CORNAMENTA", "KRAMPUS"}) {
+        for (String costume : new String[] {"GORRO_NAVIDAD", "CORNAMENTA", "KRAMPUS",
+                "GORRO_DUENDE", "BUFANDA", "CORONA_ACEBO", "MUNECO_NIEVE", "CASCANUECES", "ESTRELLA", "GUIRNALDA",
+                "ESFERA_ROTA"}) {
             session.setPlayerCostume("SALUD", costume);
             assertEquals(costume, session.playerStates().get(0).costume());
         }

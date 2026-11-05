@@ -29,6 +29,7 @@ import useTemporada from './useTemporada';
 import { playSfx } from '../game/sfx';
 import { MISSIONS_PER_KINDER, missionType } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
+import { comidaDeTemporada } from '../game/comidas';
 import { CAFETERIA_MENU, WEAPON_MACHINE_MENU } from '../game/shopCatalog';
 import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog';
 import { abilityFor, BARRICADE_COOLDOWN_MS, MAX_BARRICADES, priceFor } from '../game/abilityCatalog';
@@ -73,7 +74,13 @@ function healFor(itemId) {
 }
 
 function itemIcon(itemId) {
-  return [...CAFETERIA_MENU, ...WEAPON_MACHINE_MENU].find((item) => item.itemId === itemId)?.icon ?? null;
+  const known = [...CAFETERIA_MENU, ...WEAPON_MACHINE_MENU].find((item) => item.itemId === itemId) ?? { itemId };
+  return comidaDeTemporada(known)?.icon ?? null;
+}
+
+/** Nombre de un objeto del inventario como se ve en la temporada (bunuelo, natilla...). */
+function itemName(slot) {
+  return comidaDeTemporada(slot)?.itemName ?? slot?.itemName;
 }
 
 // Boton del inventario para sacar o guardar un arma.
@@ -100,6 +107,10 @@ function kinderStatus(wave, boss) {
   if (wave.bossStage) {
     const health = boss ? ` (${boss.health}/${boss.maxHealth})` : '';
     return `Kinder ${wave.number}/${wave.total} — ¡Derroten al Ingeniero de Sistemas!${health}`;
+  }
+  if (boss?.kind === 'PAPA_NOEL' && wave.restingSeconds === 0) {
+    const zombies = wave.remaining > 0 ? `${wave.kills}/${wave.quota} zombis · ` : '';
+    return `Kinder ${wave.number}/${wave.total} — ${zombies}¡Derriben a Papá Noel malvado! (${boss.health}/${boss.maxHealth})`;
   }
   if (wave.restingSeconds > 0) {
     return wave.number === 0
@@ -191,7 +202,7 @@ function toastFor(event) {
   } else if (event.type === 'PURCHASE_SUCCESS') {
     message = '¡Compra exitosa! Está en tu inventario (E)';
   } else if (event.type === 'PICKUP_SUCCESS') {
-    const name = FOOD_ITEMS.find((item) => item.itemId === event.itemId)?.itemName ?? 'Objeto';
+    const name = comidaDeTemporada(FOOD_ITEMS.find((item) => item.itemId === event.itemId))?.itemName ?? 'Objeto';
     message = `${name} guardado en el inventario (E para abrirlo)`;
   } else if (event.type === 'USE_SUCCESS') {
     message = `¡Recuperaste vida! +${healFor(event.itemId)}`;
@@ -406,17 +417,21 @@ export default function Hud({ onExit }) {
   const kinderActive = !!state.wave && state.wave.restingSeconds === 0 && !state.wave.victory && kinderNumber > 0;
   const kinderQuota = state.wave?.quota ?? 0;
   const bossStage = !!state.wave?.bossStage;
+  const santaStage = state.boss?.kind === 'PAPA_NOEL';
   useEffect(() => {
     if (kinderNumber < announcedWaveRef.current) announcedWaveRef.current = 0; // la corrida se reinicio
     if (!kinderActive || kinderNumber <= announcedWaveRef.current) return undefined;
 
     announcedWaveRef.current = kinderNumber;
-    setWaveBanner(bossStage
-      ? { boss: true, title: `Kinder ${kinderNumber}`, big: 'El Ingeniero de Sistemas', sub: 'viene por ustedes' }
-      : { boss: false, title: `Kinder ${kinderNumber}`, big: `Kinder ${kinderNumber}`, sub: `Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno` });
-    playSfx(bossStage ? 'bossStinger' : 'kinderStinger');
+    let banner = { boss: false, title: `Kinder ${kinderNumber}`, big: `Kinder ${kinderNumber}`, sub: `Maten ${kinderQuota} zombis y completen ${MISSIONS_PER_KINDER} misiones cada uno` };
+    if (bossStage) banner = { boss: true, title: `Kinder ${kinderNumber}`, big: 'El Ingeniero de Sistemas', sub: 'viene por ustedes' };
+    else if (santaStage) banner = { boss: true, title: `Kinder ${kinderNumber}`, big: 'Papá Noel malvado', sub: `trae regalos… y ${kinderQuota} zombis. Derríbenlo para pasar` };
+    setWaveBanner(banner);
+    playSfx(banner.boss ? 'bossStinger' : 'kinderStinger');
     const timeout = setTimeout(() => setWaveBanner(null), 3600);
     return () => clearTimeout(timeout);
+    // santaStage se lee al anunciar: el jefe llega en el mismo tick que arranca el Kinder.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kinderNumber, kinderActive, kinderQuota, bossStage]);
 
   const me = state.players.find((p) => p.playerId === getMyRole());
@@ -527,9 +542,9 @@ export default function Hud({ onExit }) {
               key={`${slot?.itemId ?? 'empty'}-${i}`}
               className="hud-slot"
               style={slot ? { background: TYPE_COLORS[slot.type] } : undefined}
-              title={slot?.itemName ?? 'Vacío'}
+              title={slot ? itemName(slot) : 'Vacío'}
             >
-              {slot && itemIcon(slot.itemId) && <img src={itemIcon(slot.itemId)} alt={slot.itemName} className="hud-slot-icon" />}
+              {slot && itemIcon(slot.itemId) && <img src={itemIcon(slot.itemId)} alt={itemName(slot)} className="hud-slot-icon" />}
             </div>
           ))}
         </div>
@@ -765,7 +780,7 @@ export default function Hud({ onExit }) {
                     <span className="inventory-swatch" style={{ background: TYPE_COLORS[slot.type] }}>
                       {itemIcon(slot.itemId) && <img src={itemIcon(slot.itemId)} alt="" className="inventory-icon" />}
                     </span>
-                    <span className="inventory-name">{slot.itemName}</span>
+                    <span className="inventory-name">{itemName(slot)}</span>
                     {slot.type === 'FOOD' ? (
                       <button type="button" className="inventory-use" onClick={() => requestUseItem(slot.itemId)}>
                         Comer +{healFor(slot.itemId)}
@@ -793,7 +808,7 @@ export default function Hud({ onExit }) {
                 <span className="inventory-swatch" style={{ background: TYPE_COLORS[slot.type] }}>
                   {itemIcon(slot.itemId) && <img src={itemIcon(slot.itemId)} alt="" className="inventory-icon" />}
                 </span>
-                <span className="inventory-name">{slot.itemName}</span>
+                <span className="inventory-name">{itemName(slot)}</span>
                 {slot.type === 'FOOD' ? (
                   <button type="button" className="inventory-use" onClick={() => requestUseItem(slot.itemId)}>
                     Comer +{healFor(slot.itemId)}
@@ -813,7 +828,8 @@ export default function Hud({ onExit }) {
           <button type="button" className="modal-close" aria-label="Cerrar tienda" onClick={() => setShopOpen(false)}>✕</button>
           <h3>{nearVendor.label}</h3>
           <div className="shop-items">
-            {nearVendor.menu.map((item) => {
+            {nearVendor.menu.map((menuItem) => {
+              const item = comidaDeTemporada(menuItem);
               const price = priceFor(getMyRole(), item.price);
               const canAfford = garavitos >= price;
               const disabled = !canAfford || inventoryFull;
@@ -854,7 +870,7 @@ export default function Hud({ onExit }) {
               <div className="hud-inventory hud-inventory--small">
                 {p.inventory.length === 0 && <span className="team-panel-empty-inv">sin items</span>}
                 {p.inventory.map((slot) => (
-                  <div key={slot.itemId} className="hud-slot hud-slot--small" style={{ background: TYPE_COLORS[slot.type] }} title={slot.itemName} />
+                  <div key={slot.itemId} className="hud-slot hud-slot--small" style={{ background: TYPE_COLORS[slot.type] }} title={itemName(slot)} />
                 ))}
               </div>
             </div>

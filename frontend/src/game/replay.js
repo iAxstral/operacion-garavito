@@ -28,7 +28,7 @@ function frameOf(state, t) {
       gone: Boolean(p.hidingIn || p.escaped),
     })),
     zombies: (state.zombies ?? []).map((z) => ({ id: z.id, floor: z.floor, x: z.x, y: z.y, kind: z.kind })),
-    boss: state.boss ? { floor: state.boss.floor, x: state.boss.x, y: state.boss.y } : null,
+    boss: state.boss ? { floor: state.boss.floor, x: state.boss.x, y: state.boss.y, name: state.boss.name } : null,
     blasts: (state.blasts ?? []).map((b) => ({ id: b.id, floor: b.floor, x: b.x, y: b.y })),
   };
 }
@@ -70,7 +70,8 @@ export function createRecorder() {
         const near = frame.players
           .filter((p) => p.floor === lastBoss.floor)
           .sort((a, b) => Math.hypot(a.x - lastBoss.x, a.y - lastBoss.y) - Math.hypot(b.x - lastBoss.x, b.y - lastBoss.y))[0];
-        consider(80, '¡Cayó el Ingeniero de Sistemas!', near?.id ?? null, t);
+        const who = lastBoss.name?.startsWith('Papá') ? lastBoss.name : `el ${lastBoss.name ?? 'jefe'}`;
+        consider(80, `¡Cayó ${who}!`, near?.id ?? null, t);
       }
       lastBoss = frame.boss;
 

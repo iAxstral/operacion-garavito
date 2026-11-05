@@ -5,7 +5,7 @@ import { displayName } from './profile';
 import PingLayer from './PingLayer';
 import HauntLayer from './HauntLayer';
 import { pollGamepad } from './gamepad';
-import { bakeCostumes, costumeKey, COSTUME_LAYOUT, HEAD_Y, NECK_Y } from './costumeArt';
+import { bakeCostumes, costumeKey, COSTUME_LAYOUT, defaultCostume, HEAD_Y, NECK_Y } from './costumeArt';
 import { setStamina } from './stamina';
 import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
 import { NIGHT_CONE_FACTOR } from './gameModes';
@@ -13,6 +13,7 @@ import { playSample, preloadSamples, setListener, setOcclusion } from './audioBa
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { CHAT_PHRASES, EMOTES, PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
+import { COMIDA_TEXTURES, texturaDeComida } from './comidas';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
 import {
@@ -22,6 +23,7 @@ import {
   getMyPlayerState,
   getMyRole,
   getBoss,
+  getTravesuras,
   getProjectiles,
   loadHideSpots,
   setNearHide,
@@ -66,6 +68,8 @@ import { channelVolume, getSettings, vibrate } from './settings';
 import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
+import TravesurasLayer from './TravesurasLayer';
+import { clearScreenFx } from './screenFx';
 import Lighting from './Lighting';
 import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY, LOCKER_KEY } from './HauntedDecor';
 import { bakeNavidadTextures, decorateFloorNavidad, startSnow } from './NavidadDecor';
@@ -262,6 +266,7 @@ export default class MainScene extends Phaser.Scene {
       this.load.image(key, `/tiles/${file}`);
     });
 
+    Object.entries(COMIDA_TEXTURES).forEach(([key, file]) => this.load.image(key, file));
     VENDORS.forEach((vendor) => {
       this.load.image(vendor.sprite, vendor.spriteFile);
     });
@@ -356,9 +361,11 @@ export default class MainScene extends Phaser.Scene {
     return Boolean(hiddenIn);
   }
 
-  // Disfraz encima del personaje (o la capa detras). `holder` guarda la imagen.
+  // Disfraz encima del personaje (o la capa detras). `holder` guarda la imagen. Sin
+  // disfraz, en Navidad todos llevan el gorrito de lana.
   syncCostume(holder, sprite, id) {
-    const costume = id && COSTUME_LAYOUT[id] ? id : null;
+    const wanted = id ?? defaultCostume(getTemporada());
+    const costume = wanted && COSTUME_LAYOUT[wanted] ? wanted : null;
     if (holder.costumeId !== costume) {
       holder.costumeImage?.destroy();
       holder.costumeImage = costume ? this.add.image(sprite.x, sprite.y, costumeKey(costume)) : null;
@@ -602,6 +609,7 @@ export default class MainScene extends Phaser.Scene {
       findTarget: (x, y) => this.nearestPlayerTo(x, y),
     });
     this.bossLayer = new BossLayer(this);
+    this.travesurasLayer = new TravesurasLayer(this);
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -660,6 +668,8 @@ export default class MainScene extends Phaser.Scene {
       this.lighting?.destroy();
       setNearVendor(null);
       setNearStairs(null);
+      this.travesurasLayer?.destroy();
+      clearScreenFx();
     });
   }
 
@@ -727,6 +737,13 @@ export default class MainScene extends Phaser.Scene {
 
   createFoodItems() {
     this.foodItems = FOOD_ITEMS.filter((item) => item.floor === this.floor).map((item) => {
+      // En Navidad la comida se ve como lo que es (bunuelo, natilla...) y flota un poco.
+      const texture = texturaDeComida(item.itemId);
+      if (texture && this.textures.exists(texture)) {
+        const rect = this.add.image(item.x, item.y, texture).setScale(0.55).setDepth(3);
+        this.tweens.add({ targets: rect, y: item.y - 5, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        return { ...item, rect, inRange: false };
+      }
       const rect = this.add
         .rectangle(item.x, item.y, 26, 26, ITEM_TYPE_COLORS[item.type])
         .setStrokeStyle(2, 0x1f5c2e)
@@ -1173,6 +1190,7 @@ export default class MainScene extends Phaser.Scene {
     const boss = getBoss();
     this.bossLayer.sync(boss && boss.floor === this.floor ? boss : null);
     this.bossLayer.update(delta);
+    this.travesurasLayer.sync(getTravesuras(), this.floor, this.spectating ? null : getMyRole(), delta);
   }
 
   update(time, delta) {

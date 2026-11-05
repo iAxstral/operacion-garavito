@@ -248,10 +248,77 @@ class GameSessionZombieTest {
         for (int k = 1; k < WaveCurve.KINDER_COUNT; k++) {
             now = tickUntilKinder(now, k);
             registerKills(WaveCurve.blueprint(k).killQuota());
+            defeatBossIfAny(now);
             now += 66;
             session.tick(now, 0.066);
         }
         return tickUntilKinder(now, WaveCurve.KINDER_COUNT);
+    }
+
+    /** Derriba al jefe que este en pie como si el golpe hubiera llegado por /attack. */
+    private void defeatBossIfAny(long now) {
+        BossZombie current = currentBoss();
+        if (current == null || !current.isAlive()) {
+            return;
+        }
+        current.hit(current.getHealth(), false, now);
+        try {
+            java.lang.reflect.Field field = GameSession.class.getDeclaredField("waveDirector");
+            field.setAccessible(true);
+            ((WaveDirector) field.get(session)).onBossDefeated(now);
+        } catch (ReflectiveOperationException ex) {
+            throw new AssertionError(ex);
+        }
+    }
+
+    @Test
+    @DisplayName("en Navidad, Papa Noel malvado aparece en el Kinder 3 y hay que derribarlo para pasarlo")
+    void papaNoelGuardsTheThirdKinder() {
+        long now = System.currentTimeMillis();
+        for (int k = 1; k < GameSession.PAPA_NOEL_KINDER; k++) {
+            now = tickUntilKinder(now, k);
+            registerKills(WaveCurve.blueprint(k).killQuota());
+            now += 66;
+            session.tick(now, 0.066);
+            assertNull(session.bossView(), "no hay jefe antes del Kinder 3");
+        }
+        now = tickUntilKinder(now, GameSession.PAPA_NOEL_KINDER);
+
+        BossView view = session.bossView();
+        assertTrue(view != null, "deberia haber aparecido Papa Noel");
+        assertEquals(BossKind.PAPA_NOEL, view.kind());
+        assertEquals("Papá Noel malvado", view.name());
+        assertTrue(view.maxHealth() < BossConfig.defaults().maxHealth(), "es mas debil que el jefe final");
+        assertFalse(session.waveState().bossStage(), "el Kinder 3 conserva su cuota");
+
+        registerKills(WaveCurve.blueprint(GameSession.PAPA_NOEL_KINDER).killQuota());
+        for (int i = 0; i < 5; i++) {
+            now += 66;
+            session.tick(now, 0.066);
+        }
+        assertEquals(GameSession.PAPA_NOEL_KINDER, session.waveState().number());
+        assertEquals(0, session.waveState().restingSeconds(), "con Papa Noel en pie el Kinder no se pasa");
+
+        defeatBossIfAny(now);
+        now += 66;
+        session.tick(now, 0.066);
+        assertNull(session.bossView());
+        assertTrue(session.waveState().restingSeconds() > 0, "derribado Papa Noel, llega el respiro");
+    }
+
+    @Test
+    @DisplayName("en Halloween el Kinder 3 no tiene jefe")
+    void halloweenHasNoMidBoss() {
+        session.setTemporada(Temporada.HALLOWEEN);
+        long now = System.currentTimeMillis();
+        for (int k = 1; k < GameSession.PAPA_NOEL_KINDER; k++) {
+            now = tickUntilKinder(now, k);
+            registerKills(WaveCurve.blueprint(k).killQuota());
+            now += 66;
+            session.tick(now, 0.066);
+        }
+        tickUntilKinder(now, GameSession.PAPA_NOEL_KINDER);
+        assertNull(session.bossView());
     }
 
     @Test
@@ -263,6 +330,7 @@ class GameSessionZombieTest {
         BossView view = session.bossView();
         assertTrue(view != null, "deberia haber aparecido el jefe");
         assertEquals(BossZombie.NAME, view.name());
+        assertEquals(BossKind.INGENIERO, view.kind());
         assertEquals(player.getFloor(), view.floor());
         assertTrue(session.waveState().bossStage());
         assertTrue(Math.hypot(view.x() - player.getX(), view.y() - player.getY()) >= WaveDirector.MIN_SPAWN_DISTANCE_PX,

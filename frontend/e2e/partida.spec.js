@@ -1,12 +1,12 @@
 import { expect, test } from '@playwright/test';
 import { myState, openLobbyScreen, startSoloGame } from './helpers.js';
 
-test('la pantalla de inicio de Navidad muestra la intro animada, Jugar y Configuracion', async ({ page }) => {
+test('la pantalla de inicio de Navidad muestra su video de intro, Jugar y Configuracion', async ({ page }) => {
   await page.goto('/');
-  // En Navidad la intro es una animacion (no el video de Halloween) y se puede saltar.
-  await expect(page.locator('.xi-root')).toBeVisible();
+  // Navidad (la temporada por defecto) abre con su propio video, que se puede saltar.
+  await expect(page.locator('video.start-video--navidad')).toHaveAttribute('src', '/video/intro-navidad.mp4');
   await page.getByText('Saltar').click();
-  await expect(page.locator('.xi-root')).toHaveCount(0);
+  await expect(page.locator('video.start-video--navidad')).toHaveCount(0);
   await expect(page.locator('img.start-campus')).toBeAttached();
   await expect(page.getByRole('button', { name: /Jugar/ })).toBeVisible();
   await page.getByRole('button', { name: /Configuración/ }).click();

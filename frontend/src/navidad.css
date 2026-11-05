@@ -27,6 +27,14 @@
   transform-origin: 62% 100%;
 }
 
+/* La intro de Navidad es un video con sus propios titulos: se ve entero, sin velos. */
+.start-video--navidad {
+  z-index: 3;
+  object-fit: contain;
+  background: #000;
+  filter: none !important;
+}
+
 :root[data-temporada='navidad'] .start-screen--menu .start-video {
   filter: brightness(0.5) saturate(0.4) contrast(1.15) hue-rotate(190deg);
   animation: xm-campus-drift 30s ease-in-out infinite alternate;
@@ -848,5 +856,108 @@
   :root[data-temporada='navidad'] .start-screen--menu .start-video {
     animation: none;
     transform: scale(1.42);
+  }
+}
+
+/* ---------- Travesuras: ceguera por bola de nieve y barro del reno ---------- */
+
+.screen-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 45; /* sobre el juego, debajo de los paneles del HUD */
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.screen-fx-snow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f4f8ff 55%, rgba(220, 232, 255, 0.85) 100%);
+  animation: fx-snow-clear 1.3s ease-out forwards;
+}
+
+.screen-fx-snow--soft {
+  animation-duration: 0.6s;
+}
+
+/* Copos pegados que se ven mientras se aclara. */
+.screen-fx-snow span {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: calc(90px * var(--s));
+  height: calc(70px * var(--s));
+  border-radius: 46% 54% 40% 60% / 55% 45% 55% 45%;
+  background: radial-gradient(circle at 40% 35%, #ffffff, #dfe8f6 70%);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.9);
+  transform: translate(-50%, -50%);
+}
+
+@keyframes fx-snow-clear {
+  0%, 45% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.screen-fx-mud {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: var(--size);
+  transform: scale(0.3);
+  opacity: 0;
+  animation: fx-mud 4s ease-in var(--delay) forwards;
+}
+
+/* La mancha: barro brillante con un grumo de carbon, de borde irregular. */
+.screen-fx-mud-blob {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--rot));
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255, 230, 200, 0.28) 0 6%, transparent 12%),
+    radial-gradient(circle at 58% 60%, #120a06 0 7%, transparent 9%),
+    radial-gradient(circle at 50% 50%, #4a2c12 0%, #33200d 45%, #24160a 100%);
+}
+
+.screen-fx-mud-drop {
+  position: absolute;
+  left: var(--dx);
+  top: var(--dy);
+  width: var(--ds);
+  height: var(--ds);
+  border-radius: 50%;
+  background: #33200d;
+  transform: translate(-50%, -50%);
+}
+
+/* Chorros que escurren hacia abajo (solo la mancha va girada, el contenedor no). */
+.screen-fx-mud-drip {
+  position: absolute;
+  left: var(--dx);
+  top: 62%;
+  width: 10px;
+  height: 0;
+  border-radius: 0 0 8px 8px;
+  background: linear-gradient(#33200d, #24160a);
+  animation: fx-drip 3.4s ease-in calc(var(--delay) + 0.3s) forwards;
+}
+
+@keyframes fx-mud {
+  0% { opacity: 0; transform: scale(0.3); }
+  6% { opacity: 0.95; transform: scale(1.08); }
+  12% { transform: scale(1); }
+  70% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1) translateY(30px); }
+}
+
+@keyframes fx-drip {
+  to { height: var(--len); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-fx-mud,
+  .screen-fx-mud-drip {
+    animation-duration: 1.5s;
   }
 }

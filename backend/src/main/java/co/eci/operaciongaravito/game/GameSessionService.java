@@ -279,7 +279,7 @@ public class GameSessionService {
                 session.lastSummary(),
                 session.kinderEvent(),
                 session.puddleStates()
-        ).withBlasts(session.blastStates());
+        ).withBlasts(session.blastStates()).withTravesuras(session.travesurasState());
     }
 
     private void startTicking(String gameId) {
