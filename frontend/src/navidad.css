@@ -894,7 +894,7 @@
 }
 
 @keyframes fx-snow-clear {
-  0%, 30% { opacity: 1; }
+  0%, 45% { opacity: 1; }
   100% { opacity: 0; }
 }
 
@@ -904,36 +904,51 @@
   top: var(--y);
   width: var(--size);
   height: var(--size);
-  transform: rotate(var(--rot)) scale(0.3);
-  border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%;
-  background:
-    radial-gradient(circle at 30% 30%, rgba(0, 0, 0, 0.85) 0 7%, transparent 8%),
-    radial-gradient(circle at 62% 58%, rgba(10, 6, 4, 0.9) 0 9%, transparent 10%),
-    radial-gradient(circle at 45% 72%, rgba(10, 6, 4, 0.85) 0 5%, transparent 6%),
-    radial-gradient(circle at 50% 45%, #5a3518 0%, #3d230f 55%, #2a170a 100%);
-  box-shadow: inset -8px -10px 18px rgba(0, 0, 0, 0.5), 0 0 0 6px rgba(58, 34, 16, 0.55);
+  transform: scale(0.3);
   opacity: 0;
   animation: fx-mud 4s ease-in var(--delay) forwards;
 }
 
-/* Hilos de barro que escurren hacia abajo. */
-.screen-fx-mud span {
+/* La mancha: barro brillante con un grumo de carbon, de borde irregular. */
+.screen-fx-mud-blob {
+  position: absolute;
+  inset: 0;
+  transform: rotate(var(--rot));
+  background:
+    radial-gradient(circle at 38% 34%, rgba(255, 230, 200, 0.28) 0 6%, transparent 12%),
+    radial-gradient(circle at 58% 60%, #120a06 0 7%, transparent 9%),
+    radial-gradient(circle at 50% 50%, #4a2c12 0%, #33200d 45%, #24160a 100%);
+}
+
+.screen-fx-mud-drop {
   position: absolute;
   left: var(--dx);
-  top: 70%;
-  width: 12px;
+  top: var(--dy);
+  width: var(--ds);
+  height: var(--ds);
+  border-radius: 50%;
+  background: #33200d;
+  transform: translate(-50%, -50%);
+}
+
+/* Chorros que escurren hacia abajo (solo la mancha va girada, el contenedor no). */
+.screen-fx-mud-drip {
+  position: absolute;
+  left: var(--dx);
+  top: 62%;
+  width: 10px;
   height: 0;
   border-radius: 0 0 8px 8px;
-  background: linear-gradient(#3d230f, #2a170a);
+  background: linear-gradient(#33200d, #24160a);
   animation: fx-drip 3.4s ease-in calc(var(--delay) + 0.3s) forwards;
 }
 
 @keyframes fx-mud {
-  0% { opacity: 0; transform: rotate(var(--rot)) scale(0.3); }
-  6% { opacity: 0.96; transform: rotate(var(--rot)) scale(1.08); }
-  12% { transform: rotate(var(--rot)) scale(1); }
+  0% { opacity: 0; transform: scale(0.3); }
+  6% { opacity: 0.95; transform: scale(1.08); }
+  12% { transform: scale(1); }
   70% { opacity: 0.9; }
-  100% { opacity: 0; transform: rotate(var(--rot)) scale(1) translateY(30px); }
+  100% { opacity: 0; transform: scale(1) translateY(30px); }
 }
 
 @keyframes fx-drip {
@@ -942,7 +957,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .screen-fx-mud,
-  .screen-fx-mud span {
+  .screen-fx-mud-drip {
     animation-duration: 1.5s;
   }
 }

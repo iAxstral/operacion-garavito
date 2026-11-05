@@ -35,7 +35,20 @@ export function snowBlind() {
   setTimeout(() => el.remove(), 1400);
 }
 
-/** Barro con carbon del reno: manchas que escurren y tardan en caerse. */
+/** Contorno irregular de una salpicadura: un borde ondulado con algunas puntas largas. */
+function splatShape() {
+  const points = [];
+  const count = 22;
+  for (let i = 0; i < count; i += 1) {
+    const angle = (i / count) * Math.PI * 2;
+    const spike = Math.random() < 0.22;
+    const r = spike ? 0.92 + Math.random() * 0.08 : 0.5 + Math.random() * 0.22;
+    points.push(`${(50 + Math.cos(angle) * r * 50).toFixed(1)}% ${(50 + Math.sin(angle) * r * 50).toFixed(1)}%`);
+  }
+  return `polygon(${points.join(', ')})`;
+}
+
+/** Barro con carbon del reno: salpicaduras que escurren y tardan en caerse. */
 export function mudSplat() {
   const count = 3 + Math.floor(Math.random() * 3);
   for (let i = 0; i < count; i += 1) {
@@ -43,13 +56,29 @@ export function mudSplat() {
     el.className = 'screen-fx-mud';
     el.style.setProperty('--x', `${8 + Math.random() * 74}%`);
     el.style.setProperty('--y', `${8 + Math.random() * 66}%`);
-    el.style.setProperty('--size', `${120 + Math.random() * 160}px`);
+    el.style.setProperty('--size', `${120 + Math.random() * 170}px`);
     el.style.setProperty('--rot', `${Math.random() * 360}deg`);
     el.style.setProperty('--delay', `${i * 60}ms`);
+    const blob = document.createElement('span');
+    blob.className = 'screen-fx-mud-blob';
+    blob.style.clipPath = splatShape();
+    el.appendChild(blob);
+    // Gotitas sueltas alrededor y chorros que escurren hacia abajo.
+    for (let d = 0; d < 5; d += 1) {
+      const drop = document.createElement('span');
+      drop.className = 'screen-fx-mud-drop';
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 52 + Math.random() * 18;
+      drop.style.setProperty('--dx', `${50 + Math.cos(angle) * dist}%`);
+      drop.style.setProperty('--dy', `${50 + Math.sin(angle) * dist}%`);
+      drop.style.setProperty('--ds', `${6 + Math.random() * 12}px`);
+      el.appendChild(drop);
+    }
     for (let d = 0; d < 3; d += 1) {
       const drip = document.createElement('span');
-      drip.style.setProperty('--dx', `${15 + Math.random() * 70}%`);
-      drip.style.setProperty('--len', `${30 + Math.random() * 70}px`);
+      drip.className = 'screen-fx-mud-drip';
+      drip.style.setProperty('--dx', `${28 + Math.random() * 44}%`);
+      drip.style.setProperty('--len', `${30 + Math.random() * 80}px`);
       el.appendChild(drip);
     }
     layer().appendChild(el);
