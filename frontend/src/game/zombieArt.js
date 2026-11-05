@@ -48,6 +48,49 @@ const TYPES = {
   },
 };
 
+// Navidad: cada tipo con un sueter navideno feo (o envuelto como regalo, el explosivo)
+// y una tira de luces cruzada que titila al caminar (cambia de color en cada cuadro).
+const SWEATERS = {
+  zombie: { shirt: '#8e1620', shirtDark: '#5a0c14', accent: '#e8e0d0', motif: 'tree' },
+  'zombie-teso': { shirt: '#2f6b35', shirtDark: '#1c4220', accent: '#e8e0d0', motif: 'tree' },
+  'zombie-corredor': { shirt: '#7a1a24', shirtDark: '#4a0e16', accent: '#e8e0d0', motif: 'flake' },
+  'zombie-escupidor': { shirt: '#3d5a22', shirtDark: '#26381a', accent: '#c01a24', motif: null },
+  'zombie-explosivo': { shirt: '#b8222a', shirtDark: '#7a141a', accent: '#e2b12a', motif: 'gift' },
+  'zombie-griton': { shirt: '#4a2a5a', shirtDark: '#2e1a38', accent: '#e8e0d0', motif: 'flake' },
+  'zombie-ciego': { shirt: '#1c3a5a', shirtDark: '#10243a', accent: '#e8e0d0', motif: 'flake' },
+};
+const LIGHT_COLORS = ['#ff3b3b', '#3bff6a', '#ffd23a', '#3ba8ff'];
+
+function drawSweater(px, t, frame, torsoX, torsoTop) {
+  const pattern = t.sweater;
+  const cx = torsoX + Math.floor(t.torsoW / 2);
+  if (pattern.motif === 'gift') {
+    // Envuelto como regalo: cinta cruzada con lazo arriba.
+    px(cx, torsoTop, 1, t.torsoH, pattern.accent);
+    px(torsoX, torsoTop + Math.floor(t.torsoH / 2), t.torsoW, 1, pattern.accent);
+    px(cx - 2, torsoTop - 1, 2, 1, pattern.accent);
+    px(cx + 1, torsoTop - 1, 2, 1, pattern.accent);
+    return;
+  }
+  // Franja en zigzag arriba.
+  for (let x = 0; x < t.torsoW; x += 1) {
+    px(torsoX + x, torsoTop + 1 + (x % 2), 1, 1, pattern.accent);
+  }
+  if (pattern.motif === 'tree') {
+    px(cx, torsoTop + 3, 1, 1, '#2f9a45');
+    px(cx - 1, torsoTop + 4, 3, 1, '#2f9a45');
+    px(cx, torsoTop + 5, 1, 1, '#5a3518');
+  } else if (pattern.motif === 'flake') {
+    px(cx, torsoTop + 3, 1, 3, pattern.accent);
+    px(cx - 1, torsoTop + 4, 3, 1, pattern.accent);
+  }
+  // Tira de luces en diagonal: cada cuadro corre los colores, asi titilan al caminar.
+  for (let i = 0; i * 2 < t.torsoW; i += 1) {
+    const color = LIGHT_COLORS[(i + frame) % LIGHT_COLORS.length];
+    px(torsoX + i * 2, torsoTop + t.torsoH - 2 - Math.floor(i * (t.torsoH - 3) / Math.max(1, t.torsoW / 2)), 1, 1, color);
+  }
+}
+
 function painter(ctx, ox) {
   return (x, y, w, h, color) => {
     ctx.fillStyle = color;
@@ -85,6 +128,10 @@ function drawFrame(ctx, ox, t, frame) {
   px(torsoX + 2, torsoTop + t.torsoH - 2 + bob, 2, 1, t.skin);
   px(torsoX + Math.floor(t.torsoW / 2), torsoTop + 2 + bob, 2, 2, t.blood);
   px(torsoX + 1, torsoTop + t.torsoH - 1 + bob, t.torsoW - 2, 1, t.shirtDark);
+  if (t.sweater) {
+    drawSweater(px, t, frame, torsoX, torsoTop + bob);
+    px(torsoX + Math.floor(t.torsoW / 2) + 1, torsoTop + 4 + bob, 1, 2, t.blood);
+  }
   if (t.sac) {
     // Escupidor: bolsa de acido que brilla en la panza.
     const sacY = torsoTop + 3 + bob;
@@ -195,6 +242,23 @@ function bakeSheet(scene, key, t) {
   }
 }
 
-export function bakeZombieSheets(scene) {
-  Object.entries(TYPES).forEach(([key, type]) => bakeSheet(scene, key, type));
+/** Clave de la hoja de un tipo: en Navidad, la version con sueter y luces. */
+export function zombieTextureKey(key, navidad) {
+  return navidad ? `${key}-navidad` : key;
+}
+
+export function bakeZombieSheets(scene, { navidad = false } = {}) {
+  Object.entries(TYPES).forEach(([key, type]) => {
+    if (!navidad) {
+      bakeSheet(scene, key, type);
+      return;
+    }
+    const sweater = SWEATERS[key];
+    bakeSheet(scene, zombieTextureKey(key, true), {
+      ...type,
+      shirt: sweater.shirt,
+      shirtDark: sweater.shirtDark,
+      sweater,
+    });
+  });
 }

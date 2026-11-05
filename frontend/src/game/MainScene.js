@@ -5,7 +5,7 @@ import { displayName } from './profile';
 import PingLayer from './PingLayer';
 import HauntLayer from './HauntLayer';
 import { pollGamepad } from './gamepad';
-import { bakeCostumes, costumeKey, COSTUME_LAYOUT, HEAD_Y, NECK_Y } from './costumeArt';
+import { bakeCostumes, costumeKey, COSTUME_LAYOUT, defaultCostume, HEAD_Y, NECK_Y } from './costumeArt';
 import { setStamina } from './stamina';
 import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
 import { NIGHT_CONE_FACTOR } from './gameModes';
@@ -359,9 +359,11 @@ export default class MainScene extends Phaser.Scene {
     return Boolean(hiddenIn);
   }
 
-  // Disfraz encima del personaje (o la capa detras). `holder` guarda la imagen.
+  // Disfraz encima del personaje (o la capa detras). `holder` guarda la imagen. Sin
+  // disfraz, en Navidad todos llevan el gorrito de lana.
   syncCostume(holder, sprite, id) {
-    const costume = id && COSTUME_LAYOUT[id] ? id : null;
+    const wanted = id ?? defaultCostume(getTemporada());
+    const costume = wanted && COSTUME_LAYOUT[wanted] ? wanted : null;
     if (holder.costumeId !== costume) {
       holder.costumeImage?.destroy();
       holder.costumeImage = costume ? this.add.image(sprite.x, sprite.y, costumeKey(costume)) : null;

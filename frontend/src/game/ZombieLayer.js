@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { SHADOW_KEY } from './HauntedDecor';
-import { bakeZombieSheets, ZOMBIE_FRAMES } from './zombieArt';
+import { bakeZombieSheets, zombieTextureKey, ZOMBIE_FRAMES } from './zombieArt';
 import { getSettings, onSettingsChange } from './settings';
 import { getTemporada } from './temporada';
 
@@ -98,11 +98,16 @@ function bakeTypeShapes(scene) {
 // Lo que el cuerpo de un zombi que cayo entero se queda en el piso.
 const CORPSE_MS = 6000;
 
-function textureFor(state, tough) {
+function baseTextureFor(state, tough) {
   if (state.kind === 'RUNNER') return RUNNER_TEXTURE;
   if (state.kind === 'SPITTER') return SPITTER_TEXTURE;
   if (KIND_TEXTURES[state.kind]) return KIND_TEXTURES[state.kind];
   return tough ? TOUGH_TEXTURE : TEXTURE;
+}
+
+/** En Navidad los zombis llevan sueter navideno y luces (ver zombieArt). */
+function textureFor(state, tough) {
+  return zombieTextureKey(baseTextureFor(state, tough), getTemporada() === 'NAVIDAD');
 }
 
 /**
@@ -121,7 +126,7 @@ export default class ZombieLayer {
     this.hooks = hooks;
     this.findTarget = findTarget;
 
-    bakeZombieSheets(scene);
+    bakeZombieSheets(scene, { navidad: getTemporada() === 'NAVIDAD' });
     bakeTypeShapes(scene);
     this.showShapes = getSettings().typeShapes;
     this.offSettings = onSettingsChange((settings) => {
