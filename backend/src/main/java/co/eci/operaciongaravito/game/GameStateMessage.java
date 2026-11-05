@@ -18,6 +18,7 @@ public record GameStateMessage(
         KinderEvent event,
         List<PuddleState> puddles,
         List<BlastState> blasts,
+        Travesuras.Estado travesuras,
         List<String> unchanged,
         boolean full) {
 
@@ -27,13 +28,19 @@ public record GameStateMessage(
             List<ProjectileState> projectiles, List<BarricadeState> barricades, MatchSummary summary,
             KinderEvent event, List<PuddleState> puddles) {
         this(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles, barricades, summary,
-                event, puddles, List.of(), List.of(), true);
+                event, puddles, List.of(), null, List.of(), true);
     }
 
     /** Copia con las explosiones que se estan viendo. */
     public GameStateMessage withBlasts(List<BlastState> current) {
         return new GameStateMessage(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles,
-                barricades, summary, event, puddles, current, unchanged, full);
+                barricades, summary, event, puddles, current, travesuras, unchanged, full);
+    }
+
+    /** Copia con los duendes, renos y bolas de Navidad. */
+    public GameStateMessage withTravesuras(Travesuras.Estado current) {
+        return new GameStateMessage(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles,
+                barricades, summary, event, puddles, blasts, current, unchanged, full);
     }
 
     public static GameStateMessage eventOnly(LastEvent event) {

@@ -99,6 +99,9 @@ public class GameSession {
     static final double NOISY_SPEED_PX_S = 185;
     private final Map<String, BlastState> blasts = new ConcurrentHashMap<>();
     private long blastSequence = 0;
+    /** Duendes y renos de Navidad (ver {@link Travesuras}). */
+    private final Travesuras travesuras = new Travesuras(java.util.random.RandomGenerator.getDefault(),
+            System.currentTimeMillis());
     static final int CANDIES_PER_BOSS = 10;
     private final Map<String, Barricade> barricades = new ConcurrentHashMap<>();
     private long barricadeSequence;
@@ -521,6 +524,10 @@ public class GameSession {
         }
     }
 
+    public Travesuras.Estado travesurasState() {
+        return temporada == Temporada.NAVIDAD ? travesuras.state() : Travesuras.Estado.VACIO;
+    }
+
     public List<BlastState> blastStates() {
         return List.copyOf(blasts.values());
     }
@@ -698,6 +705,7 @@ public class GameSession {
             acids.clear();
             puddles.clear();
             boss = null;
+            travesuras.limpiar(now);
             if (waveDirector.isVictory()) {
                 victoryPending = true;
                 closeRun(true, WaveCurve.KINDER_COUNT, now);
@@ -723,6 +731,7 @@ public class GameSession {
             acids.clear();
             puddles.clear();
             boss = null;
+            travesuras.limpiar(now);
             waveDirector.resetRun(now, WaveCurve.WAVE_REST_MS);
             players.values().forEach(player -> player.revive(REVIVE_HEALTH));
             wipedRun = true;
@@ -768,6 +777,10 @@ public class GameSession {
         puddles.values().removeIf(puddle -> !puddle.step(players.values(), now));
         zombies.values().removeIf(zombie -> !zombie.isAlive());
         updateBoss(now, deltaSeconds, targets);
+        if (temporada == Temporada.NAVIDAD) {
+            travesuras.update(now, deltaSeconds, waveDirector.isActive(), waveDirector.getKinder(), targets,
+                    this::floorGrid);
+        }
         updateRevives(now);
         updateBarricades(deltaSeconds);
         updateKinderEvent(now);

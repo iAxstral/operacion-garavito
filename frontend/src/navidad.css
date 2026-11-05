@@ -858,3 +858,91 @@
     transform: scale(1.42);
   }
 }
+
+/* ---------- Travesuras: ceguera por bola de nieve y barro del reno ---------- */
+
+.screen-fx {
+  position: fixed;
+  inset: 0;
+  z-index: 45; /* sobre el juego, debajo de los paneles del HUD */
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.screen-fx-snow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, #ffffff 0%, #f4f8ff 55%, rgba(220, 232, 255, 0.85) 100%);
+  animation: fx-snow-clear 1.3s ease-out forwards;
+}
+
+.screen-fx-snow--soft {
+  animation-duration: 0.6s;
+}
+
+/* Copos pegados que se ven mientras se aclara. */
+.screen-fx-snow span {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: calc(90px * var(--s));
+  height: calc(70px * var(--s));
+  border-radius: 46% 54% 40% 60% / 55% 45% 55% 45%;
+  background: radial-gradient(circle at 40% 35%, #ffffff, #dfe8f6 70%);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.9);
+  transform: translate(-50%, -50%);
+}
+
+@keyframes fx-snow-clear {
+  0%, 30% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.screen-fx-mud {
+  position: absolute;
+  left: var(--x);
+  top: var(--y);
+  width: var(--size);
+  height: var(--size);
+  transform: rotate(var(--rot)) scale(0.3);
+  border-radius: 42% 58% 63% 37% / 41% 44% 56% 59%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(0, 0, 0, 0.85) 0 7%, transparent 8%),
+    radial-gradient(circle at 62% 58%, rgba(10, 6, 4, 0.9) 0 9%, transparent 10%),
+    radial-gradient(circle at 45% 72%, rgba(10, 6, 4, 0.85) 0 5%, transparent 6%),
+    radial-gradient(circle at 50% 45%, #5a3518 0%, #3d230f 55%, #2a170a 100%);
+  box-shadow: inset -8px -10px 18px rgba(0, 0, 0, 0.5), 0 0 0 6px rgba(58, 34, 16, 0.55);
+  opacity: 0;
+  animation: fx-mud 4s ease-in var(--delay) forwards;
+}
+
+/* Hilos de barro que escurren hacia abajo. */
+.screen-fx-mud span {
+  position: absolute;
+  left: var(--dx);
+  top: 70%;
+  width: 12px;
+  height: 0;
+  border-radius: 0 0 8px 8px;
+  background: linear-gradient(#3d230f, #2a170a);
+  animation: fx-drip 3.4s ease-in calc(var(--delay) + 0.3s) forwards;
+}
+
+@keyframes fx-mud {
+  0% { opacity: 0; transform: rotate(var(--rot)) scale(0.3); }
+  6% { opacity: 0.96; transform: rotate(var(--rot)) scale(1.08); }
+  12% { transform: rotate(var(--rot)) scale(1); }
+  70% { opacity: 0.9; }
+  100% { opacity: 0; transform: rotate(var(--rot)) scale(1) translateY(30px); }
+}
+
+@keyframes fx-drip {
+  to { height: var(--len); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .screen-fx-mud,
+  .screen-fx-mud span {
+    animation-duration: 1.5s;
+  }
+}

@@ -549,6 +549,11 @@ export function getWave() {
 }
 
 /** El jefe del Kinder 5 ({ id, name, floor, x, y, health, maxHealth, state }) o null. */
+/** Duendes, renos, bolas y golpes de Navidad ({ bromistas, bolas, golpes }) o null. */
+export function getTravesuras() {
+  return latestState.travesuras ?? null;
+}
+
 export function getBoss() {
   return latestState.boss ?? null;
 }

@@ -22,6 +22,7 @@ import {
   getMyPlayerState,
   getMyRole,
   getBoss,
+  getTravesuras,
   getProjectiles,
   loadHideSpots,
   setNearHide,
@@ -66,6 +67,8 @@ import { channelVolume, getSettings, vibrate } from './settings';
 import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
+import TravesurasLayer from './TravesurasLayer';
+import { clearScreenFx } from './screenFx';
 import Lighting from './Lighting';
 import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY, LOCKER_KEY } from './HauntedDecor';
 import { bakeNavidadTextures, decorateFloorNavidad, startSnow } from './NavidadDecor';
@@ -602,6 +605,7 @@ export default class MainScene extends Phaser.Scene {
       findTarget: (x, y) => this.nearestPlayerTo(x, y),
     });
     this.bossLayer = new BossLayer(this);
+    this.travesurasLayer = new TravesurasLayer(this);
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -660,6 +664,8 @@ export default class MainScene extends Phaser.Scene {
       this.lighting?.destroy();
       setNearVendor(null);
       setNearStairs(null);
+      this.travesurasLayer?.destroy();
+      clearScreenFx();
     });
   }
 
@@ -1173,6 +1179,7 @@ export default class MainScene extends Phaser.Scene {
     const boss = getBoss();
     this.bossLayer.sync(boss && boss.floor === this.floor ? boss : null);
     this.bossLayer.update(delta);
+    this.travesurasLayer.sync(getTravesuras(), this.floor, this.spectating ? null : getMyRole(), delta);
   }
 
   update(time, delta) {
