@@ -13,6 +13,7 @@ import { playSample, preloadSamples, setListener, setOcclusion } from './audioBa
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import { CHAT_PHRASES, EMOTES, PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
+import { COMIDA_TEXTURES, texturaDeComida } from './comidas';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
 import {
@@ -265,6 +266,7 @@ export default class MainScene extends Phaser.Scene {
       this.load.image(key, `/tiles/${file}`);
     });
 
+    Object.entries(COMIDA_TEXTURES).forEach(([key, file]) => this.load.image(key, file));
     VENDORS.forEach((vendor) => {
       this.load.image(vendor.sprite, vendor.spriteFile);
     });
@@ -735,6 +737,13 @@ export default class MainScene extends Phaser.Scene {
 
   createFoodItems() {
     this.foodItems = FOOD_ITEMS.filter((item) => item.floor === this.floor).map((item) => {
+      // En Navidad la comida se ve como lo que es (bunuelo, natilla...) y flota un poco.
+      const texture = texturaDeComida(item.itemId);
+      if (texture && this.textures.exists(texture)) {
+        const rect = this.add.image(item.x, item.y, texture).setScale(0.55).setDepth(3);
+        this.tweens.add({ targets: rect, y: item.y - 5, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        return { ...item, rect, inRange: false };
+      }
       const rect = this.add
         .rectangle(item.x, item.y, 26, 26, ITEM_TYPE_COLORS[item.type])
         .setStrokeStyle(2, 0x1f5c2e)
