@@ -26,7 +26,7 @@ export const COSTUME_LAYOUT = {
   GUIRNALDA: { anchor: 'neck', scale: 0.85, dy: -2 },
   ESFERA_ROTA: { anchor: 'head', scale: 0.85, dy: 0 },
   // No se vende: en Navidad, quien no lleva disfraz se pone este gorrito de lana.
-  GORRITO: { anchor: 'head', scale: 0.62, dy: -14 },
+  GORRITO: { anchor: 'head', scale: 0.62, dy: -21 },
 };
 
 /** Lo que lleva puesto quien no eligio disfraz, segun la temporada. */

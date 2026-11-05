@@ -1,0 +1,583 @@
+/*
+ * Tienda de objetos. Escaparate de jugueteria maldita: cartas grandes del color de su
+ * rareza con la etiqueta en diagonal, sobre un vidrio escarchado. Usa la paleta de la
+ * temporada (--hw-*) y suma solo los colores de rareza.
+ */
+
+.is-overlay {
+  --is-comun: #5b6b73;
+  --is-comun-2: #2a3236;
+  --is-raro: #1f7fd6;
+  --is-raro-2: #0b2a52;
+  --is-epico: #9b3bd6;
+  --is-epico-2: #32104c;
+  --is-legendario: #e0952a;
+  --is-legendario-2: #5a2408;
+  --is-radius: 6px;
+  --is-name-font: 'Blockstepped', var(--hw-title-font, sans-serif);
+
+  position: fixed;
+  inset: 0;
+  z-index: 110;
+  display: flex;
+  flex-direction: column;
+  color: var(--hw-bone, #eef3f6);
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(179, 20, 12, 0.35), transparent 55%),
+    linear-gradient(180deg, #050a12 0%, #0a1420 60%, #05080d 100%);
+  font-family: sans-serif;
+  pointer-events: auto;
+}
+
+/* Escarcha en los bordes del "vidrio". */
+.is-frost {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 0% 0%, rgba(220, 238, 255, 0.22), transparent 28%),
+    radial-gradient(ellipse at 100% 0%, rgba(220, 238, 255, 0.16), transparent 24%),
+    radial-gradient(ellipse at 0% 100%, rgba(220, 238, 255, 0.14), transparent 26%),
+    radial-gradient(ellipse at 100% 100%, rgba(220, 238, 255, 0.2), transparent 30%);
+}
+
+.is-header {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: calc(14px + env(safe-area-inset-top)) 20px 12px;
+  border-bottom: 2px solid var(--hw-border, rgba(150, 196, 226, 0.38));
+  background: rgba(3, 6, 11, 0.7);
+}
+
+.is-kicker {
+  margin: 0;
+  font-size: 0.72rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--hw-ghost, #8fe3ff);
+}
+
+.is-header h2 {
+  margin: 2px 0 0;
+  font-family: var(--is-name-font);
+  font-size: clamp(1.5rem, 3.4vw, 2.3rem);
+  line-height: 1;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 3px 3px 0 var(--hw-blood, #b3140c);
+}
+
+.is-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.is-tab {
+  padding: 8px 16px;
+  border: 2px solid transparent;
+  border-radius: var(--is-radius);
+  background: transparent;
+  color: var(--hw-bone-dim, #c8d6de);
+  font-weight: 800;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.is-tab:hover {
+  color: #fff;
+}
+
+.is-overlay .is-tab.is-tab--on {
+  color: #0b0f14;
+  background: var(--hw-bone, #eef3f6);
+  transform: skewX(-8deg);
+}
+
+.is-tab-count {
+  display: inline-block;
+  min-width: 1.4em;
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  background: var(--hw-blood, #b3140c);
+  color: #fff;
+}
+
+.is-wallet {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--is-radius);
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid var(--hw-gold, #e8c34a);
+  color: var(--hw-gold, #e8c34a);
+  font-size: 1.15rem;
+}
+
+.is-wallet .hw-icon,
+.is-card-price .hw-icon,
+.is-buy .hw-icon {
+  width: 1.1em;
+  height: 1.1em;
+}
+
+.is-close {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--hw-border, rgba(150, 196, 226, 0.38));
+  border-radius: var(--is-radius);
+  background: transparent;
+  color: var(--hw-bone, #eef3f6);
+  cursor: pointer;
+}
+
+.is-close:hover {
+  background: var(--hw-blood, #b3140c);
+}
+
+.is-scroll {
+  position: relative;
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px calc(28px + env(safe-area-inset-bottom));
+}
+
+.is-timer {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+  color: var(--hw-bone-dim, #c8d6de);
+}
+
+.is-timer strong {
+  font-variant-numeric: tabular-nums;
+  color: #fff;
+}
+
+.is-section + .is-section {
+  margin-top: 22px;
+}
+
+/* En pantallas anchas, destacados a la izquierda y ofertas del dia a la derecha. */
+@media (min-width: 1000px) {
+  .is-shelves {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 24px;
+    max-width: 1320px;
+  }
+
+  .is-shelves .is-section + .is-section {
+    margin-top: 0;
+  }
+
+  .is-shelves .is-row--destacados {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Los destacados se estiran hasta la altura de las dos filas de ofertas. */
+  .is-shelves .is-section {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .is-shelves .is-row {
+    flex: 1;
+    width: 100%;
+  }
+
+  .is-shelves .is-row--diarios {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.is-section-title {
+  display: inline-block;
+  margin: 8px 0 12px;
+  padding: 4px 18px 4px 12px;
+  font-family: var(--is-name-font);
+  font-size: 1.15rem;
+  text-transform: uppercase;
+  color: #0b0f14;
+  background: var(--hw-bone, #eef3f6);
+  clip-path: polygon(0 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+}
+
+.is-row {
+  display: grid;
+  gap: 12px;
+}
+
+.is-row--destacados {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr));
+}
+
+.is-row--diarios {
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+/* ---------- Carta ---------- */
+
+.is-card {
+  --c1: var(--is-comun);
+  --c2: var(--is-comun-2);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-height: 220px;
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--is-radius);
+  text-align: left;
+  color: #fff;
+  background:
+    repeating-conic-gradient(from 0deg at 50% 38%, rgba(255, 255, 255, 0.07) 0deg 8deg, transparent 8deg 20deg),
+    radial-gradient(circle at 50% 38%, var(--c1) 0%, var(--c2) 78%);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.12), 0 6px 0 rgba(0, 0, 0, 0.45);
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease;
+}
+
+.is-card--grande {
+  min-height: 300px;
+}
+
+.is-card--comun { --c1: var(--is-comun); --c2: var(--is-comun-2); }
+.is-card--raro { --c1: var(--is-raro); --c2: var(--is-raro-2); }
+.is-card--epico { --c1: var(--is-epico); --c2: var(--is-epico-2); }
+.is-card--legendario { --c1: var(--is-legendario); --c2: var(--is-legendario-2); }
+
+.is-card:hover {
+  transform: translateY(-3px);
+  box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.55), 0 9px 0 rgba(0, 0, 0, 0.45);
+}
+
+.is-card:focus-visible {
+  outline: 3px solid var(--hw-ghost, #8fe3ff);
+  outline-offset: 3px;
+}
+
+.is-card-art {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 12px 8px 0;
+}
+
+.is-card-canvas {
+  width: min(70%, 140px);
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 6px 0 rgba(0, 0, 0, 0.35));
+  transition: transform 200ms ease;
+}
+
+.is-card--grande .is-card-canvas {
+  width: min(62%, 190px);
+}
+
+.is-card:hover .is-card-canvas {
+  transform: scale(1.06) rotate(-3deg);
+}
+
+.is-card-tags {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  right: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.is-tag {
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  transform: skewX(-10deg);
+  color: #0b0f14;
+  background: #fff;
+}
+
+.is-tag--nuevo { background: #ffe14a; }
+.is-tag--oferta { background: var(--hw-blood-bright, #ef3b2b); color: #fff; }
+.is-tag--vuelve { background: var(--hw-ghost, #8fe3ff); }
+.is-tag--puesto { background: #3bff8a; margin-left: auto; }
+
+.is-card-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 18px 10px 10px;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.78) 40%);
+}
+
+.is-card-name {
+  font-family: var(--is-name-font);
+  font-size: 1.02rem;
+  line-height: 1.05;
+  text-transform: uppercase;
+  text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.6);
+}
+
+.is-card--grande .is-card-name {
+  font-size: 1.4rem;
+}
+
+.is-card-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.is-card-rareza {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.is-card-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 900;
+  font-size: 1rem;
+  color: var(--hw-gold, #e8c34a);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-card-price s {
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.is-card-price--owned {
+  color: #3bff8a;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+}
+
+.is-card--owned .is-card-canvas {
+  opacity: 0.92;
+}
+
+/* ---------- Detalle ---------- */
+
+.is-detail-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.is-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 220px) minmax(0, 300px);
+  align-items: center;
+  gap: 20px;
+  width: min(100%, 580px);
+  padding: 20px;
+  border-radius: var(--is-radius);
+  background:
+    repeating-conic-gradient(from 0deg at 25% 50%, rgba(255, 255, 255, 0.06) 0deg 8deg, transparent 8deg 20deg),
+    radial-gradient(circle at 25% 50%, var(--c1) 0%, var(--c2) 70%);
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.25), 0 20px 50px rgba(0, 0, 0, 0.7);
+}
+
+.is-detail-canvas {
+  width: 100%;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 8px 0 rgba(0, 0, 0, 0.35));
+}
+
+.is-detail-rareza {
+  margin: 0;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.is-detail h3 {
+  margin: 4px 0 8px;
+  font-family: var(--is-name-font);
+  font-size: 1.7rem;
+  line-height: 1;
+  text-transform: uppercase;
+  text-shadow: 3px 3px 0 rgba(0, 0, 0, 0.5);
+}
+
+.is-detail-desc {
+  margin: 0 0 16px;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.is-buy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: var(--is-radius);
+  font-weight: 900;
+  font-size: 1.05rem;
+  text-transform: uppercase;
+  color: #0b0f14;
+  background: #ffe14a;
+  box-shadow: 0 4px 0 #8a6d00;
+  cursor: pointer;
+}
+
+.is-buy:hover:not(:disabled) {
+  background: #fff07a;
+}
+
+.is-buy:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0 #8a6d00;
+}
+
+.is-buy:disabled {
+  cursor: not-allowed;
+  color: rgba(255, 255, 255, 0.6);
+  background: rgba(0, 0, 0, 0.45);
+  box-shadow: none;
+}
+
+.is-buy:focus-visible,
+.is-detail-close:focus-visible,
+.is-tab:focus-visible,
+.is-close:focus-visible,
+.is-unequip:focus-visible {
+  outline: 3px solid var(--hw-ghost, #8fe3ff);
+  outline-offset: 2px;
+}
+
+.is-detail-falta {
+  margin: 8px 0 0;
+  font-size: 0.85rem;
+  color: #ffd2d2;
+}
+
+.is-detail-close {
+  margin-top: 10px;
+  padding: 6px 0;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.8);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ---------- Casillero ---------- */
+
+.is-empty,
+.is-hint {
+  max-width: 52ch;
+  color: var(--hw-bone-dim, #c8d6de);
+}
+
+.is-unequip {
+  margin-top: 16px;
+  padding: 10px 16px;
+  border: 1px solid var(--hw-border, rgba(150, 196, 226, 0.38));
+  border-radius: var(--is-radius);
+  background: transparent;
+  color: var(--hw-bone, #eef3f6);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.is-unequip:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.is-toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  z-index: 3;
+  padding: 10px 20px;
+  font-weight: 900;
+  text-transform: uppercase;
+  color: #0b0f14;
+  background: #3bff8a;
+  transform: translateX(-50%) skewX(-8deg);
+  animation: is-toast-in 260ms ease-out;
+}
+
+@keyframes is-toast-in {
+  from { opacity: 0; transform: translate(-50%, 16px) skewX(-8deg); }
+}
+
+@media (max-width: 640px) {
+  .is-header {
+    grid-template-columns: 1fr auto auto;
+    gap: 10px;
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .is-tabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .is-scroll {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .is-row--diarios {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .is-card {
+    min-height: 190px;
+  }
+
+  .is-card--grande {
+    min-height: 250px;
+  }
+
+  .is-detail {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .is-detail-canvas {
+    width: 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .is-card,
+  .is-card-canvas,
+  .is-toast {
+    transition: none;
+    animation: none;
+  }
+}

@@ -79,7 +79,8 @@ public class Player {
     public static final java.util.Set<String> COSTUMES = java.util.Set.of(
             "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA",
             // Navidad
-            "GORRO_NAVIDAD", "CORNAMENTA", "KRAMPUS");
+            "GORRO_NAVIDAD", "CORNAMENTA", "KRAMPUS", "GORRO_DUENDE", "BUFANDA", "CORONA_ACEBO",
+            "MUNECO_NIEVE", "CASCANUECES", "ESTRELLA", "GUIRNALDA", "ESFERA_ROTA");
 
     /** Llego a la salida en el escape final: ya no lo ven ni lo dañan. */
     private volatile boolean escaped = false;

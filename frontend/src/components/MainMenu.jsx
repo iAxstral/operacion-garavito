@@ -4,7 +4,7 @@ import HowToPlay from './HowToPlay';
 import RankingPanel from './RankingPanel';
 import ServerStatus from './ServerStatus';
 import AchievementsPanel from './AchievementsPanel';
-import CostumeShop from './CostumeShop';
+import ItemShop from './ItemShop';
 import ProfilePanel from './ProfilePanel';
 import TemporadaCreatures from './TemporadaCreatures';
 import Icon from './Icon';
@@ -210,6 +210,10 @@ export default function MainMenu({ onPlay }) {
             >
               <Icon name="play" /> Jugar
             </button>
+            <button type="button" className="start-btn start-btn--shop" onClick={() => open('costumes')}>
+              <Icon name={temporada.moneda.icono} /> Tienda de objetos
+              <span className="start-btn-badge">Nuevo</span>
+            </button>
             <button type="button" className="start-btn" onClick={() => open('settings')}>
               <Icon name="gear" /> Configuración
             </button>
@@ -221,9 +225,6 @@ export default function MainMenu({ onPlay }) {
             </button>
             <button type="button" className="start-btn" onClick={() => open('achievements')}>
               <Icon name="star" /> Logros
-            </button>
-            <button type="button" className="start-btn" onClick={() => open('costumes')}>
-              <Icon name={temporada.moneda.icono} /> Disfraces
             </button>
             <button type="button" className="start-btn" onClick={() => open('profile')}>
               <Icon name="skull" /> Perfil
@@ -245,7 +246,7 @@ export default function MainMenu({ onPlay }) {
       {panel === 'howto' && <HowToPlay onClose={() => setPanel(null)} />}
       {panel === 'ranking' && <RankingPanel onClose={() => setPanel(null)} />}
       {panel === 'achievements' && <AchievementsPanel onClose={() => setPanel(null)} />}
-      {panel === 'costumes' && <CostumeShop onClose={() => setPanel(null)} />}
+      {panel === 'costumes' && <ItemShop onClose={() => setPanel(null)} />}
       {panel === 'profile' && <ProfilePanel onClose={() => setPanel(null)} />}
       {panel === 'estado' && <ServerStatus onClose={() => setPanel(null)} />}
     </div>
