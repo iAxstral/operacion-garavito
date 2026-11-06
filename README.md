@@ -4,6 +4,8 @@ Juego cooperativo de decisión bajo presión, ambientado en la ECI — Proyecto 
 
 **Wiki del proyecto (Azure DevOps):** https://dev.azure.com/OperacionGaravito/OperacionGaravito/_wiki/wikis/OperacionGaravito.wiki
 
+**Jugar en línea:** https://www.operaciongaravito.me (AWS, ver [`infra/`](infra/README.md))
+
 **Squad:** Tribu Transmilenio Bogotá
 **Integrantes:** Tomás Olaya Díaz · Isaac Burgos · Javier Romero
 
@@ -16,6 +18,7 @@ Juego cooperativo de decisión bajo presión, ambientado en la ECI — Proyecto 
 - docs/rendimiento — luces más livianas, calidad automática, FPS/ping y logros de Nochebuena
 - docs/k6, docs/prometheus, docs/grafana — pruebas de carga y monitoreo, con capturas y resultados
 - k6/ — script de prueba de carga · monitoring/ — Prometheus y Grafana con los tableros ya configurados
+- infra/ — despliegue en AWS con CDK (EC2, S3 y CloudFront)
 
 ## Correr el proyecto
 
@@ -51,5 +54,12 @@ de carga de k6. Detalles en [`docs/prometheus`](docs/prometheus/README.md),
 `docker compose -f docker-compose.cluster.yml up --build` levanta dos nodos detrás de un
 balanceador (`:8080`), con Redis, PostgreSQL, Prometheus y Grafana. La demo con k6 y el
 experimento de caída de un nodo están en [`docs/escalado`](docs/escalado/README.md).
+
+## Despliegue
+
+El juego está publicado en AWS (us-east-2): backend y PostgreSQL en una EC2, frontend
+en S3, todo detrás de CloudFront con el dominio `www.operaciongaravito.me`. Cómo
+desplegar, actualizar sin perder el ranking y apagar la máquina para ahorrar está en
+[`infra/README.md`](infra/README.md).
 
 GitHub Actions corre backend, frontend y e2e en cada push y PR (`.github/workflows/ci.yml`).
