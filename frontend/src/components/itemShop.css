@@ -1,7 +1,7 @@
 /*
  * Tienda de objetos. Escaparate de jugueteria maldita: cartas grandes del color de su
  * rareza con la etiqueta en diagonal, sobre un vidrio escarchado. Usa la paleta de la
- * temporada (--hw-*) y suma solo los colores de rareza.
+ * Navidad (--hw-*) y suma solo los colores de rareza.
  */
 
 .is-overlay {
@@ -313,7 +313,6 @@
 
 .is-tag--nuevo { background: #ffe14a; }
 .is-tag--oferta { background: var(--hw-blood-bright, #ef3b2b); color: #fff; }
-.is-tag--vuelve { background: var(--hw-ghost, #8fe3ff); }
 .is-tag--puesto { background: #3bff8a; margin-left: auto; }
 
 .is-card-foot {

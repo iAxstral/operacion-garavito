@@ -174,9 +174,21 @@ export default function SettingsPanel({ onClose, onExit, inGame = false }) {
           />
           <Toggle
             label="Modo de rendimiento"
-            hint="Para celulares lentos: luz más simple, sin neblina ni polvo y menos sangre. Se aplica al cambiar de piso"
+            hint="Para celulares lentos: luz más simple, sin neblina ni nieve y menos sangre. Se aplica al instante"
             checked={settings.lowPerf}
             onChange={(lowPerf) => updateSettings({ lowPerf })}
+          />
+          <Toggle
+            label="Calidad automática"
+            hint="Si el juego va lento varios segundos seguidos, activa solo el modo de rendimiento"
+            checked={settings.autoPerf}
+            onChange={(autoPerf) => updateSettings({ autoPerf })}
+          />
+          <Toggle
+            label="Mostrar FPS y ping"
+            hint="Un recuadro en la partida con los cuadros por segundo y la latencia con el servidor"
+            checked={settings.showStats}
+            onChange={(showStats) => updateSettings({ showStats })}
           />
           <Toggle
             label="Formas según el tipo de zombi"

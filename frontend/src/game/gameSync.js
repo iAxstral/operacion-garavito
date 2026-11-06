@@ -1,6 +1,5 @@
 
 import { API_BASE, socketService } from '../services/socketService';
-import { getTemporadaPreferida, setTemporadaDeSala } from './temporada';
 import { getNickname } from './profile';
 import { getEquippedCostume } from './costumes';
 import { mergeDelta } from './deltaMerge';
@@ -143,6 +142,11 @@ export function onGameEvent(callback) {
   return () => eventListeners.delete(callback);
 }
 
+/** Avisa a los oyentes de un evento que nace en este cliente (no viene del servidor). */
+export function emitLocalEvent(event) {
+  eventListeners.forEach((callback) => callback(event));
+}
+
 function awaitEvent(predicate) {
   return new Promise((resolve, reject) => {
     const waiter = { predicate, resolve };
@@ -158,7 +162,6 @@ function handleMessage(body) {
     ...mergeDelta(body, latestState),
     lastEvent: body.lastEvent ?? latestState.lastEvent,
   };
-  if (latestState.lobby?.temporada) setTemporadaDeSala(latestState.lobby.temporada);
   if (body.lastEvent) {
     eventListeners.forEach((callback) => callback(body.lastEvent));
     eventWaiters.forEach((waiter) => {
@@ -183,10 +186,7 @@ export async function openLobby(code, create, building, redirected = false, mode
 
   const reply = awaitEvent((event) => event.playerId === CLIENT_ID
     && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED' || event.type === 'LOBBY_REDIRECT'));
-  // La temporada solo cuenta al crear: quien entra a una sala ve la que tiene la sala.
-  socketService.publish(`/app/game/${code}/lobby`, {
-    clientId: CLIENT_ID, create, building, mode, temporada: getTemporadaPreferida(),
-  });
+  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building, mode });
 
   let event;
   try {
@@ -300,7 +300,6 @@ function closeTopic() {
 
 function resetLocalState() {
   latestState = emptyState();
-  setTemporadaDeSala(null);
   eventWaiters.clear();
   lastMoveSentAt = 0;
   lastSentX = null;

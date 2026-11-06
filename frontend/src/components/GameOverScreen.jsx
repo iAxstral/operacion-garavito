@@ -4,7 +4,7 @@ import { nameWithRole } from '../game/profile';
 import { playSfx } from '../game/sfx';
 import RankingPanel from './RankingPanel';
 import Icon from './Icon';
-import useTemporada from './useTemporada';
+import { NAVIDAD } from '../game/navidad';
 import { earnAchievements } from '../game/achievements';
 import { creditRun } from '../game/costumes';
 import Credits from './Credits';
@@ -31,6 +31,7 @@ const AWARDS = [
   { key: 'missions', icon: 'scroll', label: 'Cumplidor' },
   { key: 'revives', icon: 'cross', label: 'Salvavidas' },
   { key: 'garavitosEarned', icon: 'coin', label: 'Proveedor' },
+  { key: 'snowballsDodged', icon: 'snowflake', label: 'Ágil como un reno' },
 ];
 
 function awardsFor(players) {
@@ -49,7 +50,7 @@ const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 
 
 /** Pantalla de resultados al ganar o al caer todo el equipo, con las estadisticas de la corrida. */
 export default function GameOverScreen({ onExitToMenu }) {
-  const { moneda } = useTemporada();
+  const { moneda } = NAVIDAD;
   const [outcome, setOutcome] = useState(null);
   const [summary, setSummary] = useState(null);
   const [showRanking, setShowRanking] = useState(false);
@@ -121,6 +122,8 @@ export default function GameOverScreen({ onExitToMenu }) {
                   <th scope="col"><Icon name="cross" title="Compañeros revividos" /></th>
                   <th scope="col"><Icon name="heart" title="Daño recibido" /></th>
                   <th scope="col"><Icon name="skull" title="Veces que cayó" /></th>
+                  <th scope="col"><Icon name="snowflake" title="Bolas de nieve o barro recibidas" /></th>
+                  <th scope="col"><Icon name="shield" title="Bolas esquivadas" /></th>
                 </tr>
               </thead>
               <tbody>
@@ -142,6 +145,8 @@ export default function GameOverScreen({ onExitToMenu }) {
                     <td>{p.revives}</td>
                     <td>{p.damageTaken}</td>
                     <td>{p.downs}</td>
+                    <td>{p.snowballsTaken ?? 0}</td>
+                    <td>{p.snowballsDodged ?? 0}</td>
                   </tr>
                 ))}
               </tbody>

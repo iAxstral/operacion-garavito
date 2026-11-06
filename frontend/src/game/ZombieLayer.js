@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
-import { SHADOW_KEY } from './HauntedDecor';
-import { bakeZombieSheets, zombieTextureKey, ZOMBIE_FRAMES } from './zombieArt';
+import { SHADOW_KEY } from './BaseDecor';
+import { bakeZombieSheets, ZOMBIE_FRAMES } from './zombieArt';
 import { getSettings, onSettingsChange } from './settings';
-import { getTemporada } from './temporada';
 
 // En Navidad cada zombi lleva un gorro de Papa Noel rasgado y manchado.
 const HAT_KEY = 'xm_zombie_hat';
@@ -98,16 +97,11 @@ function bakeTypeShapes(scene) {
 // Lo que el cuerpo de un zombi que cayo entero se queda en el piso.
 const CORPSE_MS = 6000;
 
-function baseTextureFor(state, tough) {
+function textureFor(state, tough) {
   if (state.kind === 'RUNNER') return RUNNER_TEXTURE;
   if (state.kind === 'SPITTER') return SPITTER_TEXTURE;
   if (KIND_TEXTURES[state.kind]) return KIND_TEXTURES[state.kind];
   return tough ? TOUGH_TEXTURE : TEXTURE;
-}
-
-/** En Navidad los zombis llevan sueter navideno y luces (ver zombieArt). */
-function textureFor(state, tough) {
-  return zombieTextureKey(baseTextureFor(state, tough), getTemporada() === 'NAVIDAD');
 }
 
 /**
@@ -126,7 +120,7 @@ export default class ZombieLayer {
     this.hooks = hooks;
     this.findTarget = findTarget;
 
-    bakeZombieSheets(scene, { navidad: getTemporada() === 'NAVIDAD' });
+    bakeZombieSheets(scene);
     bakeTypeShapes(scene);
     this.showShapes = getSettings().typeShapes;
     this.offSettings = onSettingsChange((settings) => {
@@ -225,10 +219,8 @@ export default class ZombieLayer {
       walkMs: Math.random() * 1000,
       shape: null,
     };
-    if (getTemporada() === 'NAVIDAD') {
-      bakeHat(this.scene);
-      entry.hat = this.scene.add.image(state.x, state.y, HAT_KEY).setOrigin(0.4, 0.9).setScale(tough ? 1.25 : 1);
-    }
+    bakeHat(this.scene);
+    entry.hat = this.scene.add.image(state.x, state.y, HAT_KEY).setOrigin(0.4, 0.9).setScale(tough ? 1.25 : 1);
     const shapeFrame = SHAPES[tough ? 'TOUGH' : kind];
     if (shapeFrame !== undefined) {
       entry.shape = this.scene.add.image(state.x, state.y, SHAPE_KEY, shapeFrame).setVisible(false);

@@ -50,8 +50,11 @@ public class Player {
     private int statDamage;
     private int statRevives;
     private int statDowns;
-    /** Dulces que solto la horda a este jugador en la corrida (se guardan en su navegador). */
+    /** Regalos que solto la horda a este jugador en la corrida (se guardan en su navegador). */
     private int statCandies;
+    /** Bolas de las travesuras que le pegaron y que iban por el y esquivo. */
+    private int statSnowballsTaken;
+    private int statSnowballsDodged;
 
     /** Ultima posicion aceptada (para validar la siguiente) y ultima correccion enviada. */
     private volatile long lastMoveAt = 0;
@@ -77,8 +80,6 @@ public class Player {
 
     /** Disfraces que existen: el cliente los vende y los dibuja; aqui solo se valida el id. */
     public static final java.util.Set<String> COSTUMES = java.util.Set.of(
-            "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA",
-            // Navidad
             "GORRO_NAVIDAD", "CORNAMENTA", "KRAMPUS", "GORRO_DUENDE", "BUFANDA", "CORONA_ACEBO",
             "MUNECO_NIEVE", "CASCANUECES", "ESTRELLA", "GUIRNALDA", "ESFERA_ROTA");
 
@@ -177,6 +178,16 @@ public class Player {
 
     public synchronized int getCandies() {
         return statCandies;
+    }
+
+    /** Le pego una bola de nieve o de barro de las travesuras. */
+    public synchronized void recordSnowballTaken() {
+        statSnowballsTaken++;
+    }
+
+    /** Una bola que iba por el se perdio (se movio a tiempo). */
+    public synchronized void recordSnowballDodged() {
+        statSnowballsDodged++;
     }
 
     public String getHidingIn() {
@@ -643,7 +654,7 @@ public class Player {
 
     public synchronized MatchSummary.PlayerSummary statsSnapshot() {
         return new MatchSummary.PlayerSummary(role, statKills, statMissions, statEarned, statDamage, statRevives, statDowns, name,
-                statCandies);
+                statCandies, statSnowballsTaken, statSnowballsDodged);
     }
 
     public synchronized void resetStats() {
@@ -651,6 +662,8 @@ public class Player {
         perks.clear();
         perkOffer = List.of();
         statCandies = 0;
+        statSnowballsTaken = 0;
+        statSnowballsDodged = 0;
         statKills = 0;
         statMissions = 0;
         statEarned = 0;

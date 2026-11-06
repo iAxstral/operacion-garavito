@@ -17,7 +17,6 @@ export const SAMPLES = {
   doorOpen: ['door_open_1', 'door_open_2'],
   doorClose: ['door_close_1', 'door_close_2', 'door_close_3'],
   creak: ['creak_1', 'creak_2', 'creak_3'],
-  bat: ['bat_1', 'bat_2', 'bat_3'],
   ghost: range('ghost_', 5, 1),
   swing: ['swing', 'swing_2'],
   draw: ['draw'],

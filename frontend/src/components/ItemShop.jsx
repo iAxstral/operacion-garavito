@@ -11,7 +11,7 @@ import {
 import { COSTUME_SIZE, drawCostume } from '../game/costumeArt';
 import { playSfx } from '../game/sfx';
 import Icon from './Icon';
-import useTemporada from './useTemporada';
+import { NAVIDAD } from '../game/navidad';
 import './itemShop.css';
 
 function Preview({ id, className }) {
@@ -63,7 +63,6 @@ function Carta({ item, grande, owned, worn, moneda, onAbrir }) {
       <span className="is-card-tags">
         {item.nuevo && !owned && <span className="is-tag is-tag--nuevo">¡Nuevo!</span>}
         {item.oferta && !owned && <span className="is-tag is-tag--oferta">-30%</span>}
-        {item.vuelve && <span className="is-tag is-tag--vuelve">Volvió</span>}
         {worn && <span className="is-tag is-tag--puesto">Puesto</span>}
       </span>
       <span className="is-card-foot">
@@ -94,7 +93,7 @@ function Detalle({ item, bag, moneda, onComprar, onPoner, onCerrar }) {
       <div className={`is-detail is-card--${item.rareza.toLowerCase()}`} role="dialog" aria-modal="true" aria-labelledby="is-detail-name">
         <Preview id={item.id} className="is-detail-canvas" />
         <div className="is-detail-body">
-          <p className="is-detail-rareza">{RAREZAS[item.rareza].nombre}{item.temporada === 'NAVIDAD' ? ' · Navidad' : ' · Halloween'}</p>
+          <p className="is-detail-rareza">{RAREZAS[item.rareza].nombre}</p>
           <h3 id="is-detail-name">{item.name}</h3>
           <p className="is-detail-desc">{item.description}</p>
           {owned ? (
@@ -118,21 +117,20 @@ function Detalle({ item, bag, moneda, onComprar, onPoner, onCerrar }) {
 
 /**
  * Tienda de objetos: cada dia (a medianoche) cambia lo que se vende. Dos destacados
- * grandes, cuatro diarios (uno en oferta) y uno de otro evento que vuelve. Lo comprado
- * queda en el casillero para ponerse cuando se quiera. Se paga con lo que suelta la
- * horda (regalos en Navidad, dulces en Halloween).
+ * grandes y cinco diarios (uno en oferta). Lo comprado queda en el casillero para
+ * ponerse cuando se quiera. Se paga con los regalos que suelta la horda.
  */
 export default function ItemShop({ onClose }) {
-  const { id: temporada, moneda } = useTemporada();
+  const { moneda } = NAVIDAD;
   const [bag, setBag] = useState(getBag);
   const [tab, setTab] = useState('tienda');
   const [abierto, setAbierto] = useState(null);
   const [recien, setRecien] = useState(null);
   const [version, setVersion] = useState(0);
   const ahora = useAhora(useMemo(() => () => setVersion((v) => v + 1), []));
-  // La tienda se recalcula al cambiar de dia (version) o de temporada.
+  // La tienda se recalcula al cambiar de dia (version).
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const tienda = useMemo(() => tiendaDelDia(new Date(), temporada), [temporada, version]);
+  const tienda = useMemo(() => tiendaDelDia(new Date()), [version]);
 
   useEffect(() => {
     const onKey = (event) => {
@@ -184,7 +182,7 @@ export default function ItemShop({ onClose }) {
       <div className="is-frost" aria-hidden="true" />
       <header className="is-header">
         <div className="is-title-block">
-          <p className="is-kicker">{temporada === 'NAVIDAD' ? 'Juguetería maldita' : 'Mercado de las ánimas'}</p>
+          <p className="is-kicker">Juguetería maldita</p>
           <h2 id="is-title">Tienda de objetos</h2>
         </div>
         <nav className="is-tabs" aria-label="Secciones de la tienda">
@@ -226,7 +224,7 @@ export default function ItemShop({ onClose }) {
               <p className="is-empty">Todavía no tienes nada. Sobrevive, junta {moneda.plural} y vuelve a la tienda.</p>
             ) : (
               <div className="is-row is-row--diarios">
-                {owned.map((c) => carta({ ...c, precio: c.price, oferta: false, vuelve: false }))}
+                {owned.map((c) => carta({ ...c, precio: c.price, oferta: false }))}
               </div>
             )}
             {bag.equipped && (
@@ -235,8 +233,7 @@ export default function ItemShop({ onClose }) {
               </button>
             )}
             <p className="is-hint">
-              {temporada === 'NAVIDAD' ? 'Sin nada puesto, en Navidad llevas el gorrito de lana. ' : ''}
-              Lo que te pongas lo ven todos en la partida.
+              Sin nada puesto llevas el gorrito de lana. Lo que te pongas lo ven todos en la partida.
             </p>
           </section>
         )}

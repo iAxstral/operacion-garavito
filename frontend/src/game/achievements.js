@@ -14,10 +14,17 @@ export const ACHIEVEMENTS = [
   { id: 'lifeguard', name: 'Salvavidas', description: 'Revive 3 veces en una corrida', icon: 'heart', test: (p) => p.revives >= 3 },
   { id: 'banker', name: 'Millonario', description: 'Gana 200 Garavitos en una corrida', icon: 'coin', test: (p) => p.garavitosEarned >= 200 },
   { id: 'untouchable', name: 'Intocable', description: 'Llega al Kinder 2 recibiendo 20 de daño o menos', icon: 'shield', test: (p, run) => run.kinderReached >= 2 && p.damageTaken <= 20 },
-  { id: 'survivor', name: 'Sobreviviente', description: 'Llega al Kinder 3', icon: 'pumpkin', test: (p, run) => run.kinderReached >= 3 },
+  { id: 'survivor', name: 'Sobreviviente', description: 'Llega al Kinder 3', icon: 'gift', test: (p, run) => run.kinderReached >= 3 },
   { id: 'never_down', name: 'Nunca caí', description: 'Llega al Kinder 3 sin caer ni una vez', icon: 'star', test: (p, run) => run.kinderReached >= 3 && p.downs === 0 },
   { id: 'legend', name: 'Leyenda del campus', description: 'Supera los 5 Kinders', icon: 'trophy', test: (p, run) => run.victory },
   { id: 'speedrun', name: 'A toda velocidad', description: 'Gana en menos de 15 minutos', icon: 'dash', test: (p, run) => run.victory && run.durationSeconds < 900 },
+  // Nochebuena: Papa Noel malvado (Kinder 3) y las travesuras de duendes y renos.
+  { id: 'santa_hunter', name: 'Cazador de Papá Noel', description: 'Pasa el Kinder 3 derribando a Papá Noel malvado', icon: 'gift', test: (p, run) => run.victory || run.kinderReached >= 4 },
+  { id: 'reindeer_agile', name: 'Ágil como un reno', description: 'Esquiva 5 bolas de nieve o de barro en una corrida', icon: 'snowflake', test: (p) => p.snowballsDodged >= 5 },
+  { id: 'snowman', name: 'Muñeco de nieve', description: 'Recibe 5 bolas de nieve o de barro en una corrida', icon: 'snowflake', test: (p) => p.snowballsTaken >= 5 },
+  // Solo cuenta si el servidor manda el dato (los resumenes viejos no lo traen).
+  { id: 'spotless_eve', name: 'Nochebuena impecable', description: 'Llega al Kinder 3 sin que te pegue ninguna bola', icon: 'star', test: (p, run) => run.kinderReached >= 3 && p.snowballsTaken === 0 },
+  { id: 'gifts_for_all', name: 'Regalo para todos', description: 'Junta 10 regalos en una corrida', icon: 'gift', test: (p) => p.candies >= 10 },
 ];
 
 function load() {

@@ -1,7 +1,7 @@
 /*
- * Tema de Halloween para las pantallas fuera del mapa (rol, sala de espera,
- * resultados, configuracion, como jugar, ranking) y el HUD. Va despues de App.css
- * y solo cambia la apariencia: las medidas y el acomodo siguen saliendo de App.css.
+ * Tema base (paneles, fuentes de terror, botones) de las pantallas fuera del mapa (rol,
+ * sala de espera, resultados, configuracion, como jugar, ranking) y el HUD. Va despues
+ * de App.css y solo cambia la apariencia; navidad.css lo recolorea encima.
  */
 
 @font-face {

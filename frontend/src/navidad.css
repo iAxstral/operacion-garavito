@@ -1,8 +1,8 @@
 /*
- * Tema de Navidad (la temporada por defecto). Va despues de halloween.css y solo
- * reemplaza la apariencia cuando <html data-temporada="navidad">: Halloween queda
- * intacto para quien elija ese evento. Sigue siendo de miedo: noche helada, sangre
- * sobre la nieve y luces que fallan.
+ * Tema de Navidad. Va despues de tema.css y le cambia la apariencia; <html> lleva
+ * data-temporada="navidad" fijo (index.html) para que estas reglas ganen en
+ * especificidad. Sigue siendo de miedo: noche helada, sangre sobre la nieve y luces
+ * que fallan.
  */
 
 :root[data-temporada='navidad'] {
@@ -569,7 +569,7 @@
   background-repeat: no-repeat;
 }
 
-/* El lazo dorado arriba (en vez de la telarana de Halloween). */
+/* El lazo dorado arriba. */
 :root[data-temporada='navidad'] .role-card::after {
   top: -22px;
   left: 50%;
@@ -784,7 +784,7 @@
   50% { opacity: 1; }
 }
 
-/* Esferas que bajan de su hilo, como las aranas de Halloween. */
+/* Esferas que bajan de su hilo. */
 .xm-ornament {
   position: absolute;
   top: 0;

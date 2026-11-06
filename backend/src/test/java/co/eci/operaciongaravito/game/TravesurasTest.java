@@ -81,6 +81,8 @@ class TravesurasTest {
         assertEquals("SEGURIDAD", golpe.playerId());
         assertEquals(Travesuras.Tipo.DUENDE, golpe.tipo());
         assertEquals(health, player.getHealth(), "la nieve solo ciega, no quita vida");
+        assertEquals(1, player.statsSnapshot().snowballsTaken(), "cuenta como bola recibida");
+        assertEquals(0, player.statsSnapshot().snowballsDodged());
     }
 
     @Test
@@ -111,6 +113,38 @@ class TravesurasTest {
         player.reportPosition(FLOOR, x, y);
         tick(40, true);
         assertTrue(travesuras.state().golpes().isEmpty(), "no deberia haber golpe");
+        assertEquals(1, player.statsSnapshot().snowballsDodged(), "cuenta como bola esquivada");
+        assertEquals(0, player.statsSnapshot().snowballsTaken());
+    }
+
+    @Test
+    @DisplayName("si la bola le pega a otro jugador, a ese le cuenta recibida y al objetivo esquivada")
+    void hittingSomeoneElseCountsForBoth() {
+        Player other = new Player("SALUD");
+        travesuras.soltar(Travesuras.Tipo.DUENDE, player, now, floor -> grid);
+        while (travesuras.state().bolas().isEmpty()) {
+            tick(1, true);
+        }
+        // El objetivo se aparta y otro jugador queda justo donde va a pasar la bola.
+        Travesuras.BolaState bola = travesuras.state().bolas().get(0);
+        double sx = player.getX();
+        double sy = player.getY();
+        double side = bola.angle() + Math.PI / 2;
+        double x = sx + Math.cos(side) * 96;
+        double y = sy + Math.sin(side) * 96;
+        if (!grid.isWalkable(x, y)) {
+            x = sx - Math.cos(side) * 96;
+            y = sy - Math.sin(side) * 96;
+        }
+        player.reportPosition(FLOOR, x, y);
+        other.reportPosition(FLOOR, sx, sy);
+        for (int i = 0; i < 40; i++) {
+            now += 66;
+            travesuras.update(now, DT, true, 3, List.of(player, other), floor -> grid);
+        }
+        assertEquals(1, other.statsSnapshot().snowballsTaken());
+        assertEquals(1, player.statsSnapshot().snowballsDodged());
+        assertEquals(0, player.statsSnapshot().snowballsTaken());
     }
 
     @Test

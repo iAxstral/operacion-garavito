@@ -82,3 +82,18 @@ test('el canal de voces del equipo tiene volumen propio', () => {
   setChannelVolume('voices', 0.3);
   assert.equal(channelVolume('voices'), 0.3);
 });
+
+test('la calidad automatica viene prendida y el indicador de FPS apagado', () => {
+  assert.equal(getSettings().autoPerf, true);
+  assert.equal(getSettings().showStats, false);
+  updateSettings({ autoPerf: false, showStats: true });
+  assert.equal(getSettings().autoPerf, false);
+  assert.equal(getSettings().showStats, true);
+});
+
+test('un ajuste de si/no guardado con basura vuelve a su valor por defecto', () => {
+  updateSettings({ autoPerf: 'si', showStats: 1, lowPerf: null });
+  assert.equal(getSettings().autoPerf, DEFAULT_SETTINGS.autoPerf);
+  assert.equal(getSettings().showStats, DEFAULT_SETTINGS.showStats);
+  assert.equal(getSettings().lowPerf, DEFAULT_SETTINGS.lowPerf);
+});

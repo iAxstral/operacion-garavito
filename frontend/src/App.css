@@ -218,7 +218,6 @@
   opacity: 0.7;
 }
 
-
 .hud-wave {
   max-width: min(360px, 46vw);
   text-align: right;
@@ -256,9 +255,6 @@
   color: #ffe9e9;
   text-align: center;
 }
-
-
-
 
 .hud-interact-hint {
   position: absolute;
@@ -723,116 +719,6 @@
   background: radial-gradient(ellipse at 50% 40%, #1a0c10 0%, #07040a 70%);
   font-family: sans-serif;
   color: #efe3dc;
-}
-
-.building-select-stage {
-  position: relative;
-  width: min(100vw, calc((100dvh - 64px) * 1647 / 955));
-  aspect-ratio: 1647 / 955;
-  overflow: hidden;
-  box-shadow: 0 0 60px rgba(120, 0, 0, 0.35);
-}
-
-.building-select-map {
-  width: 100%;
-  height: 100%;
-  display: block;
-  user-select: none;
-  animation: building-map-flicker 9s steps(1) infinite;
-}
-
-/* Parpadeo de luz electrica: casi siempre igual, con dos bajones cortos. */
-@keyframes building-map-flicker {
-  0%, 100% { filter: brightness(1); }
-  61% { filter: brightness(0.82); }
-  62% { filter: brightness(1); }
-  64% { filter: brightness(0.7); }
-  65% { filter: brightness(1); }
-}
-
-/* Neblina que se arrastra por el campus. */
-.building-select-fog {
-  position: absolute;
-  inset: 30% -50% 0 -50%;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse 22% 30% at 20% 70%, rgba(170, 160, 190, 0.16), transparent 70%),
-    radial-gradient(ellipse 28% 24% at 55% 85%, rgba(150, 140, 170, 0.14), transparent 70%),
-    radial-gradient(ellipse 20% 26% at 85% 65%, rgba(170, 160, 190, 0.12), transparent 70%);
-  animation: building-fog 38s linear infinite alternate;
-}
-
-@keyframes building-fog {
-  from { transform: translateX(-12%); }
-  to { transform: translateX(12%); }
-}
-
-/* Relampago: un destello cada tanto sobre todo el mapa. */
-.building-select-flash {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: rgba(210, 220, 255, 0.55);
-  mix-blend-mode: overlay;
-  opacity: 0;
-  animation: building-lightning 13s linear infinite;
-  animation-delay: 4s;
-}
-
-@keyframes building-lightning {
-  0%, 89%, 100% { opacity: 0; }
-  90% { opacity: 0.9; }
-  91% { opacity: 0.1; }
-  92.5% { opacity: 0.7; }
-  95% { opacity: 0; }
-}
-
-.building-select-vignette {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.75) 100%);
-}
-
-.building-hotspot {
-  position: absolute;
-  z-index: 2;
-  padding: 0;
-  border: none;
-  border-radius: 6px;
-  background: transparent;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-
-.building-hotspot--enabled {
-  box-shadow: 0 0 0 2px rgba(255, 60, 40, 0.75), 0 0 14px rgba(255, 40, 20, 0.55);
-  animation: building-pulse 1.8s ease-in-out infinite;
-}
-
-.building-hotspot--enabled.building-hotspot--hover,
-.building-hotspot--enabled:focus-visible {
-  outline: none;
-  background: rgba(255, 70, 40, 0.18);
-  transform: scale(1.06);
-  box-shadow: 0 0 0 3px #ff4a2a, 0 0 34px rgba(255, 50, 20, 0.95);
-  animation: none;
-}
-
-.building-hotspot--locked {
-  background: rgba(0, 0, 0, 0.45);
-  cursor: not-allowed;
-}
-
-.building-hotspot--locked.building-hotspot--hover {
-  background: rgba(0, 0, 0, 0.6);
-  box-shadow: inset 0 0 0 1px rgba(120, 120, 120, 0.5);
-}
-
-@keyframes building-pulse {
-  50% {
-    box-shadow: 0 0 0 3px rgba(255, 60, 40, 1), 0 0 26px rgba(255, 30, 10, 0.9);
-  }
 }
 
 .building-select-bar {
@@ -1358,8 +1244,6 @@ body {
     transform: translate(-50%, -50%) scale(0.78);
   }
 }
-
-
 
 .math-question {
   margin: 10px 0 14px;
@@ -2989,72 +2873,6 @@ body {
   color: rgba(225, 210, 205, 0.78);
 }
 
-/* Selector de evento (temporada): como las listas de juego por evento. */
-.start-season {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  width: min(420px, 100%);
-}
-
-.start-season-option {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  grid-template-rows: auto auto;
-  column-gap: 8px;
-  align-items: center;
-  flex: 1 1 170px;
-  padding: 8px 12px;
-  font-family: inherit;
-  text-align: left;
-  color: rgba(239, 227, 220, 0.75);
-  background: rgba(10, 8, 12, 0.6);
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 10px;
-  cursor: pointer;
-  backdrop-filter: blur(5px);
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
-}
-
-.start-season-option svg {
-  grid-row: span 2;
-  width: 22px;
-  height: 22px;
-}
-
-.start-season-name {
-  font-size: 14px;
-  font-weight: bold;
-}
-
-.start-season-tag {
-  font-size: 11px;
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
-.start-season-option:hover,
-.start-season-option:focus-visible {
-  color: #fff;
-  border-color: rgba(255, 255, 255, 0.45);
-  outline: none;
-}
-
-.start-season-option--active.start-season-option--navidad {
-  color: #f2fbff;
-  background: linear-gradient(135deg, rgba(120, 12, 10, 0.75), rgba(10, 40, 60, 0.75));
-  border-color: #8fd3ff;
-  box-shadow: 0 0 16px rgba(143, 211, 255, 0.3);
-}
-
-.start-season-option--active.start-season-option--halloween {
-  color: #fff3e0;
-  background: linear-gradient(135deg, rgba(140, 50, 0, 0.75), rgba(60, 6, 8, 0.75));
-  border-color: #ff8a1f;
-  box-shadow: 0 0 16px rgba(255, 138, 31, 0.3);
-}
-
 .start-actions {
   display: flex;
   flex-direction: column;
@@ -3588,159 +3406,7 @@ kbd {
   background: #0b120b;
 }
 
-/* ---------- Halloween: murcielagos y aranas (HalloweenCreatures) ---------- */
-
-.hw-creatures {
-  position: absolute;
-  inset: 0;
-  z-index: 2;
-  overflow: hidden;
-  pointer-events: none;
-}
-
-.hw-bat {
-  position: absolute;
-  top: var(--top);
-  left: 0;
-  animation: hw-bat-fly var(--dur) linear infinite;
-  animation-delay: var(--delay);
-}
-
-.hw-bat--reverse {
-  animation-name: hw-bat-fly-reverse;
-}
-
-/* Cruzan de lado a lado ondulando, cada uno a su altura. */
-@keyframes hw-bat-fly {
-  0% { transform: translate(-12vw, 0); }
-  25% { transform: translate(22vw, -6vh); }
-  50% { transform: translate(52vw, 4vh); }
-  75% { transform: translate(80vw, -3vh); }
-  100% { transform: translate(112vw, 2vh); }
-}
-
-@keyframes hw-bat-fly-reverse {
-  0% { transform: translate(112vw, 0) scaleX(-1); }
-  25% { transform: translate(78vw, 5vh) scaleX(-1); }
-  50% { transform: translate(48vw, -5vh) scaleX(-1); }
-  75% { transform: translate(18vw, 3vh) scaleX(-1); }
-  100% { transform: translate(-12vw, -2vh) scaleX(-1); }
-}
-
-.hw-bat-bob {
-  display: block;
-  animation: hw-bat-bob var(--bob) ease-in-out infinite alternate;
-}
-
-@keyframes hw-bat-bob {
-  from { transform: translateY(-3px) rotate(-4deg); }
-  to { transform: translateY(3px) rotate(4deg); }
-}
-
-.hw-bat-svg {
-  display: block;
-  fill: #0a0508;
-  filter: drop-shadow(0 0 4px rgba(255, 60, 30, 0.35));
-}
-
-.hw-bat-wing {
-  transform-box: view-box;
-  animation: hw-bat-flap 0.22s ease-in-out infinite alternate;
-}
-
-.hw-bat-wing--left {
-  transform-origin: 30px 15px;
-}
-
-.hw-bat-wing--right {
-  transform-origin: 34px 15px;
-}
-
-@keyframes hw-bat-flap {
-  from { transform: scaleY(1); }
-  to { transform: scaleY(-0.35); }
-}
-
-.hw-bat-eye,
-.hw-spider-eye {
-  fill: #ff3b1f;
-}
-
-/* Las aranas bajan por su hilo, se quedan meciendose y vuelven a subir. */
-.hw-spider {
-  position: absolute;
-  top: 0;
-  left: var(--x);
-  animation: hw-spider-drop var(--dur) ease-in-out infinite;
-  animation-delay: var(--delay);
-}
-
-@keyframes hw-spider-drop {
-  0%, 100% { transform: translateY(-120%); }
-  30%, 70% { transform: translateY(var(--drop)); }
-  45% { transform: translateY(calc(var(--drop) - 2vh)); }
-  55% { transform: translateY(calc(var(--drop) + 1vh)); }
-}
-
-.hw-spider-thread {
-  position: absolute;
-  bottom: calc(100% - 14px);
-  left: 50%;
-  width: 1px;
-  height: 120vh;
-  background: linear-gradient(180deg, rgba(220, 220, 230, 0.1), rgba(220, 220, 230, 0.55));
-}
-
-.hw-spider-svg {
-  position: relative;
-  display: block;
-  fill: #0b070a;
-  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.8));
-  animation: hw-spider-sway 2.4s ease-in-out infinite alternate;
-  transform-origin: 50% -40%;
-}
-
-@keyframes hw-spider-sway {
-  from { transform: rotate(-7deg); }
-  to { transform: rotate(7deg); }
-}
-
-.hw-spider-legs {
-  stroke: #0b070a;
-  transform-box: view-box;
-  transform-origin: 20px 22px;
-  animation: hw-spider-legs 0.5s ease-in-out infinite alternate;
-}
-
-@keyframes hw-spider-legs {
-  from { transform: scaleY(1); }
-  to { transform: scaleY(0.88); }
-}
-
-.hw-spider-mark {
-  fill: #b3120a;
-}
-
-@media (max-width: 640px) {
-  .hw-bat-svg {
-    transform: scale(0.75);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .hw-creatures,
-  .building-select-flash {
-    display: none;
-  }
-
-  .building-select-map,
-  .building-select-fog,
-  .building-hotspot--enabled {
-    animation: none;
-  }
-}
-
-/* ---------- Sala de juego (crear / unirse) sobre crear-sala-halloween.jpg ---------- */
+/* ---------- Sala de juego (crear / unirse) ---------- */
 
 .lobby-screen {
   position: fixed;
@@ -3758,60 +3424,6 @@ kbd {
 
 /* Ocupa el alto que dejan libre los modos y los textos de abajo, sea cual sea su alto:
    el escenario se ajusta a este hueco para no encogerse y desalinear los botones. */
-.lobby-stage-slot {
-  flex: 1 1 0;
-  min-height: 0;
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  container-type: size;
-}
-
-.lobby-stage {
-  position: relative;
-  flex-shrink: 0;
-  width: min(100cqw, 100cqh * var(--stage-ratio));
-  margin: 0;
-  overflow: hidden;
-  container-type: inline-size;
-  box-shadow: 0 0 70px rgba(60, 200, 90, 0.12);
-}
-
-.lobby-stage-art {
-  position: absolute;
-  max-width: none;
-  height: auto;
-  user-select: none;
-  animation: lobby-flicker 8s steps(1) infinite;
-}
-
-/* Tubo fluorescente que falla de vez en cuando. */
-@keyframes lobby-flicker {
-  0%, 100% { filter: brightness(1); }
-  47% { filter: brightness(0.75); }
-  48% { filter: brightness(1.05); }
-  49.5% { filter: brightness(0.6); }
-  50.5% { filter: brightness(1); }
-}
-
-/* Los ojos verdes de la profesora laten. */
-.lobby-eye {
-  position: absolute;
-  width: 2.2%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
-  background: radial-gradient(circle, rgba(200, 255, 170, 0.95) 0%, rgba(90, 255, 110, 0.55) 40%, transparent 72%);
-  mix-blend-mode: screen;
-  animation: lobby-eyes 3.2s ease-in-out infinite;
-}
-
-@keyframes lobby-eyes {
-  0%, 100% { opacity: 0.35; transform: translate(-50%, -50%) scale(0.9); }
-  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.35); }
-}
 
 .lobby-building-tag {
   position: absolute;
@@ -3829,71 +3441,6 @@ kbd {
 }
 
 /* Botones invisibles encima de los pintados: el dibujo es el boton. */
-.lobby-hotspot {
-  position: absolute;
-  padding: 0;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  cursor: pointer;
-  transition: box-shadow 0.15s ease, background 0.15s ease, transform 0.1s ease;
-}
-
-.lobby-hotspot:hover:not(:disabled),
-.lobby-hotspot:focus-visible {
-  outline: none;
-  background: rgba(170, 255, 120, 0.14);
-  box-shadow: 0 0 0 2px rgba(160, 255, 110, 0.85), 0 0 26px rgba(110, 255, 80, 0.75);
-}
-
-.lobby-hotspot--back:hover:not(:disabled),
-.lobby-hotspot--back:focus-visible {
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 0 0 2px rgba(220, 220, 220, 0.7), 0 0 18px rgba(255, 255, 255, 0.35);
-}
-
-.lobby-hotspot:active:not(:disabled) {
-  transform: translateY(2px) scale(0.98);
-}
-
-.lobby-hotspot:disabled {
-  cursor: not-allowed;
-  background: rgba(0, 0, 0, 0.35);
-}
-
-.lobby-stage--busy .lobby-hotspot {
-  cursor: progress;
-}
-
-.lobby-code-field {
-  position: absolute;
-  box-sizing: border-box;
-  padding: 0;
-  font-family: 'Courier New', monospace;
-  /* Relativo al ancho de la imagen: 4 letras siempre caben en el recuadro pintado. */
-  font-size: 2.3cqw;
-  font-weight: bold;
-  letter-spacing: 0.35em;
-  text-indent: 0.35em;
-  text-align: center;
-  text-transform: uppercase;
-  color: #b8ff9c;
-  text-shadow: 0 0 10px rgba(110, 255, 80, 0.85);
-  background: transparent;
-  border: none;
-  border-radius: 4px;
-  caret-color: #b8ff9c;
-}
-
-.lobby-code-field::placeholder {
-  color: rgba(200, 220, 190, 0.28);
-  text-shadow: none;
-}
-
-.lobby-code-field:focus {
-  outline: none;
-  box-shadow: 0 0 0 2px rgba(160, 255, 110, 0.7), 0 0 20px rgba(110, 255, 80, 0.45);
-}
 
 .lobby-status {
   position: relative;
@@ -3910,21 +3457,4 @@ kbd {
 .lobby-status--error {
   color: #ff8a7a;
   animation: building-notice-shake 0.4s ease;
-}
-
-@media (max-aspect-ratio: 1/1) {
-  .lobby-eye {
-    width: 4.4%;
-  }
-
-  .lobby-code-field {
-    font-size: 4.6cqw;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .lobby-stage-art,
-  .lobby-eye {
-    animation: none;
-  }
 }

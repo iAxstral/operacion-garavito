@@ -34,10 +34,11 @@ import BuildingSelect from './components/BuildingSelect';
 import RoleSelect from './components/RoleSelect';
 import LobbyEntry from './components/LobbyEntry';
 import WaitingRoom from './components/WaitingRoom';
+import StatsOverlay from './components/StatsOverlay';
 import { leaveGame, resumeSession } from './game/gameSync';
 import { startAmbience } from './game/ambience';
 import './App.css';
-import './halloween.css';
+import './tema.css';
 import './navidad.css';
 import './minigames.css';
 
@@ -132,6 +133,7 @@ function App() {
           <GameCanvas />
         </Suspense>
         <Hud onExit={handleExitToMenu} />
+        <StatsOverlay />
         <SecurityMission />
         <WiresMission />
         <MathMission />

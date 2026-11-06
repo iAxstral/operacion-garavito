@@ -230,13 +230,6 @@ const PATHS = {
   check: <path d="M4 12.5l5 5L20 6.5" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />,
   close: <path d="M5 5l14 14M19 5L5 19" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" />,
   dash: <path d="M4 6l6 6-6 6M12 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />,
-  pumpkin: (
-    <>
-      <path d="M12 6c-5 0-9 3-9 7.3S7 21 12 21s9-3.4 9-7.7S17 6 12 6z" fill="currentColor" />
-      <path d="M12 6c1-2 2.5-3 4-3" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-      <path d="M7.5 11.5l2 1.5-2 .5zM16.5 11.5l-2 1.5 2 .5zM7.5 16c2 1.5 7 1.5 9 0l-1.5 1.5-1.5-1-1.5 1-1.5-1-1.5 1z" fill="#120708" />
-    </>
-  ),
   gift: (
     <>
       <path d="M3.5 9.5h17v4h-17zM5 13.5h14V21H5z" fill="currentColor" />

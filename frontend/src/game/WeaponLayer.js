@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { FLASH_KEY } from './HauntedDecor';
+import { FLASH_KEY } from './BaseDecor';
 
 // Texturas de las armas en la mano, dibujadas apuntando a la derecha (+x) con el
 // origen en la empuñadura: asi basta rotarlas al angulo de apuntado.

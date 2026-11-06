@@ -1,9 +1,9 @@
 package co.eci.operaciongaravito.game;
 
 /**
- * Que jefe es. El Ingeniero de Sistemas cierra la corrida en el Kinder 5; en la
- * temporada de Navidad, ademas, Papa Noel malvado aparece en el Kinder 3: es mas
- * debil, pero hay que derribarlo para pasar ese Kinder.
+ * Que jefe es. El Ingeniero de Sistemas cierra la corrida en el Kinder 5; ademas,
+ * Papa Noel malvado aparece en el Kinder 3: es mas debil, pero hay que derribarlo para
+ * pasar ese Kinder.
  */
 public enum BossKind {
     INGENIERO("Ingeniero de Sistemas"),

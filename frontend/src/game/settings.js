@@ -21,7 +21,14 @@ export const DEFAULT_SETTINGS = Object.freeze({
   tips: true,
   typeShapes: false,
   lowPerf: false,
+  // Si el juego va lento, activa solo el modo de rendimiento (ver perfMonitor.js).
+  autoPerf: true,
+  // Recuadro con los FPS y el ping durante la partida.
+  showStats: false,
 });
+
+// Ajustes de si/no: si lo guardado no es un booleano se usa el valor por defecto.
+const FLAGS = ['muted', 'vibration', 'screenShake', 'tips', 'typeShapes', 'lowPerf', 'autoPerf', 'showStats'];
 
 function sanitize(raw) {
   const volumes = { ...DEFAULT_SETTINGS.volumes };
@@ -29,15 +36,11 @@ function sanitize(raw) {
     const value = Number(raw?.volumes?.[id]);
     if (Number.isFinite(value)) volumes[id] = Math.min(1, Math.max(0, value));
   });
-  return {
-    volumes,
-    muted: typeof raw?.muted === 'boolean' ? raw.muted : DEFAULT_SETTINGS.muted,
-    vibration: typeof raw?.vibration === 'boolean' ? raw.vibration : DEFAULT_SETTINGS.vibration,
-    screenShake: typeof raw?.screenShake === 'boolean' ? raw.screenShake : DEFAULT_SETTINGS.screenShake,
-    tips: typeof raw?.tips === 'boolean' ? raw.tips : DEFAULT_SETTINGS.tips,
-    typeShapes: typeof raw?.typeShapes === 'boolean' ? raw.typeShapes : DEFAULT_SETTINGS.typeShapes,
-    lowPerf: typeof raw?.lowPerf === 'boolean' ? raw.lowPerf : DEFAULT_SETTINGS.lowPerf,
-  };
+  const flags = Object.fromEntries(FLAGS.map((key) => [
+    key,
+    typeof raw?.[key] === 'boolean' ? raw[key] : DEFAULT_SETTINGS[key],
+  ]));
+  return { volumes, ...flags };
 }
 
 function load() {

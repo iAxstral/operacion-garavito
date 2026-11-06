@@ -188,20 +188,9 @@ public class GameSession {
     }
 
     private final Difficulty difficulty;
-    // Solo ambientacion: la elige quien crea la sala y la ven igual todos los de adentro.
-    private volatile Temporada temporada = Temporada.NAVIDAD;
 
-    public Temporada getTemporada() {
-        return temporada;
-    }
-
-    /** En Navidad, Papa Noel malvado aparece en este Kinder. */
+    /** Papa Noel malvado aparece en este Kinder. */
     static final int PAPA_NOEL_KINDER = 3;
-
-    public void setTemporada(Temporada temporada) {
-        this.temporada = temporada == null ? Temporada.NAVIDAD : temporada;
-        waveDirector.setMidBossKinder(this.temporada == Temporada.NAVIDAD ? PAPA_NOEL_KINDER : 0);
-    }
 
     public Difficulty getDifficulty() {
         return difficulty;
@@ -314,7 +303,7 @@ public class GameSession {
     }
 
     public LobbyState lobbyState() {
-        return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule(), temporada);
+        return new LobbyState(started, host, building, difficulty.mode(), difficulty.dailyRule());
     }
 
     public synchronized PickupResult attemptPickup(String playerId, String itemId, double x, double y) {
@@ -525,7 +514,7 @@ public class GameSession {
     }
 
     public Travesuras.Estado travesurasState() {
-        return temporada == Temporada.NAVIDAD ? travesuras.state() : Travesuras.Estado.VACIO;
+        return travesuras.state();
     }
 
     public List<BlastState> blastStates() {
@@ -777,10 +766,8 @@ public class GameSession {
         puddles.values().removeIf(puddle -> !puddle.step(players.values(), now));
         zombies.values().removeIf(zombie -> !zombie.isAlive());
         updateBoss(now, deltaSeconds, targets);
-        if (temporada == Temporada.NAVIDAD) {
-            travesuras.update(now, deltaSeconds, waveDirector.isActive(), waveDirector.getKinder(), targets,
-                    this::floorGrid);
-        }
+        travesuras.update(now, deltaSeconds, waveDirector.isActive(), waveDirector.getKinder(), targets,
+                this::floorGrid);
         updateRevives(now);
         updateBarricades(deltaSeconds);
         updateKinderEvent(now);

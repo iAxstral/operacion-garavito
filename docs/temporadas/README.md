@@ -1,61 +1,31 @@
-# Temporadas: Navidad sangrienta y Noche de Halloween
+# Navidad sangrienta
 
-El juego tiene **temporadas** (eventos): la misma partida con otra ambientación, como
-las listas de juego por evento de los shooters. La temporada actual es **Navidad
-sangrienta**: sigue dando miedo, pero con nieve, luces que fallan y regalos que nadie
-debería abrir. **Halloween**, la versión original, queda como evento para quien lo
-quiera jugar.
+El juego está ambientado en **Navidad sangrienta**: sigue dando miedo, pero con nieve,
+luces que fallan y regalos que nadie debería abrir.
 
-Las reglas no cambian: los roles, las misiones, los Kinders, los zombis y el jefe son
-los mismos. Solo cambia lo que se ve y se oye.
+Hasta noviembre de 2026 había dos temporadas y Halloween (la versión original) se podía
+elegir como evento. Se retiró para que el juego cargue y corra más liviano: ver
+[SOLO-NAVIDAD.md](SOLO-NAVIDAD.md). Lo que queda de Halloween es el tema base
+(`frontend/src/tema.css`, paleta `--hw-*` y fuentes), que `navidad.css` recolorea.
 
-## Cómo se elige
-
-En el menú principal, debajo del título, están los dos eventos. La elección se guarda
-en el navegador (`localStorage`, clave `garavito.temporada.v1`). Si nunca se eligió
-nada, la temporada es Navidad.
-
-![Menú en Navidad](img/01-menu-navidad.jpg)
-
-![Menú en Halloween](img/02-menu-halloween.jpg)
-
-**Dentro de una sala manda la temporada de la sala.** La elige quien la crea y la ven
-igual todos los que entran, aunque cada uno tenga otra preferida. Al salir de la sala,
-cada jugador vuelve a la suya. Así nadie juega una partida de Navidad mientras su
-compañero ve calabazas.
+![Menú](img/01-menu-navidad.jpg)
 
 ## Cómo funciona
 
-```
-menú (preferida, localStorage) ──crear sala──▶ /app/game/{código}/lobby { …, temporada }
-                                                     │
-                                       GameSession.temporada (NAVIDAD | HALLOWEEN)
-                                                     │
-                           LobbyState.temporada en cada estado del juego
-                                                     │
-            gameSync ─▶ setTemporadaDeSala() ─▶ <html data-temporada="navidad|halloween">
-                                                     │
-                     CSS (navidad.css) · React (useTemporada) · Phaser (getTemporada)
-```
+`<html data-temporada="navidad">` va fijo en `frontend/index.html` y activa las reglas
+de `navidad.css`. Los textos y la moneda (regalos) están en `frontend/src/game/navidad.js`.
+El servidor no sabe de ambientación: Papá Noel malvado y las travesuras de duendes y
+renos están siempre activos.
 
-| Pieza | Archivo | Qué hace |
-|---|---|---|
-| Temporada de la sala | `backend/.../game/Temporada.java`, `GameSession`, `LobbyState` | Se fija al crear la sala (por defecto `NAVIDAD`) y viaja en el estado del lobby. |
-| Preferida y activa | `frontend/src/game/temporada.js` | Catálogo de temporadas, preferencia guardada y la de la sala cuando hay una. |
-| React | `frontend/src/components/useTemporada.js` | Hook que redibuja el componente si cambia la temporada. |
-| Estilos | `frontend/src/navidad.css` | Reemplaza la paleta de Halloween (`--hw-*`) y los fondos cuando `data-temporada="navidad"`. |
-
-## Qué cambia en Navidad
+## Qué tiene
 
 ### Menús
 
-- **Fondo:** la vista nocturna del campus en vez del video de Halloween, con filtro de
+- **Fondo:** la vista nocturna del campus (`public/mapa/campus-noche.jpg`) con filtro de
   invierno, nieve que cae y una guirnalda de luces que falla.
-- **Criaturas:** donde Halloween tiene murciélagos y arañas, Navidad tiene copos de
-  nieve y esferas rotas que bajan de su hilo con ojos adentro
+- **Criaturas:** copos de nieve y esferas rotas que bajan de su hilo con ojos adentro
   (`NavidadCreatures.jsx`).
-- **Pantallas propias de Navidad**, hechas con código (sin las ilustraciones de
-  Halloween, que siguen intactas en su evento):
+- **Pantallas hechas con código:**
   - **Selección de edificio:** un **calendario de adviento maldito**. Cada edificio es
     una puerta del 19 al 24 de diciembre; al pasar por encima se entreabre y adentro
     asoman ojos rojos.
@@ -79,10 +49,10 @@ menú (preferida, localStorage) ──crear sala──▶ /app/game/{código}/lo
 
 ### Intro
 
-La primera vez en la sesión, Navidad abre con su propio video de intro, **"Navidad
+La primera vez en la sesión el juego abre con el video de intro, **"Navidad
 maldita"** (~38 s, con sonido): el duelo por la Decanatura y la presentación del juego.
 Se puede saltar o activar el sonido; al terminar, el menú queda sobre el campus de
-noche. Halloween conserva su video.
+noche.
 
 El video está en `frontend/public/video/intro-navidad.mp4` (720p, ~5 MB, recomprimido
 para la web) y su primer cuadro en `intro-navidad-poster.jpg`. Lo muestra
@@ -90,7 +60,7 @@ para la web) y su primer cuadro en `intro-navidad-poster.jpg`. Lo muestra
 
 ![Intro de Navidad](img/10-intro-navidad.jpg)
 
-La música de Navidad, en el menú y en la partida, es **"We Wish You a
+La música, en el menú y en la partida, es **"We Wish You a
 Merry Christmas"** (villancico tradicional en inglés, de dominio público) en La menor
 armónica: la caja de música rota, un coro grave durante el Kinder y un eco desafinado
 cuando hay peligro (`game/villancico.js`).
@@ -98,10 +68,9 @@ cuando hay peligro (`game/villancico.js`).
 ### Partida
 
 - **Decorado** (`game/NavidadDecor.js`): arbolitos de Navidad marchitos con luces que
-  titilan y fallan, y regalos abiertos a la fuerza, en los mismos lugares donde
-  Halloween pone calabazas. Hay carámbanos de hielo donde iban las telarañas. Las
-  posiciones salen de una semilla por edificio y piso, así que todos ven lo mismo.
-- **Nieve** que cae alrededor del jugador, en lugar de las motas de polvo.
+  titilan y fallan, regalos abiertos a la fuerza y carámbanos de hielo en las esquinas.
+  Las posiciones salen de una semilla por edificio y piso, así que todos ven lo mismo.
+- **Nieve** que cae alrededor del jugador.
 - **Luz fría:** la oscuridad es azul helada (`Lighting.js`) y un velo sobre el mapa
   enfría el piso y las luces cálidas sin apagar el rojo de la sangre.
 - **Zombis navideños:** gorro de Papá Noel rasgado (sale volando cuando mueren) y un
@@ -116,10 +85,10 @@ cuando hay peligro (`game/villancico.js`).
 
 #### Papá Noel malvado (Kinder 3)
 
-En Navidad, al empezar el **Kinder 3** aparece **Papá Noel malvado**: un jefe más débil
+Al empezar el **Kinder 3** aparece **Papá Noel malvado**: un jefe más débil
 que el Ingeniero de Sistemas (70% de vida, algo más lento, muerde menos) que suelta su
 "¡JO, JO, JO!" mientras persigue. Ese Kinder se pasa con la cuota, las misiones **y**
-derribándolo. En Halloween el Kinder 3 no tiene jefe.
+derribándolo.
 
 | Pieza | Archivo |
 |---|---|
@@ -129,7 +98,7 @@ derribándolo. En Halloween el Kinder 3 no tiene jefe.
 
 #### Duendes y renos
 
-Durante un Kinder de Navidad, cada 9 a 16 s sale **de la nada** (en una nube de nieve y
+Durante un Kinder, cada 9 a 16 s sale **de la nada** (en una nube de nieve y
 con un **!** encima) un **duende** cerca de un jugador; desde el Kinder 2 puede ser un
 **reno zombi**. Se queda un instante y tira hacia donde estaba el jugador: si se movió,
 la esquiva.
@@ -152,29 +121,25 @@ golpeado está en `screenFx.js`.
 
 #### Comida de diciembre
 
-En Navidad la comida que cura es la de diciembre en Colombia. Cura lo mismo y cuesta lo
+La comida que cura es la de diciembre en Colombia. Cura lo mismo y cuesta lo
 mismo (el servidor usa los mismos ids); solo cambia cómo se ve y se llama
 (`game/comidas.js`):
 
-| Halloween | Navidad |
+| Comida del servidor | Cómo se ve |
 |---|---|
 | Empanada (+20) | Natilla |
 | Arepa (+15) | Buñuelo |
 | Energizante (+10) | Chocolate caliente |
 | Gaseosa (+5) | Galleta de jengibre |
-| Comida del mapa (cuadrito verde) | Buñuelos, natilla, chocolate con queso y galletas (flotando) |
+| Comida del mapa | Buñuelos, natilla, chocolate con queso y galletas (flotando) |
 
 ![Comida de Navidad](img/19-comida-navidad.png)
 
 Pixel art generado con `tools/sprites/comidas_navidad.py`.
 
-Halloween dentro de la partida sigue exactamente igual que antes:
-
-![Partida en Halloween](img/07-partida-halloween.jpg)
-
 ### Sonido
 
-En la música generada (`game/music.js`), Navidad toca "We Wish You a Merry
+En la música generada (`game/music.js`) suena "We Wish You a Merry
 Christmas" en tono de terror (ver arriba). Durante el Kinder suman **cascabeles de
 trineo** al pulso.
 
@@ -183,15 +148,13 @@ trineo** al pulso.
 Desde el menú (botón dorado **Tienda de objetos**, justo debajo de Jugar) se abre una
 tienda que **cambia cada medianoche** y es la misma para todos ese día:
 
-- **Destacados:** dos objetos épicos o legendarios del evento.
-- **Ofertas del día:** cuatro más del evento (uno con **30% de descuento**) y uno de
-  otro evento que **vuelve** por un día.
+- **Destacados:** dos objetos épicos o legendarios.
+- **Ofertas del día:** cinco más (uno con **30% de descuento**).
 - Cartas del color de su **rareza** (común, raro, épico, legendario), etiquetas de
   **¡Nuevo!**, cuenta regresiva hasta la próxima rotación y un **casillero** con lo
   comprado para ponérselo o quitárselo.
 
-Se paga con lo que suelta la horda: **regalos** en Navidad y **dulces** en Halloween (es
-la misma bolsa). Hay 11 objetos de Navidad: gorro de Papá Noel, gorro de duende,
+Se paga con los **regalos** que suelta la horda. Hay 11 objetos: gorro de Papá Noel, gorro de duende,
 bufanda de la abuela, cornamenta, corona de acebo, guirnalda de luces, esfera rota,
 muñeco de nieve, máscara de Krampus, gorro de cascanueces y estrella de la punta. Lo que
 uno se pone lo ven todos en la partida.
@@ -209,20 +172,9 @@ La rotación sale de mezclar el catálogo con la fecha como semilla (`tiendaDelD
 
 | Prueba | Qué verifica |
 |---|---|
-| `TemporadaTest` (backend) | Navidad por defecto, la sala guarda la temporada con que se creó y entrar a una sala no se la cambia. |
-| `CandyCostumeTest` (backend) | Se aceptan los objetos de Navidad. |
-| `GameSessionZombieTest` (backend) | Papá Noel aparece en el Kinder 3 de Navidad y hay que derribarlo para pasarlo; en Halloween no. |
+| `CandyCostumeTest` (backend) | Se aceptan los objetos de la tienda. |
+| `GameSessionZombieTest` (backend) | Papá Noel aparece en el Kinder 3 y hay que derribarlo para pasarlo. |
 | `TravesurasTest` (backend) | El duende aparece con línea de visión, su bola le pega a quien no se mueve y se esquiva moviéndose; el barro quita vida; solo hay travesuras en un Kinder activo. |
 | `comidas.test.js` | La comida de Navidad cura y cuesta lo mismo, y toda la del mapa tiene su dibujo. |
-| `temporada.test.js` | Preferencia guardada, prioridad de la sala sobre la preferida y aviso de cambios. |
-| `costumes.test.js` | La tienda es la misma todo el día y rota entre días, con 2 destacados, 4 diarios (uno en oferta) y uno que vuelve; se compra al precio de oferta. |
-| `e2e/temporada.spec.js` | Elegir Halloween en el menú y que un invitado con Navidad vea la temporada de la sala (y vuelva a la suya al salir). |
-| `e2e/partida.spec.js` | Navidad abre con su video de intro; Halloween conserva el suyo. |
-
-## Agregar otra temporada
-
-1. Un valor nuevo en `Temporada.java` y su entrada en `TEMPORADAS` (`temporada.js`):
-   nombre, textos y moneda.
-2. Un CSS con `:root[data-temporada='nueva']` (como `navidad.css`).
-3. En `MainScene`, `Lighting`, `ZombieLayer` y `music.js`, la rama de la nueva
-   temporada, donde haga falta.
+| `costumes.test.js` | La tienda es la misma todo el día y rota entre días, con 2 destacados y 5 diarios (uno en oferta); se compra al precio de oferta. |
+| `e2e/partida.spec.js` | El menú abre con el video de intro y se puede saltar. |
