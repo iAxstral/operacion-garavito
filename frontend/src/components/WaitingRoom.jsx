@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ROLE_CATALOG, roleInfo } from '../game/roleCatalog';
 import { getLobbyCode, getMyRole, onStateChange, startGame } from '../game/gameSync';
-import TemporadaCreatures from './TemporadaCreatures';
+import NavidadCreatures from './NavidadCreatures';
 import { DAILY_RULES, MODES } from '../game/gameModes';
 
 export default function WaitingRoom({ onStarted, onLeave }) {
@@ -20,7 +20,7 @@ export default function WaitingRoom({ onStarted, onLeave }) {
   return (
     <div className="role-select">
       <div className="main-menu-vignette" />
-      <TemporadaCreatures bats={4} spiders={2} />
+      <NavidadCreatures ornaments={2} snow={24} />
       <div className="role-select-content">
         <p className="main-menu-kicker">Código de la sala</p>
         <h2 className="waiting-code">{getLobbyCode()}</h2>
