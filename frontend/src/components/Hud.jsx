@@ -25,11 +25,11 @@ import {
 } from '../game/gameSync';
 import SettingsPanel from './SettingsPanel';
 import Icon, { Glyph } from './Icon';
-import useTemporada from './useTemporada';
+import { NAVIDAD } from '../game/navidad';
 import { playSfx } from '../game/sfx';
 import { MISSIONS_PER_KINDER, missionType } from '../game/missionCatalog';
 import { FOOD_ITEMS } from '../game/itemCatalog';
-import { comidaDeTemporada } from '../game/comidas';
+import { comidaNavidena } from '../game/comidas';
 import { CAFETERIA_MENU, WEAPON_MACHINE_MENU } from '../game/shopCatalog';
 import { AMMO_PER_PACK, weaponById, weaponForItem } from '../game/weaponCatalog';
 import { abilityFor, BARRICADE_COOLDOWN_MS, MAX_BARRICADES, priceFor } from '../game/abilityCatalog';
@@ -75,12 +75,12 @@ function healFor(itemId) {
 
 function itemIcon(itemId) {
   const known = [...CAFETERIA_MENU, ...WEAPON_MACHINE_MENU].find((item) => item.itemId === itemId) ?? { itemId };
-  return comidaDeTemporada(known)?.icon ?? null;
+  return comidaNavidena(known)?.icon ?? null;
 }
 
-/** Nombre de un objeto del inventario como se ve en la temporada (bunuelo, natilla...). */
+/** Nombre de un objeto del inventario en Navidad (bunuelo, natilla...). */
 function itemName(slot) {
-  return comidaDeTemporada(slot)?.itemName ?? slot?.itemName;
+  return comidaNavidena(slot)?.itemName ?? slot?.itemName;
 }
 
 // Boton del inventario para sacar o guardar un arma.
@@ -202,7 +202,7 @@ function toastFor(event) {
   } else if (event.type === 'PURCHASE_SUCCESS') {
     message = '¡Compra exitosa! Está en tu inventario (E)';
   } else if (event.type === 'PICKUP_SUCCESS') {
-    const name = comidaDeTemporada(FOOD_ITEMS.find((item) => item.itemId === event.itemId))?.itemName ?? 'Objeto';
+    const name = comidaNavidena(FOOD_ITEMS.find((item) => item.itemId === event.itemId))?.itemName ?? 'Objeto';
     message = `${name} guardado en el inventario (E para abrirlo)`;
   } else if (event.type === 'USE_SUCCESS') {
     message = `¡Recuperaste vida! +${healFor(event.itemId)}`;
@@ -221,7 +221,7 @@ function toastFor(event) {
 }
 
 export default function Hud({ onExit }) {
-  const { moneda } = useTemporada();
+  const { moneda } = NAVIDAD;
   const [state, setState] = useState({ players: [], claimedItemIds: [], lastEvent: null });
   const [panelOpen, setPanelOpen] = useState(false);
   const [toast, setToast] = useState(null);
@@ -829,7 +829,7 @@ export default function Hud({ onExit }) {
           <h3>{nearVendor.label}</h3>
           <div className="shop-items">
             {nearVendor.menu.map((menuItem) => {
-              const item = comidaDeTemporada(menuItem);
+              const item = comidaNavidena(menuItem);
               const price = priceFor(getMyRole(), item.price);
               const canAfford = garavitos >= price;
               const disabled = !canAfford || inventoryFull;

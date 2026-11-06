@@ -1,6 +1,4 @@
-import { getTemporada } from './temporada.js';
-
-// En Navidad la comida que cura es la de diciembre en Colombia: bunuelos, natilla,
+// La comida que cura es la de diciembre en Colombia: bunuelos, natilla,
 // chocolate y galletas. Es solo como se ve y se llama: el servidor usa los mismos ids
 // y cura lo mismo (ShopCatalog y WorldItemCatalog no cambian).
 
@@ -21,7 +19,7 @@ const NAVIDAD = {
   'servidores-food-1': { itemName: 'Galleta de jengibre', icon: '/economia/navidad_galleta.png' },
 };
 
-/** Texturas de Phaser para la comida del mapa en Navidad (clave → archivo). */
+/** Texturas de Phaser para la comida del mapa (clave → archivo). */
 export const COMIDA_TEXTURES = {
   navidad_bunuelo: '/economia/navidad_bunuelo.png',
   navidad_natilla: '/economia/navidad_natilla.png',
@@ -31,18 +29,17 @@ export const COMIDA_TEXTURES = {
 };
 
 /**
- * El objeto `item` ({ itemId, itemName, icon? }) como se ve en la temporada: en Navidad
- * con su nombre e icono de diciembre; si no, igual que llega.
+ * El objeto `item` ({ itemId, itemName, icon? }) con su nombre e icono de diciembre (o
+ * igual que llega si no es comida).
  */
-export function comidaDeTemporada(item, temporada = getTemporada()) {
-  if (!item || temporada !== 'NAVIDAD') return item;
+export function comidaNavidena(item) {
+  if (!item) return item;
   const override = NAVIDAD[item.itemId];
   return override ? { ...item, ...override } : item;
 }
 
 /** Clave de textura de Phaser para una comida del mapa (o null si va el cuadrito). */
-export function texturaDeComida(itemId, temporada = getTemporada()) {
-  if (temporada !== 'NAVIDAD') return null;
+export function texturaDeComida(itemId) {
   const icon = NAVIDAD[itemId]?.icon;
   return icon ? icon.replace('/economia/', '').replace('.png', '') : null;
 }
