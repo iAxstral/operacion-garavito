@@ -77,8 +77,6 @@ public class Player {
 
     /** Disfraces que existen: el cliente los vende y los dibuja; aqui solo se valida el id. */
     public static final java.util.Set<String> COSTUMES = java.util.Set.of(
-            "CALABAZA", "BRUJA", "VAMPIRO", "CALAVERA", "DIABLO", "FANTASMA",
-            // Navidad
             "GORRO_NAVIDAD", "CORNAMENTA", "KRAMPUS", "GORRO_DUENDE", "BUFANDA", "CORONA_ACEBO",
             "MUNECO_NIEVE", "CASCANUECES", "ESTRELLA", "GUIRNALDA", "ESFERA_ROTA");
 

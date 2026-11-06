@@ -25,8 +25,8 @@ class CandyCostumeTest {
     void costumes() {
         GameSession session = new GameSession("DISF", Building.F, BossConfig.defaults());
         session.joinPlayer("SEGURIDAD", "t");
-        session.setPlayerCostume("SEGURIDAD", "VAMPIRO");
-        assertEquals("VAMPIRO", session.playerStates().get(0).costume());
+        session.setPlayerCostume("SEGURIDAD", "KRAMPUS");
+        assertEquals("KRAMPUS", session.playerStates().get(0).costume());
         session.setPlayerCostume("SEGURIDAD", "<script>");
         assertNull(session.playerStates().get(0).costume());
     }
