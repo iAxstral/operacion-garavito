@@ -17,6 +17,7 @@ import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
 import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
 import {
   changeFloor,
+  emitLocalEvent,
   getLatestState,
   getMyBuilding,
   getMyPlayerState,
@@ -63,7 +64,8 @@ import ZombieLayer from './ZombieLayer';
 import WeaponLayer from './WeaponLayer';
 import { ownedWeapons, weaponById } from './weaponCatalog';
 import { BARRICADE_REPAIR_RANGE_PX } from './abilityCatalog';
-import { channelVolume, getSettings, onSettingsChange, vibrate } from './settings';
+import { channelVolume, getSettings, onSettingsChange, updateSettings, vibrate } from './settings';
+import { createPerfMonitor } from './perfMonitor';
 import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
@@ -74,6 +76,8 @@ import { bakeBaseTextures, GoreFx, SHADOW_KEY, LOCKER_KEY } from './BaseDecor';
 import { bakeNavidadTextures, decorateFloorNavidad, startSnow } from './NavidadDecor';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
+// Cada cuanto se le pasan los FPS al monitor de la calidad automatica (ms).
+const PERF_SAMPLE_MS = 250;
 const DASH_SPEED = 420;
 const DASH_MS = 180;
 const DASH_COOLDOWN_MS = 1200;
@@ -360,6 +364,20 @@ export default class MainScene extends Phaser.Scene {
   }
 
   /**
+   * Calidad automatica: cada 250 ms le pasa los FPS al monitor y, si este pide bajar la
+   * calidad y el jugador lo permite, activa el modo de rendimiento y avisa en el HUD.
+   */
+  watchPerformance(time) {
+    if (time - this.perfSampleAt < PERF_SAMPLE_MS) return;
+    this.perfSampleAt = time;
+    const settings = getSettings();
+    if (!settings.autoPerf || settings.lowPerf) return;
+    if (this.perfMonitor.sample(this.game.loop.actualFps, time) !== 'lower') return;
+    updateSettings({ lowPerf: true });
+    emitLocalEvent({ type: 'AUTO_PERF', playerId: getMyRole() });
+  }
+
+  /**
    * Modo de rendimiento en vivo: luz mas simple y sin neblina, menos sangre y sin nieve.
    * Se llama al crear el piso y cada vez que cambia el ajuste.
    */
@@ -578,6 +596,8 @@ export default class MainScene extends Phaser.Scene {
     this.snow = null;
     this.appliedLowPerf = undefined;
     this.applyLowPerf(getSettings().lowPerf);
+    this.perfMonitor = createPerfMonitor();
+    this.perfSampleAt = 0;
     const offSettings = onSettingsChange((settings) => this.applyLowPerf(settings.lowPerf));
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
@@ -1205,6 +1225,7 @@ export default class MainScene extends Phaser.Scene {
 
   update(time, delta) {
     if (!this.player) return;
+    this.watchPerformance(time);
     this.syncRemotePlayers(delta);
     this.playerShadow
       .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)

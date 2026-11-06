@@ -157,6 +157,10 @@ function nameOf(playerId) {
 
 // Texto del aviso para un evento del servidor (o null si a este jugador no le toca).
 function toastFor(event) {
+  // La calidad automatica bajo los efectos porque el juego iba lento (perfMonitor.js).
+  if (event?.type === 'AUTO_PERF') {
+    return { message: '⚙️ El juego iba lento: activamos el modo de rendimiento. Puedes quitarlo en Configuración', ms: 5000 };
+  }
   const broadcastTypes = ['REVIVED', 'TRANSFER', 'EVENT_STARTED', 'EVENT_RESOLVED', 'EVENT_FAILED'];
   if (!event || (event.playerId !== getMyRole() && !broadcastTypes.includes(event.type))) return null;
 

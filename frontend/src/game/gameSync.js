@@ -142,6 +142,11 @@ export function onGameEvent(callback) {
   return () => eventListeners.delete(callback);
 }
 
+/** Avisa a los oyentes de un evento que nace en este cliente (no viene del servidor). */
+export function emitLocalEvent(event) {
+  eventListeners.forEach((callback) => callback(event));
+}
+
 function awaitEvent(predicate) {
   return new Promise((resolve, reject) => {
     const waiter = { predicate, resolve };
