@@ -3,6 +3,7 @@ import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 import { OUTSIDE_MARGIN_TILES } from './outsideDecor';
 import { getSettings } from './settings';
 import { circleTouches, darknessView, toTexture } from './lightMath';
+import { makeHaloStamp } from './lightStamps';
 
 const DARK_KEY = 'darkness_layer';
 const GLOW_KEY = 'light_glow';
@@ -47,7 +48,7 @@ const VIGNETTE_ALPHA = 0.68;
 
 // Penumbra con neblina y luz alrededor del jugador (estilo Among Us), mas algunos bombillos
 // que parpadean. La capa de oscuridad es un canvas a media resolucion al que se le "perforan"
-// circulos de luz.
+// circulos de luz estampando sellos ya horneados (ver lightStamps.js).
 export default class Lighting {
   constructor(scene) {
     this.scene = scene;
@@ -57,6 +58,7 @@ export default class Lighting {
     this.makeGlowTexture();
     this.makeFogTexture();
     this.makeBulbTexture();
+    this.haloStamp = makeHaloStamp();
     this.lowPerf = getSettings().lowPerf;
     this.resolution = this.lowPerf ? LOW_PERF_RESOLUTION : RESOLUTION;
     if (!this.lowPerf) this.makeFog();
@@ -224,14 +226,10 @@ export default class Lighting {
     const r = radius * view.scale;
     if (!circleTouches(sx, sy, r, this.texture.width, this.texture.height)) return;
 
-    const g = ctx.createRadialGradient(sx, sy, r * 0.12, sx, sy, r);
-    g.addColorStop(0, `rgba(0,0,0,${strength})`);
-    g.addColorStop(0.55, `rgba(0,0,0,${strength * 0.6})`);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(sx, sy, r, 0, Math.PI * 2);
-    ctx.fill();
+    if (strength <= 0) return;
+    ctx.globalAlpha = Math.min(1, strength);
+    ctx.drawImage(this.haloStamp, sx - r, sy - r, r * 2, r * 2);
+    ctx.globalAlpha = 1;
   }
 
   // Cono de luz: un sector con degradado (dos pasadas, ancha y suave, angosta y fuerte).
