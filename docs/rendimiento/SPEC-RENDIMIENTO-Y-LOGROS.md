@@ -1,6 +1,6 @@
 # Spec: rendimiento del cliente, indicador de FPS/ping y logros de Nochebuena
 
-Rama: `feat/solo-navidad` · Estado: en implementación (2026-11-06)
+Rama: `feat/solo-navidad` · Estado: implementado (2026-11-06)
 
 Cuatro mejoras independientes; cada una va en sus propios commits y con sus pruebas.
 
@@ -66,6 +66,31 @@ aplica al cambiar de piso.
   - **Nochebuena impecable**: llegar al Kinder 3 sin recibir ninguna bola.
   - **Regalo para todos**: juntar 10 regalos en una corrida.
 - El logro "Sobreviviente" deja el ícono de calabaza y usa el de regalo.
+
+## Resultados
+
+Medido en el Chromium de Playwright sin GPU (canvas por software), edificio F, piso 1,
+18 bombillos en el piso:
+
+| Medida | Antes | Después |
+|---|---|---|
+| Dibujar halos y cono de un cuadro (forzando el dibujado) | 0,91 ms | 0,88 ms |
+| Gradientes creados por cuadro | ~20 (uno por luz y pasada) | 0 |
+| Bombillos con sus 3 sprites dibujados | 18 | 7 (los que están en la vista) |
+| Diferencia de alfa de la oscuridad, píxel a píxel | – | 0,17 / 255 en promedio |
+
+Lo que más se gana no es el tiempo de dibujado del canvas, que en este equipo casi no
+cambia, sino **no generar basura** cada cuadro (menos pausas del recolector) y **no
+dibujar los sprites** de las luces que no se ven. En celulares con GPU, donde el canvas
+2D va acelerado, los sellos deberían ayudar más; queda por medir en un equipo real.
+
+La calidad automática no salta en CI con la configuración por defecto (el juego anda
+alrededor de 43 FPS y el umbral es 40); las pruebas e2e que miden algo fino la apagan.
+
+Pruebas nuevas: `lightMath.test.js`, `perfMonitor.test.js`, `latency.test.js`,
+`liveStats.test.js`, ajustes en `settings.test.js` y `achievements.test.js`,
+`PingControllerTest`, travesuras en `TravesurasTest` y `MatchSummaryTest`, y
+`e2e/rendimiento.spec.js`.
 
 ## Fuera de alcance
 
