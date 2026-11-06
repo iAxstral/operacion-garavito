@@ -1,6 +1,5 @@
 import { audio } from './sfx';
 import { channelVolume, onSettingsChange } from './settings';
-import { getTemporada } from './temporada';
 import { WE_WISH } from './villancico';
 
 // Musica generada en vivo con Web Audio (el proyecto no tiene pistas grabadas).
@@ -24,7 +23,6 @@ const CHORDS = [
   [82.41, 103.83, 123.47],
 ];
 const BASS = [55.0, 43.65, 36.71, 41.2];
-const BELLS = [440, 523.25, 659.25, 587.33, 493.88, 392];
 
 // Navidad: "We Wish You a Merry Christmas" (dominio publico) en La menor armonica.
 // Un paso = una corchea: la melodia dura 48 corcheas y despues hay 16 de silencio.
@@ -191,31 +189,22 @@ function scheduleBeat(ctx, time, step) {
       type: 'triangle', freq, start: time, duration: 3.6, gain: 0.05, attack: 0.8,
     }));
   }
-  const navidad = getTemporada() === 'NAVIDAD';
-  if (navidad) {
-    const note = VILLANCICO.get(step % VILLANCICO_LOOP);
-    if (note) {
-      const eighth = 60 / tempoFor(intensity) / 2;
-      // Calma: la caja de musica rota.
-      musicBox(ctx, time, note.freq);
-      // Kinder: un coro grave una octava abajo que arrastra cada nota.
-      envelopeNote(ctx, layers[1], {
-        type: 'triangle', freq: note.freq / 2, start: time, duration: note.eighths * eighth * 1.3, gain: 0.05, attack: 0.08,
-      });
-      // Peligro: el eco desafinado medio tono arriba.
-      envelopeNote(ctx, layers[2], {
-        type: 'sawtooth', freq: note.freq * 1.0595, start: time + eighth / 2, duration: 0.25, gain: 0.015, attack: 0.005,
-      });
-    }
-    // Cascabeles del trineo en cada pulso mientras corre el Kinder.
-    if (inBar % 4 === 0) sleighBells(ctx, time);
-  }
-  // Campanita lejana de vez en cuando (calma).
-  if (!navidad && inBar === 10 && Math.random() < 0.55) {
-    envelopeNote(ctx, layers[0], {
-      type: 'sine', freq: BELLS[Math.floor(Math.random() * BELLS.length)], start: time, duration: 2.2, gain: 0.035,
+  const note = VILLANCICO.get(step % VILLANCICO_LOOP);
+  if (note) {
+    const eighth = 60 / tempoFor(intensity) / 2;
+    // Calma: la caja de musica rota.
+    musicBox(ctx, time, note.freq);
+    // Kinder: un coro grave una octava abajo que arrastra cada nota.
+    envelopeNote(ctx, layers[1], {
+      type: 'triangle', freq: note.freq / 2, start: time, duration: note.eighths * eighth * 1.3, gain: 0.05, attack: 0.08,
+    });
+    // Peligro: el eco desafinado medio tono arriba.
+    envelopeNote(ctx, layers[2], {
+      type: 'sawtooth', freq: note.freq * 1.0595, start: time + eighth / 2, duration: 0.25, gain: 0.015, attack: 0.005,
     });
   }
+  // Cascabeles del trineo en cada pulso mientras corre el Kinder.
+  if (inBar % 4 === 0) sleighBells(ctx, time);
   // Latido: bombo doble en el pulso 1 y bajo en corcheas.
   if (inBar % 8 === 0) kick(ctx, time, 0.5);
   if (inBar % 8 === 1) kick(ctx, time, 0.32);
