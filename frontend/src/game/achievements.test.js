@@ -40,3 +40,21 @@ test('un rol que no esta en el resumen no gana nada y todos los logros tienen ic
   assert.deepEqual(earnAchievements(run({ kills: 99 }), 'ECONOMIA'), []);
   assert.ok(ACHIEVEMENTS.every((a) => a.icon && a.name && a.description));
 });
+
+test('los logros de Nochebuena miran a Papa Noel, las bolas y los regalos', () => {
+  const ids = (stats, extra) => earnAchievements(run(stats, extra), 'SALUD').map((a) => a.id);
+  assert.ok(ids({}, { kinderReached: 4 }).includes('santa_hunter'), 'pasar el Kinder 3 es derribar a Papa Noel');
+  assert.ok(!ids({}, { kinderReached: 3 }).includes('santa_hunter'), 'llegar al 3 no alcanza');
+  assert.ok(ids({ snowballsDodged: 5 }).includes('reindeer_agile'));
+  assert.ok(!ids({ snowballsDodged: 4 }).includes('reindeer_agile'));
+  assert.ok(ids({ snowballsTaken: 6 }).includes('snowman'));
+  assert.ok(ids({ candies: 10 }).includes('gifts_for_all'));
+  assert.ok(!ids({ candies: 9 }).includes('gifts_for_all'));
+});
+
+test('Nochebuena impecable pide el dato del servidor y cero bolas recibidas', () => {
+  const ids = (stats, extra) => earnAchievements(run(stats, extra), 'SALUD').map((a) => a.id);
+  assert.ok(ids({ snowballsTaken: 0 }, { kinderReached: 3 }).includes('spotless_eve'));
+  assert.ok(!ids({ snowballsTaken: 1 }, { kinderReached: 3 }).includes('spotless_eve'));
+  assert.ok(!ids({}, { kinderReached: 5 }).includes('spotless_eve'), 'un resumen viejo sin el dato no lo da');
+});
