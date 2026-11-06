@@ -13,6 +13,7 @@ Juego cooperativo de decisión bajo presión, ambientado en la ECI — Proyecto 
 - frontend/ — React · Vite
 - docs/ESCALABILIDAD.md — mediciones de carga y propuesta para escalar
 - docs/temporadas — ambientación de Navidad sangrienta, con capturas
+- docs/rendimiento — luces más livianas, calidad automática, FPS/ping y logros de Nochebuena
 - docs/k6, docs/prometheus, docs/grafana — pruebas de carga y monitoreo, con capturas y resultados
 - k6/ — script de prueba de carga · monitoring/ — Prometheus y Grafana con los tableros ya configurados
 

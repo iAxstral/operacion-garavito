@@ -170,6 +170,22 @@ recurso defensivo antes del hacha.
   navideños con rotación diaria.
 - Detalles y capturas en `docs/temporadas`.
 
+## 10. Rendimiento, FPS/ping y logros de Nochebuena
+
+- **Luces más livianas**: la capa de oscuridad estampa sellos ya horneados en vez
+  de crear un degradado por luz en cada cuadro, y los bombillos fuera de la vista
+  no se dibujan (`lightStamps.js`, `lightMath.js`).
+- **Calidad automática** (ajuste `autoPerf`, prendido por defecto): si el juego
+  va bajo 40 FPS por 5 s seguidos, se activa el modo de rendimiento y el HUD
+  avisa. Ese modo ahora se aplica al instante, sin cambiar de piso.
+- **Indicador de FPS y ping** (ajuste `showStats`): mide la latencia con
+  `GET /api/ping` cada 3 s mientras se ve.
+- **Travesuras en el resumen**: `PlayerSummary.snowballsTaken` y
+  `snowballsDodged`, en la tabla de resultados y en cinco logros nuevos (Cazador
+  de Papá Noel, Ágil como un reno, Muñeco de nieve, Nochebuena impecable y Regalo
+  para todos).
+- Spec y mediciones en `docs/rendimiento/SPEC-RENDIMIENTO-Y-LOGROS.md`.
+
 ## Fuera de alcance
 
 - ~~Validación de movimiento en el servidor (anti-cheat).~~ Hecho:
