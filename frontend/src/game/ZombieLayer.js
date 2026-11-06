@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { SHADOW_KEY } from './HauntedDecor';
+import { SHADOW_KEY } from './BaseDecor';
 import { bakeZombieSheets, zombieTextureKey, ZOMBIE_FRAMES } from './zombieArt';
 import { getSettings, onSettingsChange } from './settings';
 import { getTemporada } from './temporada';

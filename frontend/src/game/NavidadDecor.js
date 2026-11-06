@@ -1,9 +1,8 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
-import { canvasTexture, seeded, SHADOW_KEY } from './HauntedDecor';
+import { canvasTexture, seeded, SHADOW_KEY } from './BaseDecor';
 
-// Ambiente de Navidad dentro del edificio (la contraparte de HauntedDecor para
-// Halloween): arbolitos marchitos con luces que fallan, regalos rotos y carambanos.
+// Ambiente de Navidad dentro del edificio: arbolitos marchitos con luces que fallan, regalos rotos y carambanos.
 // Todo es solo visual: nada de esto tiene cuerpo fisico ni lo conoce el servidor.
 
 export const TREE_KEY = 'xm_tree';
@@ -118,8 +117,8 @@ export function bakeNavidadTextures(scene) {
 }
 
 /**
- * Arbolitos y regalos junto a las paredes y carambanos en las esquinas de los salones,
- * en los mismos lugares que Halloween pone calabazas y telaranas.
+ * Arbolitos y regalos junto a las paredes y carambanos en las esquinas de los salones.
+ * Se elige con una semilla por edificio y piso para que todos vean lo mismo.
  */
 export function decorateFloorNavidad(scene, grid, lighting, { building, floor }) {
   const rand = seeded(`${building}-${floor}`);
@@ -188,7 +187,7 @@ export function decorateFloorNavidad(scene, grid, lighting, { building, floor })
   });
 }
 
-/** Nieve que cae alrededor del jugador (en Halloween son motas de polvo). */
+/** Nieve que cae alrededor del jugador. */
 export function startSnow(scene, target) {
   const emitter = scene.add.particles(0, 0, FLAKE_KEY, {
     emitZone: { type: 'random', source: new Phaser.Geom.Rectangle(-560, -380, 1120, 760) },

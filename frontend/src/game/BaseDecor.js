@@ -1,11 +1,7 @@
-import Phaser from 'phaser';
-import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 
-// Ambiente de Halloween dentro del edificio y efectos de golpe. Todo es solo visual:
-// nada de esto tiene cuerpo fisico ni lo conoce el servidor.
+// Texturas comunes del mapa (sombras, casilleros, fogonazo) y efectos de golpe. Todo es
+// solo visual: nada de esto tiene cuerpo fisico ni lo conoce el servidor.
 
-export const PUMPKIN_KEY = 'hw_pumpkin';
-export const WEB_KEY = 'hw_web';
 export const DOT_KEY = 'hw_dot';
 export const SHELL_KEY = 'hw_shell';
 export const FLASH_KEY = 'hw_flash';
@@ -18,11 +14,8 @@ const BLOOD_KEYS = ['hw_blood_0', 'hw_blood_1', 'hw_blood_2', 'hw_blood_3'];
 const MAX_DECALS = 90;
 const LOW_PERF_DECALS = 30;
 const DEPTH_DECAL = 1.5;
-const DEPTH_DUST = 4995;
 
-const WALLISH = new Set(['wall', 'glass']);
-
-// Aleatorio con semilla: todos los jugadores ven las mismas calabazas y telaranas.
+// Aleatorio con semilla: todos los jugadores ven la misma decoracion.
 export function seeded(seedText) {
   let seed = 0;
   for (const ch of seedText) seed = (seed * 31 + ch.charCodeAt(0)) % 2147483647;
@@ -40,65 +33,7 @@ export function canvasTexture(scene, key, w, h, draw) {
   texture.refresh();
 }
 
-export function bakeHauntedTextures(scene) {
-  // Calabaza tallada con la cara encendida.
-  canvasTexture(scene, PUMPKIN_KEY, 34, 32, (ctx) => {
-    ctx.fillStyle = '#3b5a1c';
-    ctx.fillRect(15, 1, 4, 7);
-    const body = ctx.createRadialGradient(17, 18, 3, 17, 19, 16);
-    body.addColorStop(0, '#ff9a2e');
-    body.addColorStop(0.7, '#d9620f');
-    body.addColorStop(1, '#7a2f05');
-    ctx.fillStyle = body;
-    [[9, 19, 8], [25, 19, 8], [17, 19, 10]].forEach(([x, y, r]) => {
-      ctx.beginPath();
-      ctx.ellipse(x, y, r, 11, 0, 0, Math.PI * 2);
-      ctx.fill();
-    });
-    ctx.strokeStyle = 'rgba(90, 30, 0, 0.6)';
-    ctx.lineWidth = 1;
-    [12, 22].forEach((x) => {
-      ctx.beginPath();
-      ctx.moveTo(x, 9);
-      ctx.quadraticCurveTo(x + (x < 17 ? -3 : 3), 19, x, 29);
-      ctx.stroke();
-    });
-    ctx.fillStyle = '#ffe36a';
-    ctx.beginPath();
-    ctx.moveTo(9, 15); ctx.lineTo(14, 15); ctx.lineTo(11.5, 11); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(20, 15); ctx.lineTo(25, 15); ctx.lineTo(22.5, 11); ctx.fill();
-    ctx.beginPath();
-    ctx.moveTo(8, 21); ctx.lineTo(26, 21); ctx.lineTo(23, 26); ctx.lineTo(20, 24);
-    ctx.lineTo(17, 27); ctx.lineTo(14, 24); ctx.lineTo(11, 26); ctx.closePath(); ctx.fill();
-  });
-
-  // Telarana de esquina (se ancla arriba a la izquierda; se voltea para la otra esquina).
-  canvasTexture(scene, WEB_KEY, 72, 72, (ctx) => {
-    ctx.strokeStyle = 'rgba(225, 225, 235, 0.75)';
-    ctx.lineWidth = 1;
-    const spokes = 6;
-    for (let i = 0; i <= spokes; i += 1) {
-      const a = (i / spokes) * (Math.PI / 2);
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.lineTo(Math.cos(a) * 72, Math.sin(a) * 72);
-      ctx.stroke();
-    }
-    [14, 26, 39, 53, 67].forEach((r) => {
-      ctx.beginPath();
-      for (let i = 0; i <= spokes; i += 1) {
-        const a = (i / spokes) * (Math.PI / 2);
-        const sag = i === 0 || i === spokes ? 0 : r * 0.08;
-        const x = Math.cos(a) * (r - sag);
-        const y = Math.sin(a) * (r - sag);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      }
-      ctx.stroke();
-    });
-  });
-
+export function bakeBaseTextures(scene) {
   canvasTexture(scene, DOT_KEY, 8, 8, (ctx) => {
     const g = ctx.createRadialGradient(4, 4, 0, 4, 4, 4);
     g.addColorStop(0, 'rgba(255,255,255,1)');
@@ -195,95 +130,6 @@ export function bakeHauntedTextures(scene) {
       ctx.fill();
     });
   });
-}
-
-/**
- * Calabazas junto a las paredes y telaranas en las esquinas de los salones. Se elige
- * con una semilla por edificio y piso para que todos vean lo mismo.
- */
-export function decorateFloor(scene, grid, lighting, { building, floor }) {
-  const rand = seeded(`${building}-${floor}`);
-  const cell = (x, y) => grid[y]?.[x] ?? null;
-  const isWall = (x, y) => WALLISH.has(cell(x, y)?.type);
-  const isFloor = (x, y) => cell(x, y)?.type === 'floor';
-  const nearStairs = (x, y) => [-1, 0, 1].some((dx) => [-1, 0, 1].some((dy) => {
-    const type = cell(x + dx, y + dy)?.type;
-    return type === 'stair' || type === 'landing';
-  }));
-
-  const webs = [];
-  const pumpkinSpots = [];
-  for (let y = 1; y < MAP_ROWS - 1; y += 1) {
-    for (let x = 1; x < MAP_COLS - 1; x += 1) {
-      if (!isFloor(x, y)) continue;
-      if (isWall(x, y - 1) && isWall(x - 1, y)) webs.push({ x, y, flip: false });
-      else if (isWall(x, y - 1) && isWall(x + 1, y)) webs.push({ x, y, flip: true });
-      else if (isWall(x, y - 1) && isFloor(x, y + 1) && !nearStairs(x, y)) pumpkinSpots.push({ x, y });
-    }
-  }
-
-  webs.filter(() => rand() < 0.6).slice(0, 18).forEach(({ x, y, flip }) => {
-    const left = x * TILE + (flip ? TILE : 0);
-    const size = 0.75 + rand() * 0.5;
-    scene.add.image(left, y * TILE, WEB_KEY)
-      .setOrigin(0, 0)
-      .setFlipX(flip)
-      .setScale(size)
-      .setAlpha(0.55 + rand() * 0.3)
-      .setDepth(4);
-  });
-
-  // Calabazas separadas entre si (no dos en el mismo pasillo).
-  const placed = [];
-  pumpkinSpots
-    .map((spot) => ({ ...spot, order: rand() }))
-    .sort((a, b) => a.order - b.order)
-    .forEach((spot) => {
-      if (placed.length >= 7) return;
-      if (placed.some((p) => Math.abs(p.x - spot.x) + Math.abs(p.y - spot.y) < 7)) return;
-      placed.push(spot);
-    });
-
-  placed.forEach(({ x, y }) => {
-    const px = x * TILE + TILE / 2 + (rand() - 0.5) * 20;
-    const py = y * TILE + 22;
-    scene.add.image(px, py, SHADOW_KEY).setDepth(1.6).setAlpha(0.7);
-    scene.add.image(px, py - 8, PUMPKIN_KEY).setDepth(py).setScale(1.15);
-    const glow = scene.add.image(px, py - 8, 'light_glow')
-      .setTint(0xff7a1a)
-      .setBlendMode(Phaser.BlendModes.ADD)
-      .setDisplaySize(120, 120)
-      .setAlpha(0.45)
-      .setDepth(5001);
-    scene.tweens.add({
-      targets: glow,
-      alpha: { from: 0.3, to: 0.55 },
-      duration: 140 + rand() * 120,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.easeInOut',
-    });
-    lighting.addLight({ x: px, y: py - 8, radius: 110, mode: 'flicker', bulb: false });
-  });
-}
-
-/** Motas de polvo que flotan alrededor del jugador; solo se ven donde hay luz. */
-export function startDust(scene, target) {
-  const emitter = scene.add.particles(0, 0, DOT_KEY, {
-    emitZone: { type: 'random', source: new Phaser.Geom.Rectangle(-520, -340, 1040, 680) },
-    lifespan: { min: 4000, max: 7000 },
-    speedX: { min: -8, max: 8 },
-    speedY: { min: -10, max: 4 },
-    scale: { min: 0.25, max: 0.7 },
-    alpha: { start: 0.55, end: 0 },
-    tint: 0xffe2b0,
-    blendMode: Phaser.BlendModes.ADD,
-    frequency: 90,
-    quantity: 1,
-  });
-  emitter.setDepth(DEPTH_DUST);
-  emitter.startFollow(target);
-  return emitter;
 }
 
 /**

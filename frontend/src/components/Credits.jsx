@@ -10,7 +10,7 @@ const SECTIONS = [
   { title: 'Tecnología', lines: ['Spring Boot · STOMP sobre WebSocket', 'React · Phaser', 'PostgreSQL · Redis · Prometheus'] },
   {
     title: 'Sonido (CC0)',
-    lines: ['Kenney — Impact Sounds y RPG Audio', 'AntumDeluge — Bat Screeches', 'kurt — Gunshots', 'qubodup — Ghost/monster voice'],
+    lines: ['Kenney — Impact Sounds y RPG Audio', 'kurt — Gunshots', 'qubodup — Ghost/monster voice'],
   },
 ];
 

@@ -3,9 +3,8 @@ import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLay
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
 import { displayName } from './profile';
 import PingLayer from './PingLayer';
-import HauntLayer from './HauntLayer';
 import { pollGamepad } from './gamepad';
-import { bakeCostumes, costumeKey, COSTUME_LAYOUT, defaultCostume, HEAD_Y, NECK_Y } from './costumeArt';
+import { bakeCostumes, costumeKey, COSTUME_LAYOUT, DEFAULT_COSTUME, HEAD_Y, NECK_Y } from './costumeArt';
 import { setStamina } from './stamina';
 import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
 import { NIGHT_CONE_FACTOR } from './gameModes';
@@ -71,9 +70,8 @@ import BossLayer, { preloadBoss } from './BossLayer';
 import TravesurasLayer from './TravesurasLayer';
 import { clearScreenFx } from './screenFx';
 import Lighting from './Lighting';
-import { bakeHauntedTextures, decorateFloor, startDust, GoreFx, SHADOW_KEY, LOCKER_KEY } from './HauntedDecor';
+import { bakeBaseTextures, GoreFx, SHADOW_KEY, LOCKER_KEY } from './BaseDecor';
 import { bakeNavidadTextures, decorateFloorNavidad, startSnow } from './NavidadDecor';
-import { getTemporada } from './temporada';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
 
 const DASH_SPEED = 420;
@@ -361,10 +359,10 @@ export default class MainScene extends Phaser.Scene {
     return Boolean(hiddenIn);
   }
 
-  // Disfraz encima del personaje (o la capa detras). `holder` guarda la imagen. Sin
-  // disfraz, en Navidad todos llevan el gorrito de lana.
+  // Disfraz encima del personaje. `holder` guarda la imagen. Sin disfraz, todos llevan
+  // el gorrito de lana.
   syncCostume(holder, sprite, id) {
-    const wanted = id ?? defaultCostume(getTemporada());
+    const wanted = id ?? DEFAULT_COSTUME;
     const costume = wanted && COSTUME_LAYOUT[wanted] ? wanted : null;
     if (holder.costumeId !== costume) {
       holder.costumeImage?.destroy();
@@ -375,7 +373,7 @@ export default class MainScene extends Phaser.Scene {
     if (!image) return;
     const layout = COSTUME_LAYOUT[costume];
     const top = sprite.y - sprite.displayHeight / 2;
-    const y = layout.anchor === 'body' ? sprite.y + layout.dy : top + (layout.anchor === 'neck' ? NECK_Y : HEAD_Y) + layout.dy;
+    const y = top + (layout.anchor === 'neck' ? NECK_Y : HEAD_Y) + layout.dy;
     image
       .setPosition(sprite.x, y)
       .setScale(layout.scale)
@@ -559,10 +557,7 @@ export default class MainScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
     this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
-    if (!getSettings().lowPerf) {
-      if (getTemporada() === 'NAVIDAD') startSnow(this, this.player);
-      else startDust(this, this.player);
-    }
+    if (!getSettings().lowPerf) startSnow(this, this.player);
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
@@ -640,13 +635,6 @@ export default class MainScene extends Phaser.Scene {
         ...spot,
         image: this.add.image(spot.x, spot.y - 6, LOCKER_KEY).setDepth(spot.y + 30),
       }));
-    });
-    this.hauntLayer = new HauntLayer(this, {
-      rooms: missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor),
-      floor: this.floor,
-      lighting: this.lighting,
-      doors: this.doors,
-      getListener: () => this.focusSprite(),
     });
     preloadSamples();
     setOcclusion((x1, y1, x2, y2) => this.wallBetween(x1, y1, x2, y2));
@@ -1212,7 +1200,6 @@ export default class MainScene extends Phaser.Scene {
     this.syncBlasts();
     this.syncExit(time);
     this.pingLayer?.update(time);
-    this.hauntLayer?.update(time);
     this.checkDamageTaken();
     this.drawReviveProgress();
     if (this.updateSpectate(delta)) return;
@@ -1766,7 +1753,7 @@ export default class MainScene extends Phaser.Scene {
 
     this.layoutGrid = layout.grid;
     this.lighting = new Lighting(this);
-    bakeHauntedTextures(this);
+    bakeBaseTextures(this);
     bakeNavidadTextures(this);
     this.gore = new GoreFx(this, { lowPerf: getSettings().lowPerf });
     renderOutside(this, layout.grid, this.lighting, getMyBuilding());
@@ -1775,22 +1762,18 @@ export default class MainScene extends Phaser.Scene {
     this.renderFurniture(layout.furniture);
     this.renderLabels(layout.labels);
     this.addInteriorLights(layout);
-    // La decoracion es la de la temporada de la sala: todos los de adentro ven la misma.
-    const decorate = getTemporada() === 'NAVIDAD' ? decorateFloorNavidad : decorateFloor;
-    decorate(this, layout.grid, this.lighting, { building: getMyBuilding(), floor: this.floor });
-    if (getTemporada() === 'NAVIDAD') {
-      // Velo azul helado sobre todo el mapa (debajo de la oscuridad): enfria el piso y
-      // las luces calidas sin borrar el rojo de la sangre.
-      // El multiply oscurece lo calido; el ADD suma un poco de azul para que se sienta frio.
-      this.add.rectangle(-MAP_PIXEL_WIDTH, -MAP_PIXEL_HEIGHT, MAP_PIXEL_WIDTH * 3, MAP_PIXEL_HEIGHT * 3, 0xc4d4ee)
-        .setOrigin(0, 0)
-        .setBlendMode(Phaser.BlendModes.MULTIPLY)
-        .setDepth(4989);
-      this.add.rectangle(-MAP_PIXEL_WIDTH, -MAP_PIXEL_HEIGHT, MAP_PIXEL_WIDTH * 3, MAP_PIXEL_HEIGHT * 3, 0x08162c)
-        .setOrigin(0, 0)
-        .setBlendMode(Phaser.BlendModes.ADD)
-        .setDepth(4989.5);
-    }
+    decorateFloorNavidad(this, layout.grid, this.lighting, { building: getMyBuilding(), floor: this.floor });
+    // Velo azul helado sobre todo el mapa (debajo de la oscuridad): enfria el piso y
+    // las luces calidas sin borrar el rojo de la sangre.
+    // El multiply oscurece lo calido; el ADD suma un poco de azul para que se sienta frio.
+    this.add.rectangle(-MAP_PIXEL_WIDTH, -MAP_PIXEL_HEIGHT, MAP_PIXEL_WIDTH * 3, MAP_PIXEL_HEIGHT * 3, 0xc4d4ee)
+      .setOrigin(0, 0)
+      .setBlendMode(Phaser.BlendModes.MULTIPLY)
+      .setDepth(4989);
+    this.add.rectangle(-MAP_PIXEL_WIDTH, -MAP_PIXEL_HEIGHT, MAP_PIXEL_WIDTH * 3, MAP_PIXEL_HEIGHT * 3, 0x08162c)
+      .setOrigin(0, 0)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(4989.5);
 
     [
       { kind: 'up', stairs: layout.upStairs },
