@@ -2,8 +2,8 @@ import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 import { OUTSIDE_MARGIN_TILES } from './outsideDecor';
 import { getSettings } from './settings';
-import { circleTouches, darknessView, toTexture } from './lightMath';
-import { makeHaloStamp } from './lightStamps';
+import { circleTouches, darknessView, stampTransform, toTexture } from './lightMath';
+import { STAMP_RADIUS, makeConeStamp, makeHaloStamp } from './lightStamps';
 
 const DARK_KEY = 'darkness_layer';
 const GLOW_KEY = 'light_glow';
@@ -21,6 +21,10 @@ const PLAYER_RADIUS = 340;
 const HALO_RADIUS = 150;
 const CONE_LENGTH = 470;
 const CONE_HALF_ANGLE = 0.5;
+// Pasadas del cono: una ancha y suave y otra angosta y fuerte (en modo de rendimiento,
+// solo la angosta). [medio angulo, potencia]
+const CONE_PASSES = [[CONE_HALF_ANGLE * 1.35, 0.45], [CONE_HALF_ANGLE, 1]];
+const LOW_PERF_CONE_PASSES = [[CONE_HALF_ANGLE, 1]];
 const REMOTE_CONE_LENGTH = 300;
 const BLACKOUT_CONE_LENGTH = 260;
 // Apagon: casi negro, solo una linterna corta alrededor de cada jugador.
@@ -59,6 +63,7 @@ export default class Lighting {
     this.makeFogTexture();
     this.makeBulbTexture();
     this.haloStamp = makeHaloStamp();
+    this.coneStamps = new Map(CONE_PASSES.map(([half]) => [half, makeConeStamp(half)]));
     this.lowPerf = getSettings().lowPerf;
     this.resolution = this.lowPerf ? LOW_PERF_RESOLUTION : RESOLUTION;
     if (!this.lowPerf) this.makeFog();
@@ -232,24 +237,20 @@ export default class Lighting {
     ctx.globalAlpha = 1;
   }
 
-  // Cono de luz: un sector con degradado (dos pasadas, ancha y suave, angosta y fuerte).
+  // Cono de luz: el sello del sector girado hacia donde apunta (dos pasadas, ancha y
+  // suave, angosta y fuerte).
   punchCone(ctx, view, x, y, angle, length, strength) {
     const { sx, sy } = toTexture(view, x, y);
     const r = length * view.scale;
     if (!circleTouches(sx, sy, r, this.texture.width, this.texture.height)) return;
-    const passes = this.lowPerf ? [[CONE_HALF_ANGLE, 1]] : [[CONE_HALF_ANGLE * 1.35, 0.45], [CONE_HALF_ANGLE, 1]];
+    const passes = this.lowPerf ? LOW_PERF_CONE_PASSES : CONE_PASSES;
+    ctx.setTransform(...stampTransform(sx, sy, angle, r, STAMP_RADIUS));
     passes.forEach(([half, power]) => {
-      const g = ctx.createRadialGradient(sx, sy, r * 0.05, sx, sy, r);
-      g.addColorStop(0, `rgba(0,0,0,${strength * power})`);
-      g.addColorStop(0.6, `rgba(0,0,0,${strength * power * 0.75})`);
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = g;
-      ctx.beginPath();
-      ctx.moveTo(sx, sy);
-      ctx.arc(sx, sy, r, angle - half, angle + half);
-      ctx.closePath();
-      ctx.fill();
+      ctx.globalAlpha = Math.min(1, strength * power);
+      ctx.drawImage(this.coneStamps.get(half), -STAMP_RADIUS, -STAMP_RADIUS);
     });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
   }
 
   update(time, player, remotePlayers, aimAngle = null) {
