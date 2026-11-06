@@ -4,7 +4,7 @@ import { nameWithRole } from '../game/profile';
 import { playSfx } from '../game/sfx';
 import RankingPanel from './RankingPanel';
 import Icon from './Icon';
-import useTemporada from './useTemporada';
+import { NAVIDAD } from '../game/navidad';
 import { earnAchievements } from '../game/achievements';
 import { creditRun } from '../game/costumes';
 import Credits from './Credits';
@@ -49,7 +49,7 @@ const formatTime = (seconds) => `${Math.floor(seconds / 60)}:${String(seconds % 
 
 /** Pantalla de resultados al ganar o al caer todo el equipo, con las estadisticas de la corrida. */
 export default function GameOverScreen({ onExitToMenu }) {
-  const { moneda } = useTemporada();
+  const { moneda } = NAVIDAD;
   const [outcome, setOutcome] = useState(null);
   const [summary, setSummary] = useState(null);
   const [showRanking, setShowRanking] = useState(false);
