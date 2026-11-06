@@ -6,22 +6,17 @@ import ServerStatus from './ServerStatus';
 import AchievementsPanel from './AchievementsPanel';
 import ItemShop from './ItemShop';
 import ProfilePanel from './ProfilePanel';
-import TemporadaCreatures from './TemporadaCreatures';
+import NavidadCreatures from './NavidadCreatures';
 import Icon from './Icon';
 import { playSfx } from '../game/sfx';
 import { channelVolume, onSettingsChange } from '../game/settings';
 import { startMusic, stopMusic } from '../game/music';
-import { TEMPORADAS, setTemporadaPreferida } from '../game/temporada';
-import useTemporada from './useTemporada';
+import { NAVIDAD } from '../game/navidad';
 
-const VIDEO_SRC = '/video/inicio.mp4';
-const POSTER_SRC = '/video/inicio-poster.jpg';
-// Navidad tiene su propio video de intro; despues, el menu queda sobre el campus de noche.
-const NAVIDAD_VIDEO_SRC = '/video/intro-navidad.mp4';
-const NAVIDAD_POSTER_SRC = '/video/intro-navidad-poster.jpg';
-const CAMPUS_SRC = '/mapa/seleccion-edificio-halloween.jpg';
-// En este segundo del video no esta el texto "Happy Halloween": ahi queda quieto de fondo.
-const MENU_FRAME_S = 4.0;
+// La intro es un video; despues, el menu queda sobre el campus de noche.
+const VIDEO_SRC = '/video/intro-navidad.mp4';
+const POSTER_SRC = '/video/intro-navidad-poster.jpg';
+const CAMPUS_SRC = '/mapa/campus-noche.jpg';
 const INTRO_SEEN_KEY = 'garavito.introSeen';
 const EMBERS = 14;
 
@@ -43,14 +38,12 @@ function markIntroSeen() {
 
 /**
  * Pantalla de inicio: la primera vez en la sesion se ve el video completo como intro
- * (se puede saltar); despues el menu queda sobre un cuadro del video con un zoom
- * lento, chispas y el titulo del juego.
+ * (se puede saltar); despues el menu queda sobre el campus de noche, con chispas y el
+ * titulo del juego.
  */
 export default function MainMenu({ onPlay }) {
   const videoRef = useRef(null);
-  const temporada = useTemporada();
-  const halloween = temporada.id === 'HALLOWEEN';
-  // La primera vez en la sesion se ve la intro: cada temporada tiene su video.
+  // La primera vez en la sesion se ve la intro.
   const [phase, setPhase] = useState(() => (introAlreadySeen() ? 'menu' : 'intro'));
   const [soundOn, setSoundOn] = useState(false);
   const [panel, setPanel] = useState(null);
@@ -58,37 +51,23 @@ export default function MainMenu({ onPlay }) {
   const showMenu = useCallback(() => {
     markIntroSeen();
     startMusic(0);
-    const video = videoRef.current;
-    if (video) {
-      video.pause();
-      video.currentTime = MENU_FRAME_S;
-    }
     setPhase('menu');
   }, []);
 
   const replayIntro = () => {
     playSfx('click');
     stopMusic();
-    const video = videoRef.current;
+    // El video se monta con la intro y arranca solo (autoPlay).
     setPhase('intro');
-    if (!video) return; // Navidad: el video se monta con la intro y arranca solo (autoPlay).
-    video.currentTime = 0;
-    video.play().catch(showMenu);
   };
 
   // Intro: se reproduce sola (en silencio, como exigen los navegadores); si el
   // navegador no deja, se pasa directo al menu.
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) {
-      startMusic(0);
-      return;
-    }
-    if (phase === 'intro') {
+    if (video) {
       video.play().catch(showMenu);
     } else {
-      video.pause();
-      if (Math.abs(video.currentTime - MENU_FRAME_S) > 0.2) video.currentTime = MENU_FRAME_S;
       // Suena desde el primer toque del jugador (los navegadores no dejan antes).
       startMusic(0);
     }
@@ -127,31 +106,26 @@ export default function MainMenu({ onPlay }) {
 
   return (
     <div className={`start-screen start-screen--${phase}`}>
-      {!halloween && <img className="start-video start-campus" src={CAMPUS_SRC} alt="" aria-hidden="true" />}
-      {(halloween || phase === 'intro') && (
+      <img className="start-video start-campus" src={CAMPUS_SRC} alt="" aria-hidden="true" />
+      {phase === 'intro' && (
         <video
           ref={videoRef}
-          key={temporada.id}
-          className={`start-video${halloween ? '' : ' start-video--navidad'}`}
-          src={halloween ? VIDEO_SRC : NAVIDAD_VIDEO_SRC}
-          poster={halloween ? POSTER_SRC : NAVIDAD_POSTER_SRC}
+          className="start-video start-video--navidad"
+          src={VIDEO_SRC}
+          poster={POSTER_SRC}
           muted={!soundOn}
           playsInline
-          autoPlay={!halloween}
+          autoPlay
           preload="auto"
           onEnded={showMenu}
-          onError={halloween ? undefined : showMenu}
-          onLoadedMetadata={(event) => {
-            // Al volver a Halloween desde el menu, el video queda en su cuadro quieto.
-            if (halloween && phase === 'menu') event.currentTarget.currentTime = MENU_FRAME_S;
-          }}
+          onError={showMenu}
           aria-hidden="true"
         />
       )}
       <div className="start-shade" />
       <div className="start-fog" aria-hidden="true" />
       <div className="start-flash" aria-hidden="true" />
-      {phase === 'menu' && <TemporadaCreatures bats={5} spiders={3} />}
+      {phase === 'menu' && <NavidadCreatures ornaments={3} snow={30} />}
       <div className="start-embers" aria-hidden="true">
         {Array.from({ length: EMBERS }, (_, i) => (
           <span key={i} style={{ '--i': i, '--x': `${(i * 37) % 100}%`, '--d': `${6 + (i % 5) * 1.3}s` }} />
@@ -171,33 +145,12 @@ export default function MainMenu({ onPlay }) {
 
       {phase === 'menu' && (
         <main className="start-menu">
-          <p className="start-kicker">{temporada.kicker}</p>
+          <p className="start-kicker">{NAVIDAD.kicker}</p>
           <h1 className="start-title">
             <span>Operación</span>
             <span className="start-title-big">Garavito</span>
           </h1>
-          <p className="start-tagline">{temporada.tagline}</p>
-
-          <div className="start-season" role="radiogroup" aria-label="Evento">
-            {Object.values(TEMPORADAS).map((opcion) => (
-              <button
-                key={opcion.id}
-                type="button"
-                role="radio"
-                aria-checked={temporada.id === opcion.id}
-                className={`start-season-option start-season-option--${opcion.id.toLowerCase()}${temporada.id === opcion.id ? ' start-season-option--active' : ''}`}
-                title={opcion.descripcion}
-                onClick={() => {
-                  playSfx('click');
-                  setTemporadaPreferida(opcion.id);
-                }}
-              >
-                <Icon name={opcion.moneda.icono} />
-                <span className="start-season-name">{opcion.nombre}</span>
-                <span className="start-season-tag">{opcion.etiqueta}</span>
-              </button>
-            ))}
-          </div>
+          <p className="start-tagline">{NAVIDAD.tagline}</p>
 
           <nav className="start-actions" aria-label="Menú principal">
             <button
@@ -211,7 +164,7 @@ export default function MainMenu({ onPlay }) {
               <Icon name="play" /> Jugar
             </button>
             <button type="button" className="start-btn start-btn--shop" onClick={() => open('costumes')}>
-              <Icon name={temporada.moneda.icono} /> Tienda de objetos
+              <Icon name={NAVIDAD.moneda.icono} /> Tienda de objetos
               <span className="start-btn-badge">Nuevo</span>
             </button>
             <button type="button" className="start-btn" onClick={() => open('settings')}>

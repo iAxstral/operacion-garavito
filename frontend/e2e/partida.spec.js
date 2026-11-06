@@ -1,9 +1,9 @@
 import { expect, test } from '@playwright/test';
 import { myState, openLobbyScreen, startSoloGame } from './helpers.js';
 
-test('la pantalla de inicio de Navidad muestra su video de intro, Jugar y Configuracion', async ({ page }) => {
+test('la pantalla de inicio muestra su video de intro, Jugar y Configuracion', async ({ page }) => {
   await page.goto('/');
-  // Navidad (la temporada por defecto) abre con su propio video, que se puede saltar.
+  // Abre con el video de intro, que se puede saltar.
   await expect(page.locator('video.start-video--navidad')).toHaveAttribute('src', '/video/intro-navidad.mp4');
   await page.getByText('Saltar').click();
   await expect(page.locator('video.start-video--navidad')).toHaveCount(0);
@@ -13,14 +13,6 @@ test('la pantalla de inicio de Navidad muestra su video de intro, Jugar y Config
   await expect(page.getByRole('dialog', { name: 'Configuración' })).toBeVisible();
   // Un control por canal: general, música, ambiente, zombis, combate, interfaz y voces.
   await expect(page.locator('input[type=range]')).toHaveCount(7);
-});
-
-test('el evento de Halloween conserva su video de intro', async ({ page }) => {
-  await page.addInitScript(() => localStorage.setItem('garavito.temporada.v1', 'HALLOWEEN'));
-  await page.goto('/');
-  await expect(page.locator('video.start-video')).toBeAttached();
-  await page.getByText('Saltar').click();
-  await expect(page.getByRole('button', { name: /Jugar/ })).toBeVisible();
 });
 
 test('una partida arranca con 3 misiones y se puede caminar sin correcciones', async ({ page }) => {
