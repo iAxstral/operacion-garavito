@@ -1,30 +1,23 @@
-// Disfraces cosmeticos y la bolsa de dulces del jugador. Los dulces los suelta la
+// Disfraces cosmeticos y la bolsa de regalos del jugador. Los regalos los suelta la
 // horda en cada corrida (los cuenta el servidor) y se suman aqui al terminar; los
 // disfraces se compran con ellos y el que esta puesto viaja al servidor al unirse.
 
 const STORAGE_KEY = 'garavito.candy.v1';
 
-// `temporada`: el evento al que pertenece. `rareza` marca el color de la carta en la
-// tienda (COMUN, RARO, EPICO, LEGENDARIO) y `nuevo` los recien llegados. Todos se pueden
-// usar en cualquier temporada, pero solo se compran los que estan en la tienda del dia.
+// `rareza` marca el color de la carta en la tienda (COMUN, RARO, EPICO, LEGENDARIO) y
+// `nuevo` los recien llegados. Solo se compran los que estan en la tienda del dia.
 export const COSTUMES = [
-  { id: 'GORRO_NAVIDAD', name: 'Gorro de Papá Noel', price: 6, rareza: 'COMUN', description: 'Rasgado y con manchas que no son de chocolate', temporada: 'NAVIDAD' },
-  { id: 'GORRO_DUENDE', name: 'Gorro de duende', price: 5, rareza: 'COMUN', description: 'Con cascabel: te van a oír llegar', temporada: 'NAVIDAD', nuevo: true },
-  { id: 'BUFANDA', name: 'Bufanda de la abuela', price: 5, rareza: 'COMUN', description: 'Tejida a mano. Pica, pero abriga', temporada: 'NAVIDAD', nuevo: true },
-  { id: 'CORNAMENTA', name: 'Cornamenta de reno', price: 10, rareza: 'RARO', description: 'Con una lucecita roja que ya no ilumina', temporada: 'NAVIDAD' },
-  { id: 'CORONA_ACEBO', name: 'Corona de acebo', price: 9, rareza: 'RARO', description: 'Las bayas rojas no se comen. Las otras tampoco', temporada: 'NAVIDAD', nuevo: true },
-  { id: 'GUIRNALDA', name: 'Guirnalda de luces', price: 12, rareza: 'RARO', description: 'Titila sola cuando hay zombis cerca', temporada: 'NAVIDAD', nuevo: true },
-  { id: 'ESFERA_ROTA', name: 'Esfera rota', price: 16, rareza: 'EPICO', description: 'Algo te mira desde adentro', temporada: 'NAVIDAD', nuevo: true },
-  { id: 'MUNECO_NIEVE', name: 'Muñeco de nieve', price: 18, rareza: 'EPICO', description: 'Derritiéndose, como tus ganas de estudiar', temporada: 'NAVIDAD', nuevo: true },
-  { id: 'KRAMPUS', name: 'Máscara de Krampus', price: 18, rareza: 'EPICO', description: 'El que se lleva a los que se portaron mal', temporada: 'NAVIDAD' },
-  { id: 'CASCANUECES', name: 'Gorro de cascanueces', price: 22, rareza: 'LEGENDARIO', description: 'Rompe nueces. Y cráneos', temporada: 'NAVIDAD', nuevo: true },
-  { id: 'ESTRELLA', name: 'Estrella de la punta', price: 30, rareza: 'LEGENDARIO', description: 'La sacaste del árbol del bloque F. Nadie lo sabe', temporada: 'NAVIDAD', nuevo: true },
-  { id: 'CALABAZA', name: 'Cabeza de calabaza', price: 6, rareza: 'COMUN', description: 'Una calabaza tallada con vela adentro', temporada: 'HALLOWEEN' },
-  { id: 'BRUJA', name: 'Sombrero de bruja', price: 8, rareza: 'COMUN', description: 'Alto, torcido y con hebilla', temporada: 'HALLOWEEN' },
-  { id: 'DIABLO', name: 'Cuernos de diablo', price: 10, rareza: 'RARO', description: 'Rojos y puntiagudos', temporada: 'HALLOWEEN' },
-  { id: 'VAMPIRO', name: 'Capa de vampiro', price: 14, rareza: 'RARO', description: 'Cuello alto y forro rojo', temporada: 'HALLOWEEN' },
-  { id: 'CALAVERA', name: 'Máscara de calavera', price: 18, rareza: 'EPICO', description: 'Hueso pintado con ojos negros', temporada: 'HALLOWEEN' },
-  { id: 'FANTASMA', name: 'Sábana de fantasma', price: 25, rareza: 'LEGENDARIO', description: 'Para pasar desapercibido... o no', temporada: 'HALLOWEEN' },
+  { id: 'GORRO_NAVIDAD', name: 'Gorro de Papá Noel', price: 6, rareza: 'COMUN', description: 'Rasgado y con manchas que no son de chocolate' },
+  { id: 'GORRO_DUENDE', name: 'Gorro de duende', price: 5, rareza: 'COMUN', description: 'Con cascabel: te van a oír llegar', nuevo: true },
+  { id: 'BUFANDA', name: 'Bufanda de la abuela', price: 5, rareza: 'COMUN', description: 'Tejida a mano. Pica, pero abriga', nuevo: true },
+  { id: 'CORNAMENTA', name: 'Cornamenta de reno', price: 10, rareza: 'RARO', description: 'Con una lucecita roja que ya no ilumina' },
+  { id: 'CORONA_ACEBO', name: 'Corona de acebo', price: 9, rareza: 'RARO', description: 'Las bayas rojas no se comen. Las otras tampoco', nuevo: true },
+  { id: 'GUIRNALDA', name: 'Guirnalda de luces', price: 12, rareza: 'RARO', description: 'Titila sola cuando hay zombis cerca', nuevo: true },
+  { id: 'ESFERA_ROTA', name: 'Esfera rota', price: 16, rareza: 'EPICO', description: 'Algo te mira desde adentro', nuevo: true },
+  { id: 'MUNECO_NIEVE', name: 'Muñeco de nieve', price: 18, rareza: 'EPICO', description: 'Derritiéndose, como tus ganas de estudiar', nuevo: true },
+  { id: 'KRAMPUS', name: 'Máscara de Krampus', price: 18, rareza: 'EPICO', description: 'El que se lleva a los que se portaron mal' },
+  { id: 'CASCANUECES', name: 'Gorro de cascanueces', price: 22, rareza: 'LEGENDARIO', description: 'Rompe nueces. Y cráneos', nuevo: true },
+  { id: 'ESTRELLA', name: 'Estrella de la punta', price: 30, rareza: 'LEGENDARIO', description: 'La sacaste del árbol del bloque F. Nadie lo sabe', nuevo: true },
 ];
 
 export const RAREZAS = {
@@ -33,11 +26,6 @@ export const RAREZAS = {
   EPICO: { nombre: 'Épico', orden: 2 },
   LEGENDARIO: { nombre: 'Legendario', orden: 3 },
 };
-
-/** Los disfraces con los de la temporada indicada primero (el resto en su orden). */
-export function costumesFor(temporada) {
-  return [...COSTUMES.filter((c) => c.temporada === temporada), ...COSTUMES.filter((c) => c.temporada !== temporada)];
-}
 
 // ---------- Tienda del dia ----------
 // La tienda cambia a la medianoche (hora del jugador) y es la misma para todos ese dia:
@@ -68,29 +56,23 @@ function mezclar(lista, semilla) {
 }
 
 /**
- * La tienda de `date` para `temporada`:
- *  - destacados: 2 epicos o legendarios del evento,
- *  - diarios: 4 mas del evento (uno con descuento) y 1 de otro evento que "vuelve".
- * Cada objeto trae su `precio` de hoy (con descuento si toca) y `oferta`/`vuelve`.
+ * La tienda de `date`:
+ *  - destacados: 2 epicos o legendarios,
+ *  - diarios: 5 mas (uno con descuento).
+ * Cada objeto trae su `precio` de hoy (con descuento si toca) y `oferta`.
  */
-export function tiendaDelDia(date, temporada) {
-  const semilla = claveDelDia(date) * 31 + (temporada === 'NAVIDAD' ? 7 : 13);
-  const delEvento = mezclar(COSTUMES.filter((c) => c.temporada === temporada), semilla);
-  const deOtro = mezclar(COSTUMES.filter((c) => c.temporada !== temporada), semilla + 1);
-  const grandes = delEvento.filter((c) => RAREZAS[c.rareza].orden >= 2);
-  const destacados = grandes.slice(0, 2);
-  const resto = delEvento.filter((c) => !destacados.includes(c));
-  const diarios = resto.slice(0, 4);
+export function tiendaDelDia(date) {
+  const semilla = claveDelDia(date) * 31 + 7;
+  const mezclados = mezclar(COSTUMES, semilla);
+  const destacados = mezclados.filter((c) => RAREZAS[c.rareza].orden >= 2).slice(0, 2);
+  const diarios = mezclados.filter((c) => !destacados.includes(c)).slice(0, 5);
   const ofertaIdx = semilla % diarios.length;
-  const conPrecio = (c, extra = {}) => ({ ...c, precio: c.price, oferta: false, vuelve: false, ...extra });
+  const conPrecio = (c, extra = {}) => ({ ...c, precio: c.price, oferta: false, ...extra });
   return {
     destacados: destacados.map((c) => conPrecio(c)),
-    diarios: [
-      ...diarios.map((c, i) => (i === ofertaIdx
-        ? conPrecio(c, { oferta: true, precio: Math.max(1, Math.round(c.price * (1 - DESCUENTO_DEL_DIA))) })
-        : conPrecio(c))),
-      ...deOtro.slice(0, 1).map((c) => conPrecio(c, { vuelve: true })),
-    ],
+    diarios: diarios.map((c, i) => (i === ofertaIdx
+      ? conPrecio(c, { oferta: true, precio: Math.max(1, Math.round(c.price * (1 - DESCUENTO_DEL_DIA))) })
+      : conPrecio(c))),
   };
 }
 
@@ -136,7 +118,7 @@ export function getEquippedCostume() {
   return bag.owned.includes(bag.equipped) ? bag.equipped : null;
 }
 
-/** Suma los dulces de una corrida una sola vez (por id del resumen). Devuelve los sumados. */
+/** Suma los regalos de una corrida una sola vez (por id del resumen). Devuelve los sumados. */
 export function creditRun(summaryId, candies) {
   const bag = load();
   const key = String(summaryId);
