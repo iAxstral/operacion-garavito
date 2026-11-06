@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 import { OUTSIDE_MARGIN_TILES } from './outsideDecor';
 import { getSettings } from './settings';
+import { circleTouches, darknessView, toTexture } from './lightMath';
 
 const DARK_KEY = 'darkness_layer';
 const GLOW_KEY = 'light_glow';
@@ -219,10 +220,9 @@ export default class Lighting {
   }
 
   punch(ctx, view, x, y, radius, strength) {
-    const sx = (x - view.x) * view.scale;
-    const sy = (y - view.y) * view.scale;
+    const { sx, sy } = toTexture(view, x, y);
     const r = radius * view.scale;
-    if (sx < -r || sy < -r || sx > this.texture.width + r || sy > this.texture.height + r) return;
+    if (!circleTouches(sx, sy, r, this.texture.width, this.texture.height)) return;
 
     const g = ctx.createRadialGradient(sx, sy, r * 0.12, sx, sy, r);
     g.addColorStop(0, `rgba(0,0,0,${strength})`);
@@ -236,9 +236,9 @@ export default class Lighting {
 
   // Cono de luz: un sector con degradado (dos pasadas, ancha y suave, angosta y fuerte).
   punchCone(ctx, view, x, y, angle, length, strength) {
-    const sx = (x - view.x) * view.scale;
-    const sy = (y - view.y) * view.scale;
+    const { sx, sy } = toTexture(view, x, y);
     const r = length * view.scale;
+    if (!circleTouches(sx, sy, r, this.texture.width, this.texture.height)) return;
     const passes = this.lowPerf ? [[CONE_HALF_ANGLE, 1]] : [[CONE_HALF_ANGLE * 1.35, 0.45], [CONE_HALF_ANGLE, 1]];
     passes.forEach(([half, power]) => {
       const g = ctx.createRadialGradient(sx, sy, r * 0.05, sx, sy, r);
@@ -257,12 +257,7 @@ export default class Lighting {
   update(time, player, remotePlayers, aimAngle = null) {
     const camera = this.scene.cameras.main;
     if (this.builtFor !== `${camera.width}x${camera.height}@${camera.zoom}`) this.build();
-    const margin = OVERSCAN / camera.zoom;
-    const view = {
-      x: camera.worldView.x - margin,
-      y: camera.worldView.y - margin,
-      scale: camera.zoom * this.resolution,
-    };
+    const view = darknessView(camera.worldView, camera.zoom, this.resolution, OVERSCAN);
     this.image.setPosition(view.x, view.y);
     const ctx = this.texture.context;
     const { width, height } = this.texture;
@@ -307,8 +302,7 @@ export default class Lighting {
 
     if (player && !this.blackout && !this.lowPerf) {
       ctx.globalCompositeOperation = 'source-over';
-      const cx = (player.x - view.x) * view.scale;
-      const cy = (player.y - view.y) * view.scale;
+      const { sx: cx, sy: cy } = toTexture(view, player.x, player.y);
       const inner = PLAYER_RADIUS * 0.55 * view.scale;
       const outer = Math.max(width, height) * 0.75;
       const g = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
