@@ -66,6 +66,7 @@ import { ownedWeapons, weaponById } from './weaponCatalog';
 import { BARRICADE_REPAIR_RANGE_PX } from './abilityCatalog';
 import { channelVolume, getSettings, onSettingsChange, updateSettings, vibrate } from './settings';
 import { createPerfMonitor } from './perfMonitor';
+import { publishFps, resetLiveStats } from './liveStats';
 import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
@@ -365,12 +366,14 @@ export default class MainScene extends Phaser.Scene {
   }
 
   /**
-   * Calidad automatica: cada 250 ms le pasa los FPS al monitor y, si este pide bajar la
-   * calidad y el jugador lo permite, activa el modo de rendimiento y avisa en el HUD.
+   * Cada 250 ms publica los FPS (para el indicador) y se los pasa al monitor de la
+   * calidad automatica: si este pide bajar la calidad y el jugador lo permite, activa el
+   * modo de rendimiento y avisa en el HUD.
    */
   watchPerformance(time) {
     if (time - this.perfSampleAt < PERF_SAMPLE_MS) return;
     this.perfSampleAt = time;
+    publishFps(this.game.loop.actualFps);
     const settings = getSettings();
     if (!settings.autoPerf || settings.lowPerf) return;
     if (this.perfMonitor.sample(this.game.loop.actualFps, time) !== 'lower') return;
@@ -690,6 +693,7 @@ export default class MainScene extends Phaser.Scene {
     this.events.once('shutdown', () => {
       offCorrection();
       offSettings();
+      resetLiveStats();
       this.scale.off('resize', this.applyCameraZoom, this);
       this.weaponLayer?.destroy();
       setNearBarricade(null);
