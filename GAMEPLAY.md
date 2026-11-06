@@ -132,7 +132,7 @@ generado: **entrada normalizada** (la diagonal deja de ir 41% más rápido) y
 **dash con `Shift`/`Espacio`** con invulnerabilidad breve, que es el único
 recurso defensivo antes del hacha.
 
-## 8. Lo que se agregó después (temporada de Halloween)
+## 8. Lo que se agregó después (primera temporada, Halloween)
 
 - **Misiones**: cuatro minijuegos por rol (antes dos). `MissionBoard` reparte
   tres distintos por Kinder y pone primero el que no tocó en el anterior.
@@ -157,18 +157,17 @@ recurso defensivo antes del hacha.
 - **App instalable** (PWA): manifiesto, íconos y service worker solo en
   producción; el WebSocket y la API nunca pasan por la caché.
 
-## 9. Temporada de Navidad (y Halloween como evento)
+## 9. Navidad sangrienta
 
-- **Temporadas**: la sala tiene una temporada (`Temporada.java`: `NAVIDAD` por
-  defecto, `HALLOWEEN` como evento) que elige quien la crea y viaja en
-  `LobbyState.temporada`. Solo cambia la ambientación, no las reglas. El
-  jugador elige su evento preferido en el menú; dentro de una sala manda la de
-  la sala.
-- **Navidad sangrienta**: menús con el campus nevado y luces que fallan, árboles
+- **Solo Navidad**: hubo un tiempo con dos temporadas (Navidad y Halloween como
+  evento); en noviembre de 2026 se retiró Halloween para que el juego sea más
+  liviano (`docs/temporadas/SOLO-NAVIDAD.md`). Papá Noel malvado (Kinder 3) y
+  las travesuras de duendes y renos están siempre activos.
+- **Ambientación**: menús con el campus nevado y luces que fallan, árboles
   marchitos y regalos rotos en el edificio, carámbanos, nieve, oscuridad azul,
   zombis con gorro de Papá Noel, caja de música desafinada y cascabeles. La
-  moneda de la horda se llama "regalos". Tres disfraces nuevos: gorro de Papá
-  Noel, cornamenta de reno y Krampus.
+  moneda de la horda se llama "regalos". La tienda de objetos vende 11 objetos
+  navideños con rotación diaria.
 - Detalles y capturas en `docs/temporadas`.
 
 ## Fuera de alcance
