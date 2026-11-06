@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 import { OUTSIDE_MARGIN_TILES } from './outsideDecor';
 import { getSettings } from './settings';
-import { circleTouches, darknessView, stampTransform, toTexture } from './lightMath';
+import { circleTouches, darknessView, lightVisible, stampTransform, toTexture } from './lightMath';
 import { STAMP_RADIUS, makeConeStamp, makeHaloStamp } from './lightStamps';
 
 const DARK_KEY = 'darkness_layer';
@@ -274,6 +274,13 @@ export default class Lighting {
 
     ctx.globalCompositeOperation = 'destination-out';
     this.lights.forEach((light) => {
+      // Fuera de la vista no se calcula nada y sus sprites no se dibujan.
+      const visible = lightVisible(view, light.x, light.y, light.radius, width, height);
+      if (light.visible !== visible) {
+        light.visible = visible;
+        [light.glow, light.halo, light.fixture].forEach((sprite) => sprite?.setVisible(visible));
+      }
+      if (!visible) return;
       let level = this.blackout ? 0 : this.intensity(light, time);
       if (time < (this.failUntil ?? 0)) level *= Math.random() < 0.2 ? 0.6 : 0.04;
       if (light.glow) {
