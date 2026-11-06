@@ -2,14 +2,13 @@ import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 import { OUTSIDE_MARGIN_TILES } from './outsideDecor';
 import { getSettings } from './settings';
-import { getTemporada } from './temporada';
 
 const DARK_KEY = 'darkness_layer';
 const GLOW_KEY = 'light_glow';
 const FOG_KEY = 'fog_puffs';
 const BULB_KEY = 'bulb_fixture';
-// Noche de Halloween: penumbra mas cerrada y algo violeta. Nochebuena: azul helado.
-const DARKNESS_COLOR = { HALLOWEEN: 'rgba(8, 5, 16, 0.72)', NAVIDAD: 'rgba(3, 8, 20, 0.74)' };
+// Nochebuena: penumbra azul helada.
+const DARKNESS_COLOR = 'rgba(3, 8, 20, 0.74)';
 const RESOLUTION = 0.5;
 // Modo de rendimiento: la capa de oscuridad a menor resolucion y sin efectos extra.
 const LOW_PERF_RESOLUTION = 0.33;
@@ -276,7 +275,7 @@ export default class Lighting {
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = this.blackout ? BLACKOUT_COLOR : DARKNESS_COLOR[getTemporada()] ?? DARKNESS_COLOR.HALLOWEEN;
+    ctx.fillStyle = this.blackout ? BLACKOUT_COLOR : DARKNESS_COLOR;
     ctx.fillRect(0, 0, width, height);
 
     ctx.globalCompositeOperation = 'destination-out';

@@ -242,19 +242,11 @@ function bakeSheet(scene, key, t) {
   }
 }
 
-/** Clave de la hoja de un tipo: en Navidad, la version con sueter y luces. */
-export function zombieTextureKey(key, navidad) {
-  return navidad ? `${key}-navidad` : key;
-}
-
-export function bakeZombieSheets(scene, { navidad = false } = {}) {
+/** Hornea la hoja de cada tipo de zombi, con su sueter navideno y luces. */
+export function bakeZombieSheets(scene) {
   Object.entries(TYPES).forEach(([key, type]) => {
-    if (!navidad) {
-      bakeSheet(scene, key, type);
-      return;
-    }
     const sweater = SWEATERS[key];
-    bakeSheet(scene, zombieTextureKey(key, true), {
+    bakeSheet(scene, key, {
       ...type,
       shirt: sweater.shirt,
       shirtDark: sweater.shirtDark,
