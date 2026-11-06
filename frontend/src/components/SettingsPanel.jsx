@@ -179,6 +179,12 @@ export default function SettingsPanel({ onClose, onExit, inGame = false }) {
             onChange={(lowPerf) => updateSettings({ lowPerf })}
           />
           <Toggle
+            label="Calidad automática"
+            hint="Si el juego va lento varios segundos seguidos, activa solo el modo de rendimiento"
+            checked={settings.autoPerf}
+            onChange={(autoPerf) => updateSettings({ autoPerf })}
+          />
+          <Toggle
             label="Formas según el tipo de zombi"
             hint="Para daltonismo: cuadrado el resistente, triángulo el corredor, gota el escupidor"
             checked={settings.typeShapes}

@@ -78,6 +78,7 @@ import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutsi
 
 // Cada cuanto se le pasan los FPS al monitor de la calidad automatica (ms).
 const PERF_SAMPLE_MS = 250;
+
 const DASH_SPEED = 420;
 const DASH_MS = 180;
 const DASH_COOLDOWN_MS = 1200;
