@@ -8,7 +8,7 @@ Cuatro mejoras independientes; cada una va en sus propios commits y con sus prue
 
 **Problema.** `Lighting.update` corre en cada frame y, por cada bombillo, jugador,
 cono de linterna y fogonazo, crea un `createRadialGradient` nuevo y rellena un arco.
-Con 20-30 luces por piso son ~60 gradientes por frame que el navegador compila y
+Con ~18 bombillos por piso son ~20 gradientes por frame que el navegador compila y
 descarta, más basura para el recolector.
 
 **Solución.** Hornear una sola vez dos "sellos" en canvas fuera de pantalla:
