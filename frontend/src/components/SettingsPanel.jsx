@@ -185,6 +185,12 @@ export default function SettingsPanel({ onClose, onExit, inGame = false }) {
             onChange={(autoPerf) => updateSettings({ autoPerf })}
           />
           <Toggle
+            label="Mostrar FPS y ping"
+            hint="Un recuadro en la partida con los cuadros por segundo y la latencia con el servidor"
+            checked={settings.showStats}
+            onChange={(showStats) => updateSettings({ showStats })}
+          />
+          <Toggle
             label="Formas según el tipo de zombi"
             hint="Para daltonismo: cuadrado el resistente, triángulo el corredor, gota el escupidor"
             checked={settings.typeShapes}
