@@ -104,16 +104,19 @@ public class Travesuras {
         final String id;
         final Tipo tipo;
         final int floor;
+        /** A quien iba: si termina sin pegarle, lo cuenta como esquivada. */
+        final String objetivo;
         final double vx;
         final double vy;
         final long muereEn;
         double x;
         double y;
 
-        Bola(String id, Tipo tipo, int floor, double x, double y, double angle, long now) {
+        Bola(String id, Tipo tipo, int floor, String objetivo, double x, double y, double angle, long now) {
             this.id = id;
             this.tipo = tipo;
             this.floor = floor;
+            this.objetivo = objetivo;
             this.x = x;
             this.y = y;
             this.vx = Math.cos(angle) * tipo.velocidadPxS;
@@ -123,6 +126,16 @@ public class Travesuras {
     }
 
     private record Golpe(GolpeState state, long nacio) {
+    }
+
+    /** Como quedo una bola despues de un tick: sigue volando, se perdio o le pego a alguien. */
+    private record Vuelo(boolean termino, Player golpeado) {
+        static final Vuelo SIGUE = new Vuelo(false, null);
+        static final Vuelo PERDIDA = new Vuelo(true, null);
+
+        static Vuelo pego(Player player) {
+            return new Vuelo(true, player);
+        }
     }
 
     private final RandomGenerator random;
@@ -160,7 +173,13 @@ public class Travesuras {
         }
         bromistas.values().removeIf(bromista -> now >= bromista.seVaEn);
 
-        bolas.values().removeIf(bola -> !avanzar(bola, now, deltaSeconds, objetivos, pisos.apply(bola.floor)));
+        bolas.values().removeIf(bola -> {
+            Vuelo vuelo = avanzar(bola, now, deltaSeconds, objetivos, pisos.apply(bola.floor));
+            if (vuelo.termino()) {
+                contar(bola, vuelo.golpeado(), objetivos);
+            }
+            return vuelo.termino();
+        });
     }
 
     /** Se va todo: al pasar un Kinder o si cae el equipo. */
@@ -231,17 +250,35 @@ public class Travesuras {
         }
         bromista.angle = Math.atan2(victima.getY() - bromista.y, victima.getX() - bromista.x);
         String id = "bola" + (++secuencia);
-        bolas.put(id, new Bola(id, bromista.tipo, bromista.floor, bromista.x, bromista.y, bromista.angle, now));
+        bolas.put(id, new Bola(id, bromista.tipo, bromista.floor, bromista.objetivo, bromista.x, bromista.y,
+                bromista.angle, now));
     }
 
-    private boolean avanzar(Bola bola, long now, double deltaSeconds, Collection<Player> objetivos, FloorGrid grid) {
+    /**
+     * Estadisticas: al que le pego suma una recibida; si no le pego a quien iba (pared,
+     * tiempo o a otro), ese suma una esquivada.
+     */
+    private static void contar(Bola bola, Player golpeado, Collection<Player> objetivos) {
+        if (golpeado != null) {
+            golpeado.recordSnowballTaken();
+        }
+        if (golpeado == null || !golpeado.getPlayerId().equals(bola.objetivo)) {
+            objetivos.stream()
+                    .filter(p -> p.getPlayerId().equals(bola.objetivo))
+                    .findFirst()
+                    .ifPresent(Player::recordSnowballDodged);
+        }
+    }
+
+    /** Mueve la bola un tick y dice si sigue volando, se perdio (pared o tiempo) o pego. */
+    private Vuelo avanzar(Bola bola, long now, double deltaSeconds, Collection<Player> objetivos, FloorGrid grid) {
         if (now >= bola.muereEn) {
-            return false;
+            return Vuelo.PERDIDA;
         }
         bola.x += bola.vx * deltaSeconds;
         bola.y += bola.vy * deltaSeconds;
         if (!grid.isWalkable(bola.x, bola.y)) {
-            return false;
+            return Vuelo.PERDIDA;
         }
         for (Player player : objetivos) {
             if (player.isAlive() && player.getFloor() == bola.floor
@@ -251,9 +288,9 @@ public class Travesuras {
                 }
                 golpes.add(new Golpe(new GolpeState(bola.id, bola.tipo, player.getPlayerId(), bola.floor,
                         Math.round(bola.x), Math.round(bola.y)), now));
-                return false;
+                return Vuelo.pego(player);
             }
         }
-        return true;
+        return Vuelo.SIGUE;
     }
 }
