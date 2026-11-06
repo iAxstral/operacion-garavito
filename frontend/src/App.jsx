@@ -37,7 +37,7 @@ import WaitingRoom from './components/WaitingRoom';
 import { leaveGame, resumeSession } from './game/gameSync';
 import { startAmbience } from './game/ambience';
 import './App.css';
-import './halloween.css';
+import './tema.css';
 import './navidad.css';
 import './minigames.css';
 
