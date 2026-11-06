@@ -74,4 +74,29 @@ class MatchSummaryTest {
         assertEquals(0, guard.statsSnapshot().kills());
         assertTrue(guard.statsSnapshot().garavitosEarned() >= 0);
     }
+
+    @Test
+    @DisplayName("las bolas de las travesuras recibidas y esquivadas se cuentan y se reinician con la corrida")
+    void snowballStatsAreTrackedAndReset() {
+        guard.recordSnowballTaken();
+        guard.recordSnowballTaken();
+        guard.recordSnowballDodged();
+
+        MatchSummary.PlayerSummary stats = guard.statsSnapshot();
+        assertEquals(2, stats.snowballsTaken());
+        assertEquals(1, stats.snowballsDodged());
+
+        guard.resetStats();
+        assertEquals(0, guard.statsSnapshot().snowballsTaken());
+        assertEquals(0, guard.statsSnapshot().snowballsDodged());
+    }
+
+    @Test
+    @DisplayName("un resumen sin travesuras (historial viejo) las deja en cero")
+    void legacySummaryHasNoSnowballs() {
+        MatchSummary.PlayerSummary legacy = new MatchSummary.PlayerSummary("SALUD", 1, 2, 3, 4, 5, 6, "Ana", 7);
+        assertEquals(7, legacy.candies());
+        assertEquals(0, legacy.snowballsTaken());
+        assertEquals(0, legacy.snowballsDodged());
+    }
 }
