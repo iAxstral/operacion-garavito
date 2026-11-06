@@ -11,7 +11,7 @@ import java.util.random.RandomGenerator;
 /**
  * Travesuras de Navidad: duendes que salen de la nada y tiran una bola de nieve (deja
  * ciego un instante) y renos que escupen barro con carbon (mancha la pantalla y quita
- * un poco de vida). Solo durante un Kinder activo de la temporada de Navidad.
+ * un poco de vida). Solo durante un Kinder activo.
  *
  * <p>El servidor decide todo, como con el acido del escupidor: donde aparece el bicho,
  * a quien le tira, por donde va la bola y a quien le pega. Asi todos ven lo mismo y la

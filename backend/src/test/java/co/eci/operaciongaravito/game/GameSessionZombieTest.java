@@ -307,21 +307,6 @@ class GameSessionZombieTest {
     }
 
     @Test
-    @DisplayName("en Halloween el Kinder 3 no tiene jefe")
-    void halloweenHasNoMidBoss() {
-        session.setTemporada(Temporada.HALLOWEEN);
-        long now = System.currentTimeMillis();
-        for (int k = 1; k < GameSession.PAPA_NOEL_KINDER; k++) {
-            now = tickUntilKinder(now, k);
-            registerKills(WaveCurve.blueprint(k).killQuota());
-            now += 66;
-            session.tick(now, 0.066);
-        }
-        tickUntilKinder(now, GameSession.PAPA_NOEL_KINDER);
-        assertNull(session.bossView());
-    }
-
-    @Test
     @DisplayName("en el Kinder 5 aparece el Ingeniero de Sistemas en el piso del jugador")
     void theBossAppearsInTheLastKinder() {
         assertNull(session.bossView(), "no hay jefe antes del Kinder 5");
