@@ -63,7 +63,7 @@ import ZombieLayer from './ZombieLayer';
 import WeaponLayer from './WeaponLayer';
 import { ownedWeapons, weaponById } from './weaponCatalog';
 import { BARRICADE_REPAIR_RANGE_PX } from './abilityCatalog';
-import { channelVolume, getSettings, vibrate } from './settings';
+import { channelVolume, getSettings, onSettingsChange, vibrate } from './settings';
 import { playSfx } from './sfx';
 import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
@@ -359,6 +359,23 @@ export default class MainScene extends Phaser.Scene {
     return Boolean(hiddenIn);
   }
 
+  /**
+   * Modo de rendimiento en vivo: luz mas simple y sin neblina, menos sangre y sin nieve.
+   * Se llama al crear el piso y cada vez que cambia el ajuste.
+   */
+  applyLowPerf(lowPerf) {
+    if (this.appliedLowPerf === lowPerf) return;
+    this.appliedLowPerf = lowPerf;
+    this.lighting?.setLowPerf(lowPerf);
+    this.gore?.setLowPerf(lowPerf);
+    if (lowPerf) {
+      this.snow?.destroy();
+      this.snow = null;
+    } else if (!this.snow && this.player) {
+      this.snow = startSnow(this, this.player);
+    }
+  }
+
   // Disfraz encima del personaje. `holder` guarda la imagen. Sin disfraz, todos llevan
   // el gorrito de lana.
   syncCostume(holder, sprite, id) {
@@ -557,7 +574,11 @@ export default class MainScene extends Phaser.Scene {
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
     this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
-    if (!getSettings().lowPerf) startSnow(this, this.player);
+    // La escena se reusa al cambiar de piso: la nieve vieja ya se destruyo con ella.
+    this.snow = null;
+    this.appliedLowPerf = undefined;
+    this.applyLowPerf(getSettings().lowPerf);
+    const offSettings = onSettingsChange((settings) => this.applyLowPerf(settings.lowPerf));
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
@@ -647,6 +668,7 @@ export default class MainScene extends Phaser.Scene {
     });
     this.events.once('shutdown', () => {
       offCorrection();
+      offSettings();
       this.scale.off('resize', this.applyCameraZoom, this);
       this.weaponLayer?.destroy();
       setNearBarricade(null);

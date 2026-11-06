@@ -140,8 +140,14 @@ export class GoreFx {
   constructor(scene, { lowPerf = false } = {}) {
     this.scene = scene;
     this.decals = [];
-    this.maxDecals = lowPerf ? LOW_PERF_DECALS : MAX_DECALS;
-    this.gibs = lowPerf ? 6 : 14;
+    this.setLowPerf(lowPerf);
+  }
+
+  /** Menos manchas y tripas en modo de rendimiento; las que sobran se van de una vez. */
+  setLowPerf(on) {
+    this.maxDecals = on ? LOW_PERF_DECALS : MAX_DECALS;
+    this.gibs = on ? 6 : 14;
+    while (this.decals.length > this.maxDecals) this.decals.shift()?.destroy();
   }
 
   blood(x, y, { big = false } = {}) {

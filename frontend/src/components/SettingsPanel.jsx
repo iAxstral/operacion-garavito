@@ -174,7 +174,7 @@ export default function SettingsPanel({ onClose, onExit, inGame = false }) {
           />
           <Toggle
             label="Modo de rendimiento"
-            hint="Para celulares lentos: luz más simple, sin neblina ni polvo y menos sangre. Se aplica al cambiar de piso"
+            hint="Para celulares lentos: luz más simple, sin neblina ni nieve y menos sangre. Se aplica al instante"
             checked={settings.lowPerf}
             onChange={(lowPerf) => updateSettings({ lowPerf })}
           />

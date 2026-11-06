@@ -189,6 +189,24 @@ export default class Lighting {
       .setDisplaySize(width / camera.zoom, height / camera.zoom);
   }
 
+  /**
+   * Cambia el modo de rendimiento sin rehacer la escena: la capa de oscuridad se vuelve a
+   * crear a la otra resolucion y la neblina se crea o se quita.
+   */
+  setLowPerf(on) {
+    const lowPerf = Boolean(on);
+    if (lowPerf === this.lowPerf) return;
+    this.lowPerf = lowPerf;
+    this.resolution = lowPerf ? LOW_PERF_RESOLUTION : RESOLUTION;
+    if (lowPerf) {
+      this.fog.forEach((layer) => layer.destroy());
+      this.fog = [];
+    } else if (!this.fog.length) {
+      this.makeFog();
+    }
+    this.build();
+  }
+
   /** Susto: los bombillos fallan `ms` (la linterna sigue funcionando). */
   failLights(ms) {
     this.failUntil = this.scene.time.now + ms;
