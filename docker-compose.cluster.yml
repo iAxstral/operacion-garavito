@@ -7,7 +7,7 @@
 #
 #   Balanceador: http://localhost:8080   (frontend: VITE_WS_URL=http://localhost:8080/ws)
 #   Nodo 1: http://localhost:8081        Nodo 2: http://localhost:8082
-#   Prometheus: http://localhost:9090    Grafana: http://localhost:3000 (admin / garavito)
+#   Prometheus: http://localhost:9090    Grafana: http://localhost:3000 (admin / la clave de GRAFANA_ADMIN_PASSWORD)
 #
 # NODE_PUBLIC_URL debe ser la direccion con la que los navegadores llegan a ese nodo:
 # si se juega desde otros equipos de la red, cambiar localhost por la IP de esta maquina.
@@ -81,7 +81,7 @@ services:
       - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: garavito
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Definir GRAFANA_ADMIN_PASSWORD antes de levantar (ver docs/grafana)}
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:

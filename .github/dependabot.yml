@@ -1,0 +1,26 @@
+# Dependabot abre PRs con las actualizaciones de dependencias (sobre todo las de
+# seguridad). Cada PR pasa por el CI completo antes de poder entrar.
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /backend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      desarrollo:
+        dependency-type: development
+  - package-ecosystem: npm
+    directory: /infra
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 3
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly

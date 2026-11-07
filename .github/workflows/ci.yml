@@ -1,7 +1,8 @@
-# Integracion continua: en cada push y PR corre las pruebas del backend, el lint,
-# las pruebas y el build del frontend, las pruebas de punta a punta (Playwright) y una
-# prueba de carga corta con k6 que falla si el juego se pone lento (umbrales en
-# k6/partidas.js, ver docs/k6).
+# Integracion continua: en cada push y PR corre las pruebas del backend (incluidas las
+# de ataque de backend/src/test/.../security), el lint, las pruebas y el build del
+# frontend, las pruebas de punta a punta (Playwright), una prueba de carga corta con k6
+# que falla si el juego se pone lento (umbrales en k6/partidas.js, ver docs/k6) y la
+# revision de dependencias con vulnerabilidades conocidas (ver docs/SEGURIDAD.md).
 name: CI
 
 on:
@@ -50,12 +51,33 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
+      # Falla con vulnerabilidades altas o criticas en las dependencias de npm.
+      - name: npm audit
+        run: npm audit --audit-level=high
       - name: Lint
         run: npm run lint
       - name: Pruebas unitarias
         run: npm test
       - name: Build
         run: npm run build
+
+  dependencias:
+    name: Dependencias del backend (Trivy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      # Equivalente a OWASP dependency-check: Trivy resuelve las dependencias de
+      # pom.xml (con las transitivas) y las cruza con las bases de vulnerabilidades.
+      # Falla con vulnerabilidades altas o criticas que ya tengan version arreglada.
+      - name: Vulnerabilidades conocidas en backend/pom.xml
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: backend
+          scanners: vuln
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
 
   e2e:
     name: Punta a punta (Playwright)

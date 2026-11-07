@@ -41,5 +41,8 @@ class MonitoringTest {
         assertTrue(body.contains("garavito_players"));
         assertTrue(body.contains("garavito_tick_seconds"));
         assertTrue(body.contains("garavito_messages_total"));
+        // El panel de ataques de Grafana lee esta serie (una por razon, aunque este en cero).
+        assertTrue(body.contains("garavito_rejected_total{"), "falta garavito_rejected_total");
+        assertTrue(body.contains("reason=\"rate_limit\""));
     }
 }

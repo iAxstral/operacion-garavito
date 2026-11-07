@@ -44,8 +44,8 @@ O en Windows: `./dev.ps1` abre los dos.
 
 ## Monitoreo
 
-`docker compose -f monitoring/docker-compose.yml up -d` levanta Prometheus (`:9090`) y
-Grafana (`:3000`, admin / garavito) con dos tableros: el servidor en vivo y la prueba
+`GRAFANA_ADMIN_PASSWORD=<clave> docker compose -f monitoring/docker-compose.yml up -d`
+levanta Prometheus (`:9090`) y Grafana (`:3000`, usuario `admin` con esa clave) con dos tableros: el servidor en vivo y la prueba
 de carga de k6. Detalles en [`docs/prometheus`](docs/prometheus/README.md),
 [`docs/grafana`](docs/grafana/README.md) y [`docs/k6`](docs/k6/README.md).
 

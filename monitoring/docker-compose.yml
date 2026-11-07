@@ -3,7 +3,7 @@
 #
 #   1. Levantar el backend (por defecto en el puerto 8080).
 #   2. docker compose -f monitoring/docker-compose.yml up -d
-#   3. Grafana en http://localhost:3000 (admin / garavito), Prometheus en :9090.
+#   3. Grafana en http://localhost:3000 (admin / la clave de GRAFANA_ADMIN_PASSWORD), Prometheus en :9090.
 #
 # Si el backend corre en otro puerto u otra máquina, cambiar el destino en prometheus.yml.
 
@@ -27,7 +27,7 @@ services:
       - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: garavito
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Definir GRAFANA_ADMIN_PASSWORD antes de levantar (ver docs/grafana)}
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
     volumes:

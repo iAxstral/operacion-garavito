@@ -8,7 +8,7 @@ capturas y salidas son de esas corridas.
 Con un solo comando se levanta todo:
 
 ```bash
-docker compose -f docker-compose.cluster.yml up --build
+GRAFANA_ADMIN_PASSWORD=<clave> docker compose -f docker-compose.cluster.yml up --build
 ```
 
 | Servicio | Dirección |
@@ -16,7 +16,7 @@ docker compose -f docker-compose.cluster.yml up --build
 | Balanceador (nginx), la entrada del juego | `http://localhost:8080` |
 | Nodo 1 / Nodo 2 | `http://localhost:8081` / `http://localhost:8082` |
 | Prometheus | `http://localhost:9090` |
-| Grafana (admin / garavito) | `http://localhost:3000` |
+| Grafana (usuario `admin`, clave en `GRAFANA_ADMIN_PASSWORD`) | `http://localhost:3000` |
 
 El frontend se apunta al balanceador con `VITE_WS_URL=http://localhost:8080/ws`.
 
