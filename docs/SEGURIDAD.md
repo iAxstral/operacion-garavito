@@ -140,6 +140,11 @@ detectados"**, con los rechazos por segundo de cada razón:
 - CI: `npm audit --audit-level=high` en el frontend y Trivy sobre `backend/pom.xml`
   (equivalente a OWASP dependency-check): fallan con vulnerabilidades altas o críticas.
 - `.github/dependabot.yml` propone las actualizaciones cada semana.
+- **Lo primero que encontró Trivy:** Spring Boot 4.1.1 trae Tomcat 11.0.24 (4 vulnerabilidades
+  críticas: CVE-2026-65182, -65637, -65905, -68525) y Jackson 3.1.5 (5 altas, de denegación
+  de servicio). Se subieron a Tomcat 11.0.25 y Jackson 3.1.7 con `tomcat.version` y
+  `jackson-bom.version` en `backend/pom.xml`. Quitarlas al pasar a un Spring Boot que ya
+  las traiga.
 - Se aplicó `npm audit fix` (sin cambios incompatibles): las 4 vulnerabilidades altas eran
   de herramientas de desarrollo (vite, eslint). Quedan 4 moderadas en eslint (arreglarlas
   pide una versión incompatible) y 2 moderadas en `aws-cdk-lib` (solo se usa al desplegar).
