@@ -69,15 +69,11 @@ jobs:
       # Equivalente a OWASP dependency-check: Trivy resuelve las dependencias de
       # pom.xml (con las transitivas) y las cruza con las bases de vulnerabilidades.
       # Falla con vulnerabilidades altas o criticas que ya tengan version arreglada.
+      # Se usa la imagen oficial de Docker (el runner trae Docker) en vez de la accion.
       - name: Vulnerabilidades conocidas en backend/pom.xml
-        uses: aquasecurity/trivy-action@0.28.0
-        with:
-          scan-type: fs
-          scan-ref: backend
-          scanners: vuln
-          severity: HIGH,CRITICAL
-          ignore-unfixed: true
-          exit-code: '1'
+        run: |
+          docker run --rm -v "$PWD/backend:/src:ro" aquasec/trivy:latest fs \
+            --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 /src
 
   ataques:
     name: Ataques (pentest contra el backend de produccion)
