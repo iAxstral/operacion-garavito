@@ -30,9 +30,29 @@ cd backend; .\mvnw.cmd -B package; cd ..
 # 2. Frontend (el WebSocket va por el mismo dominio)
 cd frontend; npm ci; npm run lint; npm test; $env:VITE_WS_URL='/ws'; npm run build; cd ..
 
-# 3. Infraestructura: primero ver que cambia, despues desplegar
-cd infra; npm install; npx cdk diff; npx cdk deploy
+# 3. Infraestructura: primero ver que cambia, despues desplegar (con el secreto de origen)
+cd infra; npm install; npx ts-node test/verificar-stack.ts
+$env:GARAVITO_ORIGIN_SECRET = Get-Content $HOME\.garavito-origin-secret
+npx cdk diff; npx cdk deploy
 ```
+
+### Secreto de origen (obligatorio)
+
+CloudFront le agrega al backend el header `X-Origin-Verify` y el backend responde 403 a
+todo lo que no lo trae (ver `docs/SEGURIDAD.md`). Sin ese secreto, `cdk diff` y
+`cdk deploy` se niegan a correr. **Nunca va en el repositorio.** Se genera una sola vez
+y se guarda fuera del proyecto; hay que usar el mismo en cada despliegue (si cambia,
+cambia la maquina y se pierde la base, ver abajo):
+
+```bash
+openssl rand -hex 32 > ~/.garavito-origin-secret      # una sola vez
+chmod 600 ~/.garavito-origin-secret
+export GARAVITO_ORIGIN_SECRET=$(cat ~/.garavito-origin-secret)
+```
+
+Queda guardado en la plantilla de CloudFormation (lo ve quien tenga acceso de lectura
+a la cuenta de AWS) y en `infra/cdk.out/` (ignorada por git). Ver los riesgos que quedan
+en `docs/SEGURIDAD.md`.
 
 Si `cdk diff` dice `There were no differences`, lo desplegado ya es el codigo actual
 y no hace falta `cdk deploy`. Si el juego no responde, puede que la maquina este
@@ -77,6 +97,9 @@ aws ssm send-command --region us-east-2 --instance-ids $ID --document-name AWS-R
 El respaldo viaja por la salida de SSM, que admite unos 24 KB. Si la base crece mas
 que eso, hay que mover el respaldo por S3.
 
+La migracion `V4__indice_jugadores_por_partida.sql` solo agrega un indice: no cambia
+las tablas, asi que este respaldo de datos se restaura igual en la maquina nueva.
+
 ### Comprobar que quedo bien
 
 ```bash
@@ -88,6 +111,39 @@ curl -i https://www.operaciongaravito.me/ws/info                   # 200 (WebSoc
 
 Un 504 en `/api/*` casi siempre es la maquina apagada o el backend aun arrancando
 (tarda uno o dos minutos despues de encenderla o desplegar).
+
+Comprobar los encabezados de seguridad y que el backend exige el secreto:
+
+```bash
+curl -sI https://www.operaciongaravito.me/ | grep -iE "strict-transport|content-security|x-frame|x-content-type|referrer"
+# Dentro de la maquina (por SSM): sin el header el backend responde 403,
+# y el actuator solo esta en 127.0.0.1:9091.
+aws ssm send-command --region us-east-2 --instance-ids $ID --document-name AWS-RunShellScript \
+  --parameters 'commands=["curl -s -o /dev/null -w %{http_code} localhost:8080/api/ping; echo; curl -s localhost:9091/actuator/health"]'
+```
+
+Y antes de la entrega, correr los ataques contra el sitio desplegado (no carga la
+maquina; ver `docs/SEGURIDAD.md`):
+
+```bash
+cd frontend && node scripts/pentest.mjs https://www.operaciongaravito.me
+```
+
+## Propuestas que no estan aplicadas
+
+- **AWS WAF con una regla rate-based** en CloudFront: cortaria inundaciones desde una
+  IP antes de llegar al EC2. Para CloudFront el WebACL se crea en `us-east-1`, y la
+  organizacion de esta cuenta no permite CloudFormation alli (por eso el certificado se
+  creo con la CLI). Se podria crear con la CLI (`aws wafv2 create-web-acl --scope
+  CLOUDFRONT --region us-east-1`) y asociarlo con `webAclId` en la `Distribution`.
+  Cuesta unos USD 5/mes mas USD 1 por regla. El backend ya limita por conexion y por
+  IP, asi que es una capa extra, no la unica.
+- **TLS entre CloudFront y el EC2** (hoy `HTTP_ONLY`): el trafico va por la red de AWS,
+  pero sin cifrar. Para usar `HTTPS_ONLY`, CloudFront exige un certificado publico
+  valido en el origen: un subdominio (p. ej. `origen.operaciongaravito.me`) apuntando a
+  la IP elastica con un certificado de Let's Encrypt en la maquina, o un ALB con ACM
+  delante del EC2 (~USD 16/mes). Con el header secreto, un tercero no puede usar el
+  origen aunque vaya por HTTP.
 
 ## Ahorrar
 

@@ -9,6 +9,8 @@ import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import { Duration } from 'aws-cdk-lib';
+import encabezados from './encabezados.json';
 
 const ROOT = path.join(__dirname, '..', '..');
 const JAR = path.join(ROOT, 'backend', 'target', 'operacion-garavito-0.0.1-SNAPSHOT.jar');
@@ -23,6 +25,30 @@ const DOMAIN = 'www.operaciongaravito.me';
 const CERTIFICATE_ARN =
   'arn:aws:acm:us-east-1:224772449836:certificate/b3c97791-79fe-4372-9039-9f5cf45e57ca';
 
+/** Content-Security-Policy de lib/encabezados.json con el dominio real. */
+export function contentSecurityPolicy(dominio: string): string {
+  return Object.entries(encabezados.csp)
+    .map(([directiva, valores]) => `${directiva} ${valores.join(' ').split('__DOMINIO__').join(dominio)}`)
+    .join('; ');
+}
+
+/**
+ * Secreto que CloudFront manda al backend en X-Origin-Verify (ver
+ * OrigenVerificadoFilter). Nunca va en el repositorio: se pasa al desplegar con
+ * `GARAVITO_ORIGIN_SECRET=... npx cdk deploy` o `-c originSecret=...`.
+ */
+function originSecret(stack: Stack): string {
+  const value = stack.node.tryGetContext('originSecret') ?? process.env.GARAVITO_ORIGIN_SECRET;
+  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{32,128}$/.test(value)) {
+    throw new Error(
+      'Falta el secreto de origen (32 a 128 letras, numeros, - o _). Generarlo con\n'
+        + '  openssl rand -hex 32\n'
+        + 'y desplegar con GARAVITO_ORIGIN_SECRET=<valor> npx cdk deploy (ver infra/README.md).',
+    );
+  }
+  return value;
+}
+
 /**
  * Despliegue minimo: un EC2 (backend + PostgreSQL en la misma maquina) y el
  * frontend en S3, todo detras de una sola distribucion de CloudFront con HTTPS.
@@ -32,6 +58,7 @@ export class GaravitoStack extends Stack {
     super(scope, id, props);
 
     const vpc = ec2.Vpc.fromLookup(this, 'DefaultVpc', { isDefault: true });
+    const secret = originSecret(this);
 
     // El backend solo recibe trafico de CloudFront; sin SSH (se entra por SSM).
     const sg = new ec2.SecurityGroup(this, 'BackendSg', { vpc, allowAllOutbound: true });
@@ -61,7 +88,14 @@ export class GaravitoStack extends Stack {
       'SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:5432/operaciongaravito',
       'SPRING_DATASOURCE_USERNAME=garavito',
       'SPRING_DATASOURCE_PASSWORD=$PW',
-      `WS_ALLOWED_ORIGINS=https://${DOMAIN},https://*.cloudfront.net`,
+      // Solo el dominio propio: *.cloudfront.net dejaba abrir el WebSocket desde una
+      // pagina alojada en la distribucion de CloudFront de cualquiera.
+      `WS_ALLOWED_ORIGINS=https://${DOMAIN}`,
+      // Sin este header (lo pone CloudFront) el backend responde 403 a todo.
+      `SECURITY_ORIGIN_SECRET=${secret}`,
+      // Detras de CloudFront la IP real del jugador es el ultimo valor de X-Forwarded-For.
+      'SECURITY_TRUST_FORWARDED_FOR=true',
+      'NODE_NAME=aws',
       'EOF',
       'chmod 600 /opt/garavito/app.env',
       'cat > /etc/systemd/system/garavito.service <<EOF',
@@ -107,16 +141,33 @@ export class GaravitoStack extends Stack {
       autoDeleteObjects: true,
     });
 
+    // CloudFront le agrega al backend el header secreto (si un visitante manda uno
+    // propio con el mismo nombre, CloudFront lo reemplaza por este).
     const backendOrigin = new origins.HttpOrigin(backendDns, {
       protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
       httpPort: 8080,
+      customHeaders: { 'X-Origin-Verify': secret },
     });
+
+    // Encabezados de seguridad en todas las respuestas (frontend y APIs).
+    const seguridad = new cloudfront.ResponseHeadersPolicy(this, 'SecurityHeaders', {
+      securityHeadersBehavior: {
+        strictTransportSecurity: { accessControlMaxAge: Duration.days(365), includeSubdomains: true, override: true },
+        contentTypeOptions: { override: true },
+        frameOptions: { frameOption: cloudfront.HeadersFrameOption.DENY, override: true },
+        referrerPolicy: { referrerPolicy: cloudfront.HeadersReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN, override: true },
+        contentSecurityPolicy: { contentSecurityPolicy: contentSecurityPolicy(DOMAIN), override: true },
+      },
+      removeHeaders: ['Server', 'X-Powered-By'],
+    });
+
     const toBackend: cloudfront.BehaviorOptions = {
       origin: backendOrigin,
       viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
       allowedMethods: cloudfront.AllowedMethods.ALLOW_ALL,
       cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
       originRequestPolicy: cloudfront.OriginRequestPolicy.ALL_VIEWER_EXCEPT_HOST_HEADER,
+      responseHeadersPolicy: seguridad,
     };
 
     const cdn = new cloudfront.Distribution(this, 'Cdn', {
@@ -127,6 +178,7 @@ export class GaravitoStack extends Stack {
       defaultBehavior: {
         origin: origins.S3BucketOrigin.withOriginAccessControl(site),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
+        responseHeadersPolicy: seguridad,
       },
       additionalBehaviors: { '/ws/*': toBackend, '/api/*': toBackend },
     });

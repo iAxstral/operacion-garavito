@@ -1,0 +1,18 @@
+{
+  "_comentario": "Content-Security-Policy del sitio. La usan garavito-stack.ts (CloudFront) y frontend/scripts/probar-csp.mjs (prueba el build con esta misma politica). __DOMINIO__ se reemplaza por el dominio publico.",
+  "csp": {
+    "default-src": ["'self'"],
+    "script-src": ["'self'"],
+    "style-src": ["'self'", "'unsafe-inline'"],
+    "img-src": ["'self'", "data:", "blob:"],
+    "media-src": ["'self'", "blob:"],
+    "font-src": ["'self'"],
+    "connect-src": ["'self'", "wss://__DOMINIO__", "https://__DOMINIO__"],
+    "worker-src": ["'self'"],
+    "manifest-src": ["'self'"],
+    "object-src": ["'none'"],
+    "base-uri": ["'self'"],
+    "form-action": ["'self'"],
+    "frame-ancestors": ["'none'"]
+  }
+}
