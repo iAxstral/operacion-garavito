@@ -2,11 +2,12 @@ package co.eci.operaciongaravito.game;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.event.EventListener;
+import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
+import org.springframework.messaging.simp.SimpMessageType;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
@@ -23,11 +24,31 @@ public class GameSessionService {
     private final Map<String, GameSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, Seat> seatsByConnection = new ConcurrentHashMap<>();
     private final SimpMessagingTemplate messagingTemplate;
-    private final ScheduledExecutorService gameLoop = Executors.newScheduledThreadPool(4, runnable -> {
-        Thread thread = new Thread(runnable, "game-loop");
-        thread.setDaemon(true);
-        return thread;
-    });
+    private final java.util.concurrent.ScheduledThreadPoolExecutor gameLoop =
+            new java.util.concurrent.ScheduledThreadPoolExecutor(4, runnable -> {
+                Thread thread = new Thread(runnable, "game-loop");
+                thread.setDaemon(true);
+                return thread;
+            });
+    /** La tarea de tick de cada sala: se cancela al cerrar la sala (no queda programada). */
+    private final Map<String, ScheduledFuture<?>> tickers = new ConcurrentHashMap<>();
+
+    {
+        // Una tarea cancelada sale de la cola enseguida, no cuando le tocaria correr.
+        gameLoop.setRemoveOnCancelPolicy(true);
+    }
+
+    /** Topes de salas (security.rooms.*). Sin Spring (pruebas armadas a mano), los de por defecto. */
+    private co.eci.operaciongaravito.security.SecurityProperties security =
+            new co.eci.operaciongaravito.security.SecurityProperties();
+    private final java.security.SecureRandom random = new java.security.SecureRandom();
+    /** Sin ambiguos (0/O, 1/I): se dictan en voz alta en clase. */
+    static final String CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSecurity(co.eci.operaciongaravito.security.SecurityProperties security) {
+        this.security = security;
+    }
 
     private final BossConfig bossConfig;
     private final co.eci.operaciongaravito.history.MatchHistoryService history;
@@ -105,6 +126,11 @@ public class GameSessionService {
     /** Un codificador de mensajes livianos por sala (ver DeltaEncoder). */
     private final Map<String, DeltaEncoder> encoders = new ConcurrentHashMap<>();
 
+    /** Cuantas tareas de tick hay programadas (para comprobar que no quedan salas zombi). */
+    public int scheduledTasks() {
+        return gameLoop.getQueue().size();
+    }
+
     public static boolean isValidCode(String gameId) {
         return gameId != null && VALID_CODE.matcher(gameId).matches();
     }
@@ -117,8 +143,34 @@ public class GameSessionService {
         return create(gameId, building, GameMode.NORMAL);
     }
 
+    /** True si este nodo ya tiene el maximo de salas (security.rooms.max-per-node). */
+    public boolean atRoomCap() {
+        return sessions.size() >= security.getRooms().getMaxPerNode();
+    }
+
+    /**
+     * Crea una sala con un codigo que genera el servidor (SecureRandom, sin que el
+     * cliente lo elija). Devuelve el codigo, o null si el nodo esta lleno.
+     */
+    public String createWithServerCode(Building building, GameMode mode) {
+        int length = security.getRooms().getCodeLength();
+        for (int attempt = 0; attempt < 20; attempt++) {
+            StringBuilder code = new StringBuilder(length);
+            for (int i = 0; i < length; i++) {
+                code.append(CODE_ALPHABET.charAt(random.nextInt(CODE_ALPHABET.length())));
+            }
+            if (atRoomCap()) {
+                return null;
+            }
+            if (create(code.toString(), building, mode) != null) {
+                return code.toString();
+            }
+        }
+        return null;
+    }
+
     public GameSession create(String gameId, Building building, GameMode mode) {
-        if (!isValidCode(gameId)) {
+        if (!isValidCode(gameId) || atRoomCap()) {
             return null;
         }
         // Con varios nodos, el codigo puede estar tomado en otro.
@@ -166,6 +218,21 @@ public class GameSessionService {
                 partidas);
     }
 
+    /**
+     * Reserva el puesto {@code role} de la sala para esta conexion si todavia no ocupa
+     * ninguno (en ninguna sala). Atomico: dos join en paralelo no ocupan dos puestos.
+     */
+    public boolean reserveSeat(String connectionId, String gameId, String role) {
+        return connectionId != null && seatsByConnection.putIfAbsent(connectionId, new Seat(gameId, role)) == null;
+    }
+
+    /** Suelta la reserva si el join no prospero (rol tomado, rol invalido). */
+    public void releaseSeat(String connectionId, String gameId, String role) {
+        if (connectionId != null) {
+            seatsByConnection.remove(connectionId, new Seat(gameId, role));
+        }
+    }
+
     public void registerSeat(String connectionId, String gameId, String role) {
         if (connectionId != null) {
             seatsByConnection.put(connectionId, new Seat(gameId, role));
@@ -191,9 +258,18 @@ public class GameSessionService {
         if (session.hasPlayers()) {
             broadcast(gameId, session, null);
         } else {
-            sessions.remove(gameId);
-            encoders.remove(gameId);
-            roomRegistry.release(gameId, nodeUrl);
+            closeRoom(gameId);
+        }
+    }
+
+    /** Borra la sala: deja de existir, se libera su codigo y se cancela su tick. */
+    private void closeRoom(String gameId) {
+        sessions.remove(gameId);
+        encoders.remove(gameId);
+        roomRegistry.release(gameId, nodeUrl);
+        ScheduledFuture<?> ticker = tickers.remove(gameId);
+        if (ticker != null) {
+            ticker.cancel(false);
         }
     }
 
@@ -248,8 +324,20 @@ public class GameSessionService {
         messagingTemplate.convertAndSend("/topic/game/" + gameId, message);
     }
 
-    public void broadcastRejected(String gameId, LastEvent event) {
-        messagingTemplate.convertAndSend("/topic/game/" + gameId, GameStateMessage.eventOnly(event));
+    /**
+     * Responde solo a la conexion {@code connectionId} (su cola /user/queue/eventos):
+     * rechazos y el codigo de la sala nueva. Asi el topic de una sala no confirma si un
+     * codigo existe ni muestra el clientId de quien pregunto.
+     */
+    public void reply(String connectionId, LastEvent event) {
+        if (connectionId == null || messagingTemplate == null) {
+            return;
+        }
+        SimpMessageHeaderAccessor headers = SimpMessageHeaderAccessor.create(SimpMessageType.MESSAGE);
+        headers.setSessionId(connectionId);
+        headers.setLeaveMutable(true);
+        messagingTemplate.convertAndSendToUser(connectionId, "/queue/eventos", GameStateMessage.eventOnly(event),
+                headers.getMessageHeaders());
     }
 
     private GameStateMessage message(GameSession session, LastEvent lastEvent) {
@@ -281,11 +369,13 @@ public class GameSessionService {
         long[] lastTickAt = { System.currentTimeMillis() };
         long[] lastBroadcastAt = { 0 };
         long[] lastRegistryRefresh = { System.currentTimeMillis() };
+        long[] emptySince = { System.currentTimeMillis() };
 
-        gameLoop.scheduleAtFixedRate(() -> {
+        ScheduledFuture<?> ticker = gameLoop.scheduleAtFixedRate(() -> {
             GameSession session = sessions.get(gameId);
             if (session == null) {
-                throw new IllegalStateException("partida cerrada");
+                closeRoom(gameId);
+                return;
             }
 
             expireSeats(gameId, session, System.currentTimeMillis());
@@ -294,9 +384,21 @@ public class GameSessionService {
                 roomRegistry.refresh(gameId, nodeUrl);
             }
             if (!sessions.containsKey(gameId)) {
-                throw new IllegalStateException("partida cerrada");
+                closeRoom(gameId);
+                return;
             }
-            if (!session.hasPlayers() || !session.isStarted()) {
+            if (!session.hasPlayers()) {
+                // Una sala que se creo y nadie uso (o que quedo vacia) no vive para siempre.
+                if (System.currentTimeMillis() - emptySince[0] >= security.getRooms().getEmptyTtlMs()) {
+                    LOGGER.log(System.Logger.Level.INFO, "se borra la sala vacia " + gameId);
+                    closeRoom(gameId);
+                    return;
+                }
+                lastTickAt[0] = System.currentTimeMillis();
+                return;
+            }
+            emptySince[0] = System.currentTimeMillis();
+            if (!session.isStarted()) {
                 lastTickAt[0] = System.currentTimeMillis();
                 return;
             }
@@ -327,5 +429,6 @@ public class GameSessionService {
                 LOGGER.log(System.Logger.Level.WARNING, "fallo el tick de la partida " + gameId, ex);
             }
         }, TICK_PERIOD_MS, TICK_PERIOD_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        tickers.put(gameId, ticker);
     }
 }

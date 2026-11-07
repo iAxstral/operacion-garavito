@@ -7,7 +7,8 @@ la carga desde **otro equipo**. Esta guía deja todo listo para hacerlo en la sa
 
 ## Qué se necesita
 
-- **Máquina A (servidor):** el backend, idealmente con el perfil `dev` o con Docker.
+- **Máquina A (servidor):** el backend con los perfiles `dev,carga` (el perfil `carga` apaga los
+  límites de abuso, que en producción no dejarían a tantos bots salir de una sola máquina).
 - **Máquina B (generador):** Node 22 o superior y una copia del repositorio (solo se usa
   `frontend/scripts/load-test.mjs` y sus dependencias).
 - Las dos en la misma red. En Windows, permitir el puerto del backend en el firewall de A.
@@ -18,7 +19,7 @@ la carga desde **otro equipo**. Esta guía deja todo listo para hacerlo en la sa
 
    ```bash
    cd backend
-   ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+   ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev,carga
    ```
 
    Anotar la IP de A (`ipconfig` en Windows, `ip a` en Linux), p. ej. `192.168.1.20`.

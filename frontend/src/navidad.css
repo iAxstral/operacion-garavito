@@ -478,12 +478,12 @@
 }
 
 .xl-code {
-  width: 150px;
+  width: min(100%, 220px);
   padding: 8px 10px;
   font-family: 'Courier New', monospace;
-  font-size: 26px;
+  font-size: 24px;
   font-weight: bold;
-  letter-spacing: 8px;
+  letter-spacing: 5px;
   text-align: center;
   text-transform: uppercase;
   color: #2b1a0c;

@@ -4,6 +4,11 @@
 //
 //   node scripts/load-test.mjs --url ws://localhost:8081/ws/websocket --rooms 20 --players 4 --seconds 60
 //
+// El backend tiene que correr con el perfil "carga" (ademas de dev o cluster): los bots
+// eligen el codigo de su sala y salen todos de la misma maquina, cosa que en produccion
+// los limites de abuso no dejan (ver docs/SEGURIDAD.md).
+//   ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev,carga
+//
 // Reporta: mensajes por segundo que recibe cada cliente, cada cuanto llega el estado
 // (deberia ser ~125 ms), sus percentiles, el tamaño de los mensajes y el tiempo de
 // ida y vuelta de una accion (de mandar un movimiento a verlo reflejado).
@@ -35,7 +40,8 @@ class Bot {
     this.building = building;
     this.create = create;
     this.clientId = Math.random().toString(36).slice(2, 10);
-    this.token = Math.random().toString(36).slice(2);
+    // Mismo formato que el cliente real (el servidor exige 16 a 64 caracteres).
+    this.token = crypto.randomUUID();
     this.messages = 0;
     this.bytes = 0;
     this.intervals = [];

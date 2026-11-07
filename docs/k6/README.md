@@ -79,9 +79,13 @@ de <https://github.com/grafana/k6/releases>. También sirve Docker con
 `grafana/k6`.
 
 ```bash
-# 1. Backend
-cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# 1. Backend (el perfil carga apaga los limites de abuso: los VUs eligen el codigo de su
+#    sala y salen todos de esta maquina; ver docs/SEGURIDAD.md)
+cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev,carga
 ```
+
+Contra el clúster (`docker-compose.cluster.yml`), los nodos se levantan con
+`PERFILES_NODO=cluster,carga docker compose -f docker-compose.cluster.yml up --build`.
 
 ```bash
 # 2. Prometheus + Grafana (opcional, para ver la prueba en vivo)

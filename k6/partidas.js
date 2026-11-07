@@ -4,6 +4,11 @@
 // Cada 4 VUs comparten sala: el primero que llega la crea, los otros entran, y se
 // inicia cuando estan los 4 (o a los 15 s si falta alguno).
 //
+// El backend tiene que tener el perfil "carga" (ademas de dev o cluster): los VUs eligen
+// el codigo de su sala para encontrarse y salen todos de la misma maquina, cosa que los
+// limites de abuso de produccion no dejan (ver docs/SEGURIDAD.md).
+//   java -jar target/*.jar --spring.profiles.active=dev,carga
+//
 //   k6 run k6/partidas.js
 //   k6 run -e BASE_URL=http://192.168.1.20:8080 -e PERFIL=estres k6/partidas.js
 //   k6 run -e BASE_URL=http://localhost:8080 k6/partidas.js   (balanceador del cluster)

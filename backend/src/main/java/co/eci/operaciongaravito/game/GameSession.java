@@ -283,7 +283,10 @@ public class GameSession {
         if (player == null || expected == null) {
             return "seat_expired";
         }
-        if (!expected.equals(token)) {
+        // Comparacion en tiempo constante: no deja adivinar el token midiendo cuanto tarda.
+        if (token == null || !java.security.MessageDigest.isEqual(
+                expected.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                token.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
             return "bad_token";
         }
         player.markConnected();
@@ -372,7 +375,7 @@ public class GameSession {
             return true;
         }
         long now = System.currentTimeMillis();
-        if (!isValidMove(player, floor, x, y, now)) {
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !isValidMove(player, floor, x, y, now)) {
             player.countRejectedMove();
             return false;
         }
@@ -945,6 +948,9 @@ public class GameSession {
      */
     public synchronized PlayerActionResult attemptPlaceBarricade(String playerId, double x, double y, double facing) {
         Player player = players.get(playerId);
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(facing)) {
+            return PlayerActionResult.rejected("bad_position");
+        }
         if (player == null) {
             return PlayerActionResult.rejected("unknown_player");
         }
@@ -1201,6 +1207,11 @@ public class GameSession {
     }
 
     public synchronized AttackResult attemptAttack(String playerId, AttackType type, double x, double y, double facing) {
+        // Con NaN todas las comparaciones de distancia y angulo dan false: el golpe le
+        // pegaria a todos los zombis del piso. El controlador ya lo filtra; esto es por si acaso.
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(facing)) {
+            return AttackResult.rejected("bad_position");
+        }
         Player player = players.get(playerId);
         if (player == null) {
             return AttackResult.rejected("unknown_player");

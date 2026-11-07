@@ -98,11 +98,13 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Levantar backend (perfil dev)
+      # Perfil carga: los jugadores falsos de k6 eligen el codigo de su sala y salen todos
+      # de la misma maquina; en produccion los limites de abuso no lo dejarian.
+      - name: Levantar backend (perfiles dev y carga)
         working-directory: backend
         run: |
           ./mvnw -B -q package -DskipTests
-          nohup java -jar target/*.jar --spring.profiles.active=dev > ../backend.log 2>&1 &
+          nohup java -jar target/*.jar --spring.profiles.active=dev,carga > ../backend.log 2>&1 &
           for i in $(seq 1 60); do
             curl -sf http://localhost:8080/actuator/health && exit 0
             sleep 2

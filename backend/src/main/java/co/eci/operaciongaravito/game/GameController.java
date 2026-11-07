@@ -1,38 +1,141 @@
 package co.eci.operaciongaravito.game;
 
+import static co.eci.operaciongaravito.security.Entrada.CLIENT_ID;
+import static co.eci.operaciongaravito.security.Entrada.CONSTANTE;
+import static co.eci.operaciongaravito.security.Entrada.ID;
+import static co.eci.operaciongaravito.security.Entrada.TOKEN;
+import static co.eci.operaciongaravito.security.Entrada.cumple;
+import static co.eci.operaciongaravito.security.Entrada.finitos;
+import static co.eci.operaciongaravito.security.Entrada.opcional;
+
+import co.eci.operaciongaravito.security.Entrada;
+import co.eci.operaciongaravito.security.IpHandshakeInterceptor;
+import co.eci.operaciongaravito.security.LimiteSalas;
+import co.eci.operaciongaravito.security.Rechazos;
+import co.eci.operaciongaravito.security.SecurityProperties;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.messaging.converter.MessageConversionException;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
+import org.springframework.messaging.handler.annotation.MessageExceptionHandler;
 import org.springframework.messaging.handler.annotation.MessageMapping;
+import org.springframework.messaging.handler.invocation.MethodArgumentResolutionException;
 import org.springframework.messaging.simp.SimpMessageHeaderAccessor;
 import org.springframework.stereotype.Controller;
 
+/**
+ * Mensajes STOMP del juego. Cada accion se atribuye al puesto ligado a la conexion
+ * (nunca al playerId del mensaje) y antes de tocar la sala se valida el formato de lo
+ * que llega (ver {@link Entrada}); lo invalido se descarta y se cuenta en
+ * garavito.rejected. Los rechazos de entrada (sala, puesto) se responden solo a quien
+ * los causo, por su cola privada.
+ */
 @Controller
 public class GameController {
 
-    private final GameSessionService sessionService;
+    private static final System.Logger LOGGER = System.getLogger(GameController.class.getName());
 
+    private final GameSessionService sessionService;
+    private final SecurityProperties security;
+    private final LimiteSalas limiteSalas;
+    private final Rechazos rechazos;
+
+    /** Para pruebas armadas a mano: limites por defecto y sin metricas. */
     public GameController(GameSessionService sessionService) {
+        this(sessionService, new SecurityProperties(), null, null);
+    }
+
+    @Autowired
+    public GameController(GameSessionService sessionService, SecurityProperties security, LimiteSalas limiteSalas,
+            Rechazos rechazos) {
         this.sessionService = sessionService;
+        this.security = security;
+        this.limiteSalas = limiteSalas == null ? new LimiteSalas(security) : limiteSalas;
+        this.rechazos = rechazos;
+    }
+
+    private void contar(String reason) {
+        if (rechazos != null) {
+            rechazos.contar(reason);
+        }
+    }
+
+    /** Descarta un cuerpo invalido: lo cuenta y devuelve true para cortar el metodo. */
+    private boolean invalido(boolean ok) {
+        if (!ok) {
+            contar(Rechazos.BAD_PAYLOAD);
+        }
+        return !ok;
+    }
+
+    private static String ipDe(SimpMessageHeaderAccessor headers) {
+        Map<String, Object> attributes = headers.getSessionAttributes();
+        Object ip = attributes == null ? null : attributes.get(IpHandshakeInterceptor.IP_ATTRIBUTE);
+        return ip == null ? null : ip.toString();
+    }
+
+    private static boolean lobbyValido(LobbyRequest request) {
+        return request != null && cumple(CLIENT_ID, request.clientId())
+                && opcional(CONSTANTE, request.building()) && opcional(CONSTANTE, request.mode());
+    }
+
+    /** Pide una sala nueva: el servidor genera el codigo y se lo responde solo a quien la pidio. */
+    @MessageMapping("/game/create")
+    public void createRoom(CreateRoomRequest request, SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(CLIENT_ID, request.clientId())
+                && opcional(CONSTANTE, request.building()) && opcional(CONSTANTE, request.mode()))) {
+            return;
+        }
+        String connection = headers.getSessionId();
+        if (sessionService.atRoomCap() || !limiteSalas.permitir(connection, ipDe(headers))) {
+            contar(Rechazos.ROOM_CAP);
+            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "room_cap"));
+            return;
+        }
+        String code = sessionService.createWithServerCode(Building.parseOrDefault(request.building()),
+                GameMode.parseOrDefault(request.mode()));
+        if (code == null) {
+            contar(Rechazos.ROOM_CAP);
+            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "room_cap"));
+            return;
+        }
+        sessionService.reply(connection, LastEvent.lobbyCreated(request.clientId(), code));
     }
 
     @MessageMapping("/game/{gameId}/lobby")
-    public void lobby(@DestinationVariable String gameId, LobbyRequest request) {
+    public void lobby(@DestinationVariable String gameId, LobbyRequest request, SimpMessageHeaderAccessor headers) {
+        if (invalido(lobbyValido(request))) {
+            return;
+        }
+        String connection = headers.getSessionId();
         GameSession session;
         if (!GameSessionService.isValidCode(gameId)) {
-            sessionService.broadcastRejected(gameId, LastEvent.lobbyRejected(request.clientId(), "invalid_code"));
+            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "invalid_code"));
             return;
         }
         if (request.create()) {
+            // El codigo lo genera el servidor (/app/game/create). Elegirlo el cliente solo
+            // queda para las pruebas de carga (perfil carga), con los mismos topes.
+            if (!security.getRooms().isClientCodesAllowed()) {
+                sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "use_create"));
+                return;
+            }
+            if (sessionService.atRoomCap() || !limiteSalas.permitir(connection, ipDe(headers))) {
+                contar(Rechazos.ROOM_CAP);
+                sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "room_cap"));
+                return;
+            }
             session = sessionService.create(gameId, Building.parseOrDefault(request.building()),
                     GameMode.parseOrDefault(request.mode()));
             if (session == null) {
-                sessionService.broadcastRejected(gameId, LastEvent.lobbyRejected(request.clientId(), "code_taken"));
+                sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "code_taken"));
                 return;
             }
         } else {
             session = sessionService.find(gameId);
             if (session == null) {
                 String owner = sessionService.redirectFor(gameId);
-                sessionService.broadcastRejected(gameId, owner != null
+                sessionService.reply(connection, owner != null
                         ? LastEvent.lobbyRedirect(request.clientId(), owner)
                         : LastEvent.lobbyRejected(request.clientId(), "lobby_not_found"));
                 return;
@@ -41,41 +144,92 @@ public class GameController {
         sessionService.broadcast(gameId, session, LastEvent.lobbyOk(request.clientId()));
     }
 
+    private boolean asientoValido(JoinRequest request) {
+        return request != null && cumple(CONSTANTE, request.role()) && cumple(CLIENT_ID, request.clientId())
+                && Entrada.nombre(request.name()) && opcional(CONSTANTE, request.costume());
+    }
+
     @MessageMapping("/game/{gameId}/join")
     public void join(@DestinationVariable String gameId, JoinRequest request, SimpMessageHeaderAccessor headers) {
+        if (invalido(asientoValido(request))) {
+            return;
+        }
+        String connection = headers.getSessionId();
+        if (!opcional(TOKEN, request.token())) {
+            contar(Rechazos.BAD_TOKEN);
+            sessionService.reply(connection, LastEvent.joinRejected(request.clientId(), "bad_token"));
+            return;
+        }
         GameSession session = sessionService.find(gameId);
         if (session == null) {
-            sessionService.broadcastRejected(gameId, LastEvent.joinRejected(request.clientId(), "lobby_not_found"));
+            sessionService.reply(connection, LastEvent.joinRejected(request.clientId(), "lobby_not_found"));
+            return;
+        }
+        // Una conexion, un puesto: si no, un solo cliente llena la sala y nadie mas juega.
+        // Se reserva de forma atomica: los join de una conexion pueden llegar en paralelo.
+        if (!sessionService.reserveSeat(connection, gameId, request.role())) {
+            contar(Rechazos.SEAT_CAP);
+            sessionService.reply(connection, LastEvent.joinRejected(request.clientId(), "already_seated"));
             return;
         }
 
         String rejection = session.joinPlayer(request.role(), request.token());
         if (rejection != null) {
-            sessionService.broadcast(gameId, session, LastEvent.joinRejected(request.clientId(), rejection));
+            sessionService.releaseSeat(connection, gameId, request.role());
+            sessionService.reply(connection, LastEvent.joinRejected(request.clientId(), rejection));
             return;
         }
         session.setPlayerName(request.role(), request.name());
         session.setPlayerCostume(request.role(), request.costume());
-        sessionService.registerSeat(headers.getSessionId(), gameId, request.role());
         sessionService.broadcast(gameId, session, LastEvent.joinOk(request.role(), request.clientId()));
     }
 
     @MessageMapping("/game/{gameId}/rejoin")
     public void rejoin(@DestinationVariable String gameId, JoinRequest request, SimpMessageHeaderAccessor headers) {
-        GameSession session = sessionService.find(gameId);
-        String rejection = sessionService.rejoin(gameId, request.role(), request.token(), headers.getSessionId());
-        if (rejection != null) {
-            sessionService.broadcastRejected(gameId, LastEvent.rejoinRejected(request.clientId(), rejection));
+        if (invalido(asientoValido(request))) {
             return;
         }
+        String connection = headers.getSessionId();
+        if (!cumple(TOKEN, request.token())) {
+            contar(Rechazos.BAD_TOKEN);
+            sessionService.reply(connection, LastEvent.rejoinRejected(request.clientId(), "bad_token"));
+            return;
+        }
+        String rejection = sessionService.rejoin(gameId, request.role(), request.token(), connection);
+        if (rejection != null) {
+            if ("bad_token".equals(rejection)) {
+                contar(Rechazos.BAD_TOKEN);
+            }
+            sessionService.reply(connection, LastEvent.rejoinRejected(request.clientId(), rejection));
+            return;
+        }
+        GameSession session = sessionService.find(gameId);
         session.setPlayerName(request.role(), request.name());
         session.setPlayerCostume(request.role(), request.costume());
         sessionService.broadcast(gameId, session, LastEvent.rejoinOk(request.role(), request.clientId()));
     }
 
+    /**
+     * Cuerpo que no se pudo leer (JSON roto, vacio, tipos imposibles) o que hizo fallar un
+     * metodo: se cuenta y se descarta sin volcar la traza al log por cada intento.
+     */
+    @MessageExceptionHandler
+    public void onBadMessage(Exception ex) {
+        contar(Rechazos.BAD_PAYLOAD);
+        if (ex instanceof MessageConversionException || ex instanceof MethodArgumentResolutionException
+                || ex instanceof IllegalArgumentException) {
+            LOGGER.log(System.Logger.Level.DEBUG, "mensaje STOMP descartado: " + ex.getClass().getSimpleName());
+        } else {
+            LOGGER.log(System.Logger.Level.WARNING, "fallo un mensaje STOMP: " + ex);
+        }
+    }
+
     @MessageMapping("/game/{gameId}/perk")
     public void choosePerk(@DestinationVariable String gameId, PerkRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(CONSTANTE, request.perk()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -91,6 +245,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/hide")
     public void hide(@DestinationVariable String gameId, PlayerRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null)) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -106,6 +263,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/chat")
     public void chat(@DestinationVariable String gameId, ChatRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(CONSTANTE, request.phrase()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -123,6 +283,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/ping")
     public void ping(@DestinationVariable String gameId, PingRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(CONSTANTE, request.kind()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -140,6 +303,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/start")
     public void start(@DestinationVariable String gameId, StartRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null)) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -153,6 +319,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/leave")
     public void leave(@DestinationVariable String gameId, LeaveRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null)) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -163,6 +332,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/pickup")
     public void pickup(@DestinationVariable String gameId, PickupRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.itemId()) && finitos(request.x(), request.y()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -183,6 +355,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/purchase")
     public void purchase(@DestinationVariable String gameId, PurchaseRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.itemId()) && finitos(request.x(), request.y()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -203,6 +378,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/door/toggle")
     public void toggleDoor(@DestinationVariable String gameId, DoorToggleRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.doorId()) && finitos(request.x(), request.y()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -223,6 +401,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/mission/start")
     public void startMission(@DestinationVariable String gameId, MissionStartRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.missionId()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -243,6 +424,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/mission/cancel")
     public void cancelMission(@DestinationVariable String gameId, MissionStartRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.missionId()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -258,6 +442,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/mission/complete")
     public void completeMission(@DestinationVariable String gameId, MissionCompleteRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.missionId()) && finitos(request.x(), request.y()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -278,6 +465,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/move")
     public void move(@DestinationVariable String gameId, MoveRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && Entrada.piso(request.floor()) && finitos(request.x(), request.y()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -293,6 +483,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/attack")
     public void attack(@DestinationVariable String gameId, AttackRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && finitos(request.x(), request.y(), request.facing()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -316,6 +509,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/use")
     public void useItem(@DestinationVariable String gameId, UseItemRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.itemId()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -335,6 +531,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/equip")
     public void equip(@DestinationVariable String gameId, EquipRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.itemId()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -352,6 +551,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/reload")
     public void reload(@DestinationVariable String gameId, PlayerRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null)) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -367,6 +569,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/revive/start")
     public void startRevive(@DestinationVariable String gameId, ReviveRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(CONSTANTE, request.targetId()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -384,6 +589,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/revive/cancel")
     public void cancelRevive(@DestinationVariable String gameId, PlayerRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null)) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -398,6 +606,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/event/interact")
     public void interactEvent(@DestinationVariable String gameId, PlayerRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null)) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -414,6 +625,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/barricade/place")
     public void placeBarricade(@DestinationVariable String gameId, BarricadeRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && finitos(request.x(), request.y(), request.facing()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -429,6 +643,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/barricade/repair")
     public void repairBarricade(@DestinationVariable String gameId, BarricadeRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.barricadeId()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -444,6 +661,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/barricade/dismantle")
     public void dismantleBarricade(@DestinationVariable String gameId, BarricadeRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(ID, request.barricadeId()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;
@@ -459,6 +679,9 @@ public class GameController {
     @MessageMapping("/game/{gameId}/transfer")
     public void transfer(@DestinationVariable String gameId, TransferRequest request,
             SimpMessageHeaderAccessor headers) {
+        if (invalido(request != null && cumple(CONSTANTE, request.targetId()))) {
+            return;
+        }
         String playerId = sessionService.seatRole(gameId, headers.getSessionId());
         if (playerId == null) {
             return;

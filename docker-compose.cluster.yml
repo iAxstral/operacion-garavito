@@ -32,7 +32,7 @@ services:
     ports:
       - "8081:8080"
     environment: &node
-      SPRING_PROFILES_ACTIVE: cluster
+      SPRING_PROFILES_ACTIVE: ${PERFILES_NODO:-cluster}
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/operaciongaravito
       SPRING_DATASOURCE_USERNAME: postgres
       SPRING_DATASOURCE_PASSWORD: postgres

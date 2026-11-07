@@ -34,8 +34,8 @@ class SeatOwnershipTest {
         service = new GameSessionService(mock(SimpMessagingTemplate.class), null, 8, 1, 500, 600, 1500, 3000, 115, 24, 12, 900);
         controller = new GameController(service);
         session = service.create(ROOM, Building.F);
-        controller.join(ROOM, new JoinRequest("ECONOMIA", "c1", "t1", "Eco", null), connection("conn-eco"));
-        controller.join(ROOM, new JoinRequest("SEGURIDAD", "c2", "t2", "Seg", null), connection("conn-seg"));
+        controller.join(ROOM, new JoinRequest("ECONOMIA", "c1", "token-economia-0001", "Eco", null), connection("conn-eco"));
+        controller.join(ROOM, new JoinRequest("SEGURIDAD", "c2", "token-seguridad-0002", "Seg", null), connection("conn-seg"));
         session.getOrCreatePlayer("ECONOMIA").addGaravitos(50);
         ecoStart = session.getOrCreatePlayer("ECONOMIA").getGaravitos();
         segStart = session.getOrCreatePlayer("SEGURIDAD").getGaravitos();
