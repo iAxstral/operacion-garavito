@@ -40,7 +40,8 @@ O en Windows: `./dev.ps1` abre los dos.
 | De punta a punta (Playwright: levanta backend y frontend solos) | `cd frontend && npm run test:e2e` |
 | Costo del tick (benchmark, sin red) | `cd backend && ./mvnw test -Dtest=TickCostBenchmarkTest -Dbenchmark=true` |
 | Carga por la red (bots STOMP) | `cd frontend && node scripts/load-test.mjs --url ws://localhost:8080/ws/websocket --rooms 25` |
-| Carga con k6 (umbrales, ver `docs/k6`) | `k6 run k6/partidas.js` (o `-e PERFIL=humo` / `estres`) |
+| Carga con k6 (umbrales, ver `docs/k6`) | `k6 run k6/partidas.js` (o `-e PERFIL=humo` / `estres`); backend con `dev,carga` |
+| Ataques contra un servidor (ver `docs/SEGURIDAD.md`) | `cd frontend && node scripts/pentest.mjs https://www.operaciongaravito.me` |
 
 ## Monitoreo
 

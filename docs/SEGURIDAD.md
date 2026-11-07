@@ -44,8 +44,9 @@ seguridad no se basa en "quién eres", sino en tres ideas:
 | Solo `SEND` a `/app/game/...`. Antes se podía publicar directo en `/topic/game/{sala}` y mandarles un estado falso a todos los jugadores | `StompGuardInterceptor` | `CanalStompSecurityTest.cannotPublishToBrokerTopic` |
 | Tope de suscripciones por conexión (4) | `StompGuardInterceptor` | `subscriptionsAreCapped` |
 | Token bucket por conexión: 40 mensajes/s sostenidos, ráfaga de 80. Lo que sobra se descarta; si sigue, se corta | `StompGuardInterceptor` | `floodIsRateLimited`, y `normalClientIsNotLimited` (movimiento a 10 Hz más acciones no se corta) |
-| Frames de máximo 8 KB, buffer y tiempo de envío acotados | `WebSocketConfig` | `oversizedFrameIsRejected` |
+| Frames de máximo 8 KB, buffer y tiempo de envío acotados. **Ya pasaba** por el buffer de 8 KB que Tomcat trae por defecto; ahora queda explícito y configurable | `WebSocketConfig` | `oversizedFrameIsRejected`, `JuegoSecurityTest.hugeTokenIsRejected` (60 KB) |
 | Una conexión que no manda el `CONNECT` de STOMP en 10 s se cierra (revisión propia cada segundo: la de Spring solo corre si hay tráfico de salida) | `SesionesWebSocket` | `idleConnectionIsClosed` |
+| Máximo 50 conexiones a la vez por IP (alto a propósito: un salón entero puede salir por la misma IP de la universidad). Sin esto, una sola máquina abre cientos y prueba códigos de sala en paralelo | `SesionesWebSocket` | `JuegoSecurityTest.connectionsPerIpAreCapped` |
 | `Origin` del handshake: solo el dominio propio (antes también `*.cloudfront.net`, es decir, páginas en CloudFront de cualquiera) | `WebSocketConfig`, `infra/lib/garavito-stack.ts` | `foreignOriginIsRejected`, `infra/test/verificar-stack.ts` |
 
 ### Salas
@@ -57,6 +58,22 @@ seguridad no se basa en "quién eres", sino en tres ideas:
 | Una sala sin jugadores más de 60 s se borra y se cancela su tick. Antes una sala creada y nunca usada vivía para siempre (miles de salas = memoria y CPU agotadas) | `GameSessionService.startTicking/closeRoom` | `emptyRoomExpires` |
 | Los rechazos (sala no existe, puesto tomado, token malo) van solo a quien los causó. Antes salían en el topic público: confirmaban qué códigos existen y mostraban el `clientId` | `GameSessionService.reply` | `rejectionsArePrivate` |
 | Una conexión ocupa un solo puesto (reserva atómica: los `join` de una conexión llegan en paralelo) | `GameSessionService.reserveSeat` | `oneSeatPerConnection` |
+
+### Trampas desde un cliente con script
+
+Estas defensas ya existían (servidor autoritativo); ahora tienen prueba contra el
+servidor real:
+
+| Ataque | Prueba |
+|---|---|
+| Mandar acciones con el `playerId` de otro (moverlo, sacarlo, gastarle la plata) | `JuegoSecurityTest.spoofedPlayerIdIsIgnored`, `SeatOwnershipTest` |
+| Actuar sin haberse sentado (iniciar la partida, comprar, sacar a alguien) | `actionsWithoutJoinAreIgnored` |
+| Ocupar un rol ya tomado | `takenRoleIsRejected` |
+| Volver a un puesto con un token válido pero adivinado | `rejoinWithWrongTokenFails` |
+| Speed hack: salto de 1500 px | `speedhackIsCorrected` |
+| Transferencias negativas, de cero, mayores al saldo o con desbordamiento | `negativeTransferIsRejected` |
+| 2000 pedidos de sala desde 4 conexiones | `thousandsOfCreatesAreCapped` |
+| Suscribirse a una sala sin conocer su código | `unknownRoomSubscriptionGetsNothing` |
 
 ### Validación de entrada
 
@@ -116,6 +133,7 @@ detectados"**, con los rechazos por segundo de cada razón:
 | `idle` | Conexión que nunca mandó el `CONNECT` |
 | `bad_origin` | Petición sin el header de CloudFront |
 | `api_rate_limit` | REST en bucle |
+| `conn_cap` | Demasiadas conexiones a la vez desde una IP |
 
 ### Dependencias
 
@@ -138,6 +156,7 @@ producción:
 | `security.ratelimit.enabled` / `.messages-per-second` / `.burst` / `.max-violations` | `true` / 40 / 80 / 200 | Token bucket STOMP por conexión |
 | `security.stomp.max-subscriptions` | 4 | Suscripciones por conexión |
 | `security.ws.message-size-limit` / `.time-to-first-message-ms` | 8192 / 10000 | Transporte |
+| `security.ws.max-connections-per-ip` | 50 | Conexiones WebSocket a la vez por IP |
 | `security.rooms.max-per-node` / `.max-per-connection` / `.max-per-ip` | 200 / 3 / 20 | Topes de salas |
 | `security.rooms.empty-ttl-ms` | 60000 | Vida de una sala vacía |
 | `security.rooms.client-codes-allowed` | `false` | Modo heredado: el cliente elige el código |
@@ -166,9 +185,9 @@ producción.**
 
 - **Adivinar un código de sala sigue siendo posible, pero caro.** A 40 intentos por
   segundo por conexión, una sola conexión tarda unos 310 días en recorrer los mil
-  millones de códigos. Con 100 conexiones, y 10 salas abiertas, encontrar una tomaría
-  unas 7 horas. Quien la encuentra solo puede ocupar un puesto libre o mirar: no puede
-  actuar como otro jugador sin su token.
+  millones de códigos. Desde una IP (máximo 50 conexiones), con 10 salas abiertas,
+  encontrar una toma unas 15 horas; con muchas IPs, menos. Quien la encuentra solo puede
+  ocupar un puesto libre o mirar: no puede actuar como otro jugador sin su token.
 - **Un solo EC2.** Los límites protegen la aplicación, pero una inundación a nivel de red
   o miles de conexiones desde muchas IPs pueden saturar la máquina. Lo cubriría WAF
   (propuesta).
@@ -185,6 +204,28 @@ producción.**
   despliegue (ver arriba).
 
 ## 6. Cómo comprobarlo
+
+### Contra el sitio desplegado
+
+`frontend/scripts/pentest.mjs` corre 18 ataques por STOMP y REST contra una URL y dice
+cuáles defendió. Es liviano (crea 4 salas que se borran solas, inunda solo su propia
+conexión y manda unas 50 peticiones REST), así que se puede lanzar contra el juego en
+línea antes de la entrega:
+
+```bash
+cd frontend && node scripts/pentest.mjs https://www.operaciongaravito.me
+```
+
+Resultado contra el backend de este cambio (configuración de producción, local):
+**18/18 defendidos**. El mismo script contra `main` antes del cambio defendió 6 de 18:
+`/topic/**` leía todas las salas, el cliente elegía el código, no había límite de
+mensajes, el actuator respondía en el puerto del juego y la API REST no tenía límite.
+Los ataques que necesitan una sala creada por el servidor no se pudieron correr allí
+(`/app/game/create` no existía), y uno de los 6 (W13, salas sin límite) salió bien solo
+por eso; ahora el script lo cuenta como no concluyente.
+El CI lo corre en cada push (job *Ataques*).
+
+### Pruebas automáticas
 
 ```bash
 # Todas las pruebas, incluidas las de ataque

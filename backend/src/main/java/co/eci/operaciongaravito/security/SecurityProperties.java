@@ -59,6 +59,14 @@ public class SecurityProperties {
         private int sendTimeLimitMs = 10_000;
         /** Una conexion que no manda el CONNECT de STOMP en este tiempo se cierra. */
         private int timeToFirstMessageMs = 10_000;
+        /**
+         * Conexiones WebSocket a la vez desde una misma IP. Alto a proposito: un salon
+         * entero puede salir a internet por la misma IP (NAT de la universidad).
+         */
+        private int maxConnectionsPerIp = 50;
+
+        public int getMaxConnectionsPerIp() { return maxConnectionsPerIp; }
+        public void setMaxConnectionsPerIp(int v) { this.maxConnectionsPerIp = v; }
 
         public int getMessageSizeLimit() { return messageSizeLimit; }
         public void setMessageSizeLimit(int v) { this.messageSizeLimit = v; }

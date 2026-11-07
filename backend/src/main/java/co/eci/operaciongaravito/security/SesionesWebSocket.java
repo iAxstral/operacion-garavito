@@ -7,6 +7,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.WebSocketHandler;
@@ -19,6 +20,9 @@ import org.springframework.web.socket.handler.WebSocketHandlerDecorator;
  *
  * <p>Spring tiene {@code setTimeToFirstMessage}, pero solo revisa cuando hay trafico de
  * salida; aqui se revisa cada segundo, aunque el servidor este quieto.
+ *
+ * <p>Tambien limita cuantas conexiones abiertas a la vez puede tener una IP: sin eso, una
+ * sola maquina abre cientos y prueba codigos de sala en paralelo.
  */
 @Component
 public class SesionesWebSocket {
@@ -31,6 +35,9 @@ public class SesionesWebSocket {
     private final Map<String, Abierta> abiertas = new ConcurrentHashMap<>();
     /** Conexiones que ya mandaron su CONNECT de STOMP. */
     private final Map<String, Boolean> conectadas = new ConcurrentHashMap<>();
+    private final Map<String, AtomicInteger> porIp = new ConcurrentHashMap<>();
+    /** IP de cada conexion que se conto (para descontarla al cerrar). */
+    private final Map<String, String> ipDe = new ConcurrentHashMap<>();
     private final SecurityProperties properties;
     private final Rechazos rechazos;
     private final ScheduledExecutorService checker = Executors.newSingleThreadScheduledExecutor(runnable -> {
@@ -49,6 +56,16 @@ public class SesionesWebSocket {
         return new WebSocketHandlerDecorator(handler) {
             @Override
             public void afterConnectionEstablished(WebSocketSession session) throws Exception {
+                Object ip = session.getAttributes().get(IpHandshakeInterceptor.IP_ATTRIBUTE);
+                if (ip != null) {
+                    int abiertasDeIp = porIp.computeIfAbsent(ip.toString(), k -> new AtomicInteger()).incrementAndGet();
+                    ipDe.put(session.getId(), ip.toString());
+                    if (abiertasDeIp > properties.getWs().getMaxConnectionsPerIp()) {
+                        rechazos.contar(Rechazos.CONN_CAP);
+                        session.close(CloseStatus.POLICY_VIOLATION.withReason("demasiadas conexiones"));
+                        return;
+                    }
+                }
                 abiertas.put(session.getId(), new Abierta(session, System.currentTimeMillis()));
                 super.afterConnectionEstablished(session);
             }
@@ -57,6 +74,10 @@ public class SesionesWebSocket {
             public void afterConnectionClosed(WebSocketSession session, CloseStatus closeStatus) throws Exception {
                 abiertas.remove(session.getId());
                 conectadas.remove(session.getId());
+                String ip = ipDe.remove(session.getId());
+                if (ip != null) {
+                    porIp.computeIfPresent(ip, (k, count) -> count.decrementAndGet() <= 0 ? null : count);
+                }
                 super.afterConnectionClosed(session, closeStatus);
             }
         };

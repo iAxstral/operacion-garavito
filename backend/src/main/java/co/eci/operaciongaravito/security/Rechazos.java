@@ -22,9 +22,10 @@ public class Rechazos {
     public static final String IDLE = "idle";
     public static final String BAD_ORIGIN = "bad_origin";
     public static final String API_RATE_LIMIT = "api_rate_limit";
+    public static final String CONN_CAP = "conn_cap";
 
     static final List<String> REASONS = List.of(RATE_LIMIT, BAD_SUBSCRIBE, BAD_DESTINATION, BAD_PAYLOAD, BAD_TOKEN,
-            ROOM_CAP, SEAT_CAP, IDLE, BAD_ORIGIN, API_RATE_LIMIT);
+            ROOM_CAP, SEAT_CAP, IDLE, BAD_ORIGIN, API_RATE_LIMIT, CONN_CAP);
 
     private final MeterRegistry registry;
 
