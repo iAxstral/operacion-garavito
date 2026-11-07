@@ -66,14 +66,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
-      # Equivalente a OWASP dependency-check: Trivy resuelve las dependencias de
-      # pom.xml (con las transitivas) y las cruza con las bases de vulnerabilidades.
-      # Falla con vulnerabilidades altas o criticas que ya tengan version arreglada.
-      # Se usa la imagen oficial de Docker (el runner trae Docker) en vez de la accion.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # Trivy lee las dependencias (con las transitivas) del repositorio local de Maven:
+      # si las pide el mismo a Maven Central, este responde 429 al runner.
+      - name: Descargar las dependencias al repositorio local
+        working-directory: backend
+        run: ./mvnw -B -q dependency:go-offline
+      # Equivalente a OWASP dependency-check: cruza las dependencias de pom.xml con las
+      # bases de vulnerabilidades. Falla con vulnerabilidades altas o criticas que ya
+      # tengan version arreglada. Imagen oficial de Docker (el runner trae Docker).
       - name: Vulnerabilidades conocidas en backend/pom.xml
         run: |
-          docker run --rm -v "$PWD/backend:/src:ro" aquasec/trivy:latest fs \
-            --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 /src
+          docker run --rm -v "$PWD/backend:/src:ro" -v "$HOME/.m2:/root/.m2:ro" aquasec/trivy:latest fs \
+            --offline-scan --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 /src
 
   ataques:
     name: Ataques (pentest contra el backend de produccion)
