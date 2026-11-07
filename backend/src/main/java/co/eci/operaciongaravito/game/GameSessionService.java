@@ -111,6 +111,14 @@ public class GameSessionService {
         this.nodeUrl = url;
     }
 
+    /** Nombre del nodo que se muestra en la pagina publica (nunca su URL interna). */
+    private String nodeName = "local";
+
+    @org.springframework.beans.factory.annotation.Autowired
+    void setNodeName(@Value("${app.node.name:local}") String name) {
+        this.nodeName = name == null || name.isBlank() ? "local" : name;
+    }
+
     /** URL del nodo que tiene la sala si no es este, o null (la sala esta aqui o no existe). */
     public String redirectFor(String gameId) {
         if (sessions.containsKey(gameId)) {
@@ -209,7 +217,7 @@ public class GameSessionService {
             }
         }
         return new EstadoServidor(
-                nodeUrl,
+                nodeName,
                 java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime() / 1000,
                 partidas.size(),
                 partidas.stream().mapToInt(EstadoServidor.SalaEnVivo::jugadores).sum(),

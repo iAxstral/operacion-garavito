@@ -167,6 +167,8 @@ export function jugador() {
         if (command === 'CONNECTED') {
           conexionStomp.add(Date.now() - inicio);
           socket.send(frame('SUBSCRIBE', { id: 'sub-0', destination: `/topic/game/${codigo}` }));
+          // Los rechazos (code_taken, puesto tomado) llegan solo a quien los causo.
+          socket.send(frame('SUBSCRIBE', { id: 'sub-1', destination: '/user/queue/eventos' }));
           // Spring puede atender el SUBSCRIBE y el primer SEND en hilos distintos: se espera
           // un momento para no perder la respuesta, y se reintenta si igual no llega.
           socket.setTimeout(pedirSala, 500);
@@ -177,6 +179,7 @@ export function jugador() {
         }
         if (command !== 'MESSAGE') return;
 
+        const privado = raw.includes('destination:/user/queue/eventos');
         const estado = JSON.parse(body);
         const evento = estado.lastEvent;
         if (evento) {
@@ -200,7 +203,7 @@ export function jugador() {
             correcciones.add(1);
           }
         }
-        if (!estado.players) return; // rechazo suelto, sin estado
+        if (privado || !estado.players) return; // rechazo suelto, sin estado
 
         // Entro si el servidor lo confirma o si ya aparece en la sala con su nombre.
         if (!entro && ((evento && evento.type === 'JOIN_OK' && evento.itemId === clientId)

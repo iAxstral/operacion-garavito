@@ -77,4 +77,13 @@ class EstadoTest {
 
         assertNotNull(controller.estado().tickP99Ms());
     }
+
+    @Test
+    @org.junit.jupiter.api.DisplayName("la pagina publica no muestra la URL interna del nodo, solo su nombre")
+    void estadoDoesNotLeakNodeUrl() {
+        service.setNodeUrl("http://10.0.3.17:8081");
+        String nodo = service.estado().nodo();
+        org.junit.jupiter.api.Assertions.assertFalse(nodo.contains("10.0.3.17") || nodo.contains("http"),
+                "nodo publico: " + nodo);
+    }
 }
