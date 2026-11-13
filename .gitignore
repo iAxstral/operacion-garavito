@@ -1,3 +1,12 @@
 # Fuentes de audio sin procesar (varios cientos de MB, uno supera el límite de 100 MB de GitHub).
 # Las versiones ya usadas por el juego están en frontend/public/sounds/.
 imagenes/sounds/
+
+# Configuracion local del editor (IntelliJ / WebStorm).
+.idea/
+
+# Cache de Python de los scripts de herramientas.
+__pycache__/
+
+# npm corrido por error en la raiz: el proyecto de Node vive en frontend/.
+/package-lock.json
