@@ -182,15 +182,23 @@ export default function SecurityMission() {
     return () => cancelAnimationFrame(rafId);
   }, [phase]);
 
+  // Del puntero a pixeles del canvas: la interfaz puede estar escalada (--ui-scale), asi
+  // que el canvas no siempre mide en pantalla lo mismo que por dentro.
+  const canvasPoint = (event) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) * canvas.width) / rect.width,
+      y: ((event.clientY - rect.top) * canvas.height) / rect.height,
+    };
+  };
+
   const handlePointerMove = (event) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    mouseRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    mouseRef.current = canvasPoint(event);
   };
 
   const handleClick = (event) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
+    const { x: clickX, y: clickY } = canvasPoint(event);
     const now = performance.now();
 
     let bestIndex = -1;

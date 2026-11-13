@@ -108,3 +108,12 @@ code {
   padding: 4px 8px;
   background: var(--code-bg);
 }
+
+/* Interfaz a escala de la pantalla (--ui-scale, ver src/game/screenScale.js): se
+   achica en una ventana con barras del navegador y crece en monitores grandes. Las
+   medidas en px se multiplican; los porcentajes y inset: 0 siguen llenando la pantalla.
+   El canvas de Phaser no: el juego escala con el zoom de su camara. */
+.hw-screen > :not(.game-stage),
+.game-stage > :not(#game-canvas) {
+  zoom: var(--ui-scale, 1);
+}

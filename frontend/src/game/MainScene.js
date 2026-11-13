@@ -11,6 +11,7 @@ import { NIGHT_CONE_FACTOR } from './gameModes';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
 import CharacterRig, { footOffsetFor, hideHostSprite, preloadCharacterRigs } from './CharacterRig';
+import { cameraZoomFor } from './screenScale';
 import { CHAT_PHRASES, EMOTES, PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { COMIDA_TEXTURES, texturaDeComida } from './comidas';
@@ -155,17 +156,7 @@ const TOUCH_SPRINT = 0.95;
 const CORNER_PROBE_PX = 14;
 const CORNER_NUDGE_SPEED = 110;
 
-// En pantallas chicas (celular) la camara se aleja para que se vea mas mapa alrededor:
-// con zoom 1 el personaje ocupaba casi la mitad del alto en horizontal.
-const ZOOM_REFERENCE_PX = 620;
-const MIN_CAMERA_ZOOM = 0.6;
 const BANNER_TOP_PX = 70;
-
-export function cameraZoomFor(width, height) {
-  const shortSide = Math.min(width, height);
-  if (shortSide >= ZOOM_REFERENCE_PX) return 1;
-  return Math.max(MIN_CAMERA_ZOOM, Math.round((shortSide / ZOOM_REFERENCE_PX) * 20) / 20);
-}
 
 const WALK_WOBBLE_HZ = 3;
 // Letra gotica del tema (GameCanvas espera a que cargue antes de crear la escena).
