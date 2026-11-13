@@ -10,6 +10,7 @@ import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
 import { NIGHT_CONE_FACTOR } from './gameModes';
 import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
 import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
+import CharacterRig, { footOffsetFor, hideHostSprite, preloadCharacterRigs } from './CharacterRig';
 import { CHAT_PHRASES, EMOTES, PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
 import { COMIDA_TEXTURES, texturaDeComida } from './comidas';
@@ -120,6 +121,12 @@ const RAIN_MAX_VOLUME = 0.6;
 const RAIN_SWELL_MS = 11000;
 const TOUCH_DEADZONE = 0.3;
 const REMOTE_LERP_PER_SECOND = 10;
+// Compañeros: su velocidad se mide sobre esta ventana de posiciones del servidor y se
+// suaviza para animar los pasos sin tirones; un salto mayor que REMOTE_JUMP_PX es una
+// correccion, no velocidad.
+const REMOTE_SPEED_WINDOW_MS = 300;
+const REMOTE_VELOCITY_SMOOTH_PER_S = 8;
+const REMOTE_JUMP_PX = 120;
 
 const FACING_RADIANS = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
 
@@ -260,6 +267,7 @@ export default class MainScene extends Phaser.Scene {
   }
 
   preload() {
+    preloadCharacterRigs(this);
     ROLE_CATALOG.forEach(({ spritePrefix }) => {
       DIRECTIONS.forEach((direction) => {
         this.load.image(`${spritePrefix}_${direction}`, `/sprites/${spritePrefix}_${direction}.png`);
@@ -398,11 +406,15 @@ export default class MainScene extends Phaser.Scene {
     }
   }
 
-  // Disfraz encima del personaje. `holder` guarda la imagen. Sin disfraz, todos llevan
-  // el gorrito de lana.
-  syncCostume(holder, sprite, id) {
-    const wanted = id ?? DEFAULT_COSTUME;
+  // Disfraz encima del personaje. `holder` guarda la imagen. Sin disfraz, el personaje
+  // de 16 direcciones lleva el gorro de Santa sincronizado con cada pose (CharacterRig);
+  // un disfraz de cabeza se lo saca y uno de cuello (bufanda, guirnalda) va con el.
+  // Sin rig (o sin gorro en el atlas) se usa el gorrito de lana de siempre.
+  syncCostume(holder, sprite, id, rig = null) {
+    const santaHat = Boolean(rig?.hasHat);
+    const wanted = id ?? (santaHat ? null : DEFAULT_COSTUME);
     const costume = wanted && COSTUME_LAYOUT[wanted] ? wanted : null;
+    rig?.setHat(!costume || COSTUME_LAYOUT[costume].anchor !== 'head');
     if (holder.costumeId !== costume) {
       holder.costumeImage?.destroy();
       holder.costumeImage = costume ? this.add.image(sprite.x, sprite.y, costumeKey(costume)) : null;
@@ -411,6 +423,19 @@ export default class MainScene extends Phaser.Scene {
     const image = holder.costumeImage;
     if (!image) return;
     const layout = COSTUME_LAYOUT[costume];
+    if (rig) {
+      // Sobre la cabeza de la pose que se esta dibujando (16 direcciones, acostado...).
+      const head = rig.headPoint((layout.anchor === 'neck' ? NECK_Y : HEAD_Y) + layout.dy - 1);
+      image
+        .setPosition(head.x, head.y)
+        .setScale(layout.scale)
+        .setAngle(head.angle)
+        .setFlipX(head.flip)
+        .setVisible(sprite.visible)
+        .setAlpha(sprite.alpha)
+        .setDepth(rig.depth + (layout.anchor === 'neck' ? -0.2 : 0.2));
+      return;
+    }
     const top = sprite.y - sprite.displayHeight / 2;
     const y = top + (layout.anchor === 'neck' ? NECK_Y : HEAD_Y) + layout.dy;
     image
@@ -595,6 +620,11 @@ export default class MainScene extends Phaser.Scene {
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
+    // El sprite con fisica no cambia (mismas texturas y cuerpo de colision); lo que se ve
+    // es el personaje de 16 direcciones que lo sigue.
+    hideHostSprite(this.player);
+    this.playerFootOffset = footOffsetFor(this, this.spritePrefix);
+    this.playerRig = new CharacterRig(this, this.spritePrefix, spawn.x, spawn.y + this.playerFootOffset);
     this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
     // La escena se reusa al cambiar de piso: la nieve vieja ya se destruyo con ella.
     this.snow = null;
@@ -851,7 +881,13 @@ export default class MainScene extends Phaser.Scene {
           .setOrigin(0.5, 1)
           .setDepth(11);
         const shadow = this.add.image(state.x, state.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
-        entry = { sprite, shadow, label, prefix, aim: Math.PI / 2, shotSeq: state.shotSeq ?? 0, weaponSeen: false };
+        hideHostSprite(sprite);
+        const footOffset = footOffsetFor(this, prefix);
+        const rig = new CharacterRig(this, prefix, state.x, state.y + footOffset);
+        entry = {
+          sprite, shadow, label, prefix, rig, footOffset, vx: 0, vy: 0,
+          aim: Math.PI / 2, shotSeq: state.shotSeq ?? 0, weaponSeen: false,
+        };
         this.remotePlayers.set(state.playerId, entry);
       }
 
@@ -880,6 +916,7 @@ export default class MainScene extends Phaser.Scene {
       const blend = Math.min(1, (delta / 1000) * REMOTE_LERP_PER_SECOND);
       entry.sprite.x += dx * blend;
       entry.sprite.y += dy * blend;
+      this.trackRemoteVelocity(entry, state.x, state.y, delta);
       const downed = state.lifeState === 'DOWNED';
       entry.sprite.setAlpha(downed ? 0.75 : 1).setAngle(downed ? 90 : 0);
       if (downed) entry.sprite.setTint(0x9a9a9a);
@@ -890,17 +927,24 @@ export default class MainScene extends Phaser.Scene {
       entry.sprite.setVisible(!hidden);
       entry.label.setVisible(!hidden);
       entry.shadow.setVisible(!hidden);
-      this.syncCostume(entry, entry.sprite, state.costume);
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
-      entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.sprite.displayHeight / 2 - 5);
+      entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.footOffset - 3);
       const labelText = state.connected === false ? `${displayName(state)} (desconectado)` : displayName(state);
       if (entry.label.text !== labelText) entry.label.setText(labelText);
       entry.sprite.setAlpha(state.connected === false ? 0.45 : entry.sprite.alpha);
+      entry.rig.update(delta, entry.sprite, {
+        x: entry.sprite.x,
+        y: entry.sprite.y + entry.footOffset,
+        vx: entry.vx,
+        vy: entry.vy,
+        aim: entry.aim,
+      });
+      this.syncCostume(entry, entry.sprite, state.costume, entry.rig);
       this.weaponLayer.update(state.playerId, {
         x: entry.sprite.x,
         y: entry.sprite.y,
         aim: entry.aim,
-        depth: entry.sprite.depth,
+        depth: entry.rig.depth,
         weaponId: state.lifeState === 'DOWNED' ? 'FISTS' : (state.weapon ?? 'FISTS'),
         silent: !entry.weaponSeen,
       });
@@ -910,12 +954,34 @@ export default class MainScene extends Phaser.Scene {
     this.remotePlayers.forEach((entry, id) => {
       if (seen.has(id)) return;
       entry.sprite.destroy();
+      entry.rig.destroy();
       entry.shadow.destroy();
       entry.costumeImage?.destroy();
       entry.label.destroy();
       this.weaponLayer.remove(id);
       this.remotePlayers.delete(id);
     });
+  }
+
+  // Velocidad de un compañero para animar sus pasos: lo que avanzo su posicion del
+  // servidor en la ultima ventana de tiempo (las posiciones llegan a tirones por la red,
+  // asi que medir cuadro a cuadro daria picos). El dash de un compañero no se dibuja:
+  // el servidor no lo informa y adivinarlo por la velocidad daba dashes falsos.
+  trackRemoteVelocity(entry, targetX, targetY, delta) {
+    const now = this.time.now;
+    const track = entry.track ?? (entry.track = []);
+    const last = track[track.length - 1];
+    // Un salto (correccion del servidor) no es velocidad: se empieza a medir de nuevo.
+    if (last && Math.hypot(targetX - last.x, targetY - last.y) > REMOTE_JUMP_PX) track.length = 0;
+    track.push({ t: now, x: targetX, y: targetY });
+    while (track.length > 2 && now - track[1].t >= REMOTE_SPEED_WINDOW_MS) track.shift();
+    const oldest = track[0];
+    const span = Math.max(now - oldest.t, 1) / 1000;
+    const wx = (targetX - oldest.x) / span;
+    const wy = (targetY - oldest.y) / span;
+    const k = 1 - Math.exp(-(REMOTE_VELOCITY_SMOOTH_PER_S * delta) / 1000);
+    entry.vx += (wx - entry.vx) * k;
+    entry.vy += (wy - entry.vy) * k;
   }
 
   // Evento del Kinder: apagon (oscuridad + tablero) o caja de suministros.
@@ -1232,10 +1298,11 @@ export default class MainScene extends Phaser.Scene {
     if (!this.player) return;
     this.watchPerformance(time);
     this.syncRemotePlayers(delta);
+    this.syncPlayerRig(delta);
     this.playerShadow
-      .setPosition(this.player.x, this.player.y + this.player.displayHeight / 2 - 5)
+      .setPosition(this.player.x, this.player.y + this.playerFootOffset - 3)
       .setVisible(this.player.visible);
-    this.syncCostume(this, this.player, getMyPlayerState()?.costume);
+    this.syncCostume(this, this.player, getMyPlayerState()?.costume, this.playerRig);
     // La linterna apunta hacia donde mira el jugador (o el compañero que se espectea).
     const watched = this.spectating ? this.remotePlayers.get(getSpectateTarget()) : null;
     const flashlightAim = this.spectating ? (watched?.aim ?? null) : this.aimAngle;
@@ -1311,7 +1378,7 @@ export default class MainScene extends Phaser.Scene {
         this.dashVy = dy * DASH_SPEED;
         this.dashUntil = time + DASH_MS;
         this.dashReadyAt = time + DASH_COOLDOWN_MS;
-        this.spawnDashTrail();
+        this.playerRig.dash(Math.atan2(dy, dx), DASH_MS);
       }
     }
 
@@ -1578,7 +1645,7 @@ export default class MainScene extends Phaser.Scene {
       x: this.player.x,
       y: this.player.y,
       aim: this.aimAngle,
-      depth: this.player.depth,
+      depth: this.playerRig.depth,
       weaponId: me && me.lifeState !== 'DOWNED' ? (me.weapon ?? 'FISTS') : 'FISTS',
       // Al cambiar de piso la escena se recrea: no se repite la animacion de sacar el arma.
       silent: !this.weaponSynced,
@@ -1696,10 +1763,18 @@ export default class MainScene extends Phaser.Scene {
     this.tweens.add({ targets: arc, alpha: 0, duration: 160, onComplete: () => arc.destroy() });
   }
 
-  spawnDashTrail() {
-    const ghost = this.add.sprite(this.player.x, this.player.y, this.player.texture.key);
-    ghost.setDepth(this.player.depth - 1).setAlpha(0.45).setTint(0x7ec8ff);
-    this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
+  // El personaje que se ve: sigue al sprite con fisica, mira hacia donde apunta y camina
+  // segun la velocidad real del cuerpo.
+  syncPlayerRig(delta) {
+    const body = this.player.body;
+    const moving = body.enable && !this.spectating;
+    this.playerRig.update(delta, this.player, {
+      x: this.player.x,
+      y: this.player.y + this.playerFootOffset,
+      vx: moving ? body.velocity.x : 0,
+      vy: moving ? body.velocity.y : 0,
+      aim: this.aimAngle ?? this.facingAngle,
+    });
   }
 
   updateVendorProximity() {
