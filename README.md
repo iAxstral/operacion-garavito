@@ -49,6 +49,10 @@ Grafana (`:3000`, admin / garavito) con dos tableros: el servidor en vivo y la p
 de carga de k6. Detalles en [`docs/prometheus`](docs/prometheus/README.md),
 [`docs/grafana`](docs/grafana/README.md) y [`docs/k6`](docs/k6/README.md).
 
+En el despliegue, los mismos tableros están en
+<https://www.operaciongaravito.me/grafana/>, y `.\k6\nube.ps1 -Perfil estres` lanza la
+prueba de estrés contra el juego publicado (ver [`infra/README.md`](infra/README.md#monitoreo-prometheus-y-grafana)).
+
 ## Varios nodos
 
 `docker compose -f docker-compose.cluster.yml up --build` levanta dos nodos detrás de un

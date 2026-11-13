@@ -6,8 +6,11 @@ El juego corre en **https://www.operaciongaravito.me**.
 Navegador ──HTTPS──▶ CloudFront (www.operaciongaravito.me)
                         ├── /*      → S3 (frontend estatico)
                         ├── /ws/*   → EC2 :8080 (WebSocket)
-                        └── /api/*  → EC2 :8080
-EC2 t4g.small: backend (Java 21) + PostgreSQL 16 en la misma maquina
+                        ├── /api/*         → EC2 :8080
+                        ├── /grafana/*     → EC2 :3000 (Grafana)
+                        └── /prometheus/*  → EC2 :9090 (Prometheus, con clave)
+EC2 t4g.small: backend (Java 21) + PostgreSQL 16 + Prometheus + Grafana
+               (Prometheus lee /actuator/prometheus por localhost)
 ```
 
 - Region: **us-east-2** (la organizacion de la cuenta solo permite esa).
@@ -44,6 +47,8 @@ Un `.jar` nuevo **recrea la maquina**, y con ella PostgreSQL: se pierden el
 historial y el ranking. Basta con volver a compilar, aunque el codigo no cambie,
 porque el archivo sale distinto. En `cdk diff` se ve como
 `AWS::EC2::Instance Backend ... destroy`. Cambiar solo el frontend no borra nada.
+Lo mismo pasa al cambiar algo en `monitoring/` (tableros, alertas, `prometheus.aws.yml`):
+la maquina se recrea y con ella la base y el historial de Prometheus.
 
 Para conservar los datos, respaldar antes de `cdk deploy` y restaurar despues.
 Sirve mientras no haya migraciones nuevas en `backend/src/main/resources/db/migration`
@@ -88,6 +93,62 @@ curl -i https://www.operaciongaravito.me/ws/info                   # 200 (WebSoc
 
 Un 504 en `/api/*` casi siempre es la maquina apagada o el backend aun arrancando
 (tarda uno o dos minutos despues de encenderla o desplegar).
+
+## Monitoreo (Prometheus y Grafana)
+
+Corren en la misma EC2 y se instalan solos al crear la maquina, con los mismos
+tableros y alertas de `monitoring/grafana` que el entorno local.
+
+- **Grafana:** https://www.operaciongaravito.me/grafana/ (con la barra final). Los
+  tableros se ven sin iniciar sesion; para editar, usuario `admin`.
+- **Prometheus:** https://www.operaciongaravito.me/prometheus/ (usuario `garavito`).
+  En *Status → Targets* el destino `garavito` debe estar `UP`.
+
+Las claves se generan en la maquina (`/opt/garavito/monitoring.env`) y cambian cada
+vez que se recrea. Para verlas:
+
+```powershell
+.\k6\nube.ps1 -SoloClaves
+```
+
+`/actuator` no se publica: Prometheus lo lee por `localhost` dentro de la maquina.
+
+### Pruebas de carga contra el despliegue
+
+Requiere k6 (`winget install k6`) y la sesion de AWS iniciada. El script lee la clave
+de Prometheus por SSM y le manda las metricas de k6, asi en Grafana se ven juntas la
+carga y la respuesta del servidor:
+
+```powershell
+.\k6\nube.ps1 -Perfil humo        # 4 jugadores, ~45 s: comprobar que todo responde
+.\k6\nube.ps1 -Perfil carga       # hasta 80 jugadores, ~3,5 min
+.\k6\nube.ps1 -Perfil estres      # hasta 200 jugadores, ~5 min
+.\k6\nube.ps1 -Perfil estres -Reporte   # ademas deja docs/k6/reporte-nube-estres.html
+```
+
+Mientras corre, abrir en Grafana **Prueba de carga (k6)** (elegir la corrida en el
+selector **Corrida**) y **Operación Garavito** (jugadores, salas, tick, CPU y memoria
+del servidor). Los perfiles y umbrales estan en [`docs/k6`](../docs/k6/README.md).
+
+A diferencia de la corrida local, aqui la latencia incluye el viaje hasta Ohio y por
+CloudFront, y la maquina es una t4g.small (2 vCPU con creditos, 2 GB), asi que el
+perfil `estres` sirve para ver hasta donde aguanta el despliegue real.
+
+#### Resultado del 07-11-2026 (k6 desde Bogota, corrida `estres-nube-1107-0842`)
+
+| Umbral | Local (docs/k6) | AWS t4g.small | |
+|---|---|---|---|
+| Entrada exitosa > 95 % | 100 % | **95,4 %** (497 de 521) | ✅ por poco |
+| Intervalo de estado p95 < 250 ms | 133 ms | **957 ms** | ❌ |
+| Ida y vuelta del movimiento p95 < 300 ms | 101 ms | **1,76 s** | ❌ |
+| Ranking p95 < 300 ms | 16,6 ms | **5,9 s** | ❌ |
+| Errores HTTP < 1 % | 0 % | **0 %** | ✅ |
+
+El servidor (Prometheus) llego a **195 jugadores en 68 salas**, con tick p99 de 13 ms
+(de 66 ms disponibles). El limite es la maquina: la CPU total llego a **90 %**, de la
+cual el backend usaba 42 % y el resto Prometheus, Grafana y PostgreSQL. No es falta de
+creditos: la instancia esta en modo `unlimited`. Con `humo` (4 jugadores) todos los
+umbrales pasan (estado p95 145 ms, movimiento p95 223 ms).
 
 ## Ahorrar
 
