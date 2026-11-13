@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import SettingsPanel from './SettingsPanel';
 import HowToPlay from './HowToPlay';
 import RankingPanel from './RankingPanel';
-import ServerStatus from './ServerStatus';
 import AchievementsPanel from './AchievementsPanel';
 import ItemShop from './ItemShop';
 import ProfilePanel from './ProfilePanel';
@@ -182,9 +181,6 @@ export default function MainMenu({ onPlay }) {
             <button type="button" className="start-btn" onClick={() => open('profile')}>
               <Icon name="skull" /> Perfil
             </button>
-            <button type="button" className="start-btn" onClick={() => open('estado')}>
-              <Icon name="pulse" /> Servidor en vivo
-            </button>
           </nav>
 
           <button type="button" className="start-link" onClick={replayIntro}>
@@ -201,7 +197,6 @@ export default function MainMenu({ onPlay }) {
       {panel === 'achievements' && <AchievementsPanel onClose={() => setPanel(null)} />}
       {panel === 'costumes' && <ItemShop onClose={() => setPanel(null)} />}
       {panel === 'profile' && <ProfilePanel onClose={() => setPanel(null)} />}
-      {panel === 'estado' && <ServerStatus onClose={() => setPanel(null)} />}
     </div>
   );
 }
