@@ -42,6 +42,29 @@ O en Windows: `./dev.ps1` abre los dos.
 | Carga por la red (bots STOMP) | `cd frontend && node scripts/load-test.mjs --url ws://localhost:8080/ws/websocket --rooms 25` |
 | Carga con k6 (umbrales, ver `docs/k6`) | `k6 run k6/partidas.js` (o `-e PERFIL=humo` / `estres`) |
 
+GitHub Actions corre backend, frontend, e2e, carga con k6 y análisis SonarQube en cada push y PR (`.github/workflows/ci.yml`).
+
+## Calidad de código (SonarQube)
+
+SonarQube corre localmente junto al stack de monitoreo:
+
+```bash
+docker compose -f monitoring/docker-compose.yml up -d
+# SonarQube en http://localhost:9000 (admin / admin al primer inicio)
+```
+
+Una vez levantado, genera un token en **Administración → Seguridad → Tokens** y analiza:
+
+```bash
+# Backend (también genera reporte de cobertura JaCoCo)
+cd backend && ./mvnw verify sonar:sonar -Dsonar.token=<TOKEN>
+
+# Frontend
+cd frontend && npx sonar-scanner -Dsonar.token=<TOKEN>
+```
+
+En CI se usan los secretos del repositorio `SONAR_TOKEN` y `SONAR_HOST_URL` (configúralos en *Settings → Secrets and variables → Actions*).
+
 ## Monitoreo
 
 `docker compose -f monitoring/docker-compose.yml up -d` levanta Prometheus (`:9090`) y
@@ -65,5 +88,3 @@ El juego está publicado en AWS (us-east-2): backend y PostgreSQL en una EC2, fr
 en S3, todo detrás de CloudFront con el dominio `www.operaciongaravito.me`. Cómo
 desplegar, actualizar sin perder el ranking y apagar la máquina para ahorrar está en
 [`infra/README.md`](infra/README.md).
-
-GitHub Actions corre backend, frontend y e2e en cada push y PR (`.github/workflows/ci.yml`).
