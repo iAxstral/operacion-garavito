@@ -1,0 +1,72 @@
+# Monitoreo de Operación Garavito: Prometheus lee /actuator/prometheus del backend y
+# Grafana muestra el tablero "Operación Garavito" ya configurado.
+# SonarQube corre en :9000 (admin / admin al primer inicio, se pide cambio de contraseña).
+#
+#   1. Levantar el backend (por defecto en el puerto 8080).
+#   2. docker compose -f monitoring/docker-compose.yml up -d
+#   3. Grafana en http://localhost:3000 (admin / garavito), Prometheus en :9090.
+#   4. SonarQube en http://localhost:9000
+#
+# Para analizar el backend: cd backend && ./mvnw sonar:sonar -Dsonar.token=<TOKEN>
+# Para analizar el frontend: cd frontend && npx sonar-scanner -Dsonar.token=<TOKEN>
+#
+# Si el backend corre en otro puerto u otra máquina, cambiar el destino en prometheus.yml.
+
+services:
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: garavito
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
+  sonar-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonar
+    volumes:
+      - sonarqube_db:/var/lib/postgresql/data
+
+  sonarqube:
+    image: sonarqube:10.7-community
+    depends_on:
+      - sonar-db
+    ports:
+      - "9000:9000"
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://sonar-db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+
+volumes:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  sonarqube_db:
