@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   onNearMissionChange,
-  onStateChange,
+  onGameEvent,
   getMyRole,
   requestMissionStart,
   requestMissionCancel,
@@ -9,13 +9,13 @@ import {
   setInputLocked,
 } from '../game/gameSync';
 
-const KILLS_TARGET = 10;
+const KILLS_TARGET = 7;
 const WINDOW_W = 420;
 const WINDOW_H = 260;
-const SPAWN_INTERVAL_MS = 900;
-const TRAVEL_MS_MAX = 5200;
-const TRAVEL_MS_MIN = 2400;
-const HIT_PADDING_PX = 10;
+const SPAWN_INTERVAL_MS = 1100;
+const TRAVEL_MS_MAX = 6000;
+const TRAVEL_MS_MIN = 3000;
+const HIT_PADDING_PX = 14;
 const SUCCESS_CLOSE_DELAY_MS = 1100;
 
 const EDGE_RADIUS = Math.hypot(WINDOW_W, WINDOW_H) / 2;
@@ -83,7 +83,6 @@ export default function SecurityMission() {
   const [nearMission, setNearMissionState] = useState(null);
   const [phase, setPhase] = useState('closed');
   const [kills, setKills] = useState(0);
-  const [lastEvent, setLastEvent] = useState(null);
 
   const canvasRef = useRef(null);
   const zombiesRef = useRef([]);
@@ -93,20 +92,20 @@ export default function SecurityMission() {
   const nextSpawnAtRef = useRef(0);
   const activeMissionRef = useRef(null);
 
-  // 'SEGURIDAD' es el rol dueno de este minijuego: ahora hay 3 salas/instancias posibles
-  // (mission-seguridad, mission-seguridad-f1, mission-seguridad-f3), asi que se filtra
-  // por rol en vez de por un missionId fijo.
+  // Se abre junto a una mision de tipo CAMARAS (Seguridad tambien tiene CODIGO).
   useEffect(
-    () => onNearMissionChange((mission) => setNearMissionState(mission?.role === 'SEGURIDAD' ? mission : null)),
+    () => onNearMissionChange((mission) => setNearMissionState(mission?.type === 'CAMARAS' ? mission : null)),
     [],
   );
 
-  useEffect(() => onStateChange((state) => setLastEvent(state.lastEvent)), []);
-
+  const phaseRef = useRef(phase);
   useEffect(() => {
-    const event = lastEvent;
+    phaseRef.current = phase;
+  });
+
+  useEffect(() => onGameEvent((event) => {
     const activeId = activeMissionRef.current?.missionId;
-    if (!event || event.playerId !== getMyRole() || !activeId || event.itemId !== activeId) return;
+    if (event.playerId !== getMyRole() || !activeId || event.itemId !== activeId) return;
 
     if (event.type === 'MISSION_STARTED') {
       finishedRef.current = false;
@@ -114,12 +113,11 @@ export default function SecurityMission() {
       setKills(0);
       setPhase('active');
       setInputLocked(true);
-    } else if (event.type === 'MISSION_REJECTED' && phase !== 'closed') {
+    } else if (event.type === 'MISSION_REJECTED' && phaseRef.current !== 'closed') {
       setPhase('closed');
       setInputLocked(false);
     }
-
-  }, [lastEvent]);
+  }), []);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -129,7 +127,7 @@ export default function SecurityMission() {
         requestMissionStart(nearMission.missionId);
       } else if (event.key === 'Escape' && phase === 'active') {
         event.preventDefault();
-        requestMissionCancel(activeMissionRef.current?.missionId ?? 'mission-seguridad');
+        requestMissionCancel(activeMissionRef.current?.missionId ?? nearMission?.missionId);
         setInputLocked(false);
         setPhase('closed');
       }
@@ -184,15 +182,23 @@ export default function SecurityMission() {
     return () => cancelAnimationFrame(rafId);
   }, [phase]);
 
+  // Del puntero a pixeles del canvas: la interfaz puede estar escalada (--ui-scale), asi
+  // que el canvas no siempre mide en pantalla lo mismo que por dentro.
+  const canvasPoint = (event) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    return {
+      x: ((event.clientX - rect.left) * canvas.width) / rect.width,
+      y: ((event.clientY - rect.top) * canvas.height) / rect.height,
+    };
+  };
+
   const handlePointerMove = (event) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    mouseRef.current = { x: event.clientX - rect.left, y: event.clientY - rect.top };
+    mouseRef.current = canvasPoint(event);
   };
 
   const handleClick = (event) => {
-    const rect = canvasRef.current.getBoundingClientRect();
-    const clickX = event.clientX - rect.left;
-    const clickY = event.clientY - rect.top;
+    const { x: clickX, y: clickY } = canvasPoint(event);
     const now = performance.now();
 
     let bestIndex = -1;
@@ -214,7 +220,7 @@ export default function SecurityMission() {
   };
 
   const handleCancelClick = () => {
-    requestMissionCancel(activeMissionRef.current?.missionId ?? 'mission-seguridad');
+    requestMissionCancel(activeMissionRef.current?.missionId ?? nearMission?.missionId);
     setInputLocked(false);
     setPhase('closed');
   };
@@ -223,7 +229,7 @@ export default function SecurityMission() {
     <>
       {phase === 'closed' && nearMission && (
         <div className="mission-hint">
-          Presiona <strong>E</strong> — Tarea de Seguridad
+          Presiona <strong>E</strong> — Revisar las cámaras
         </div>
       )}
 
@@ -243,9 +249,11 @@ export default function SecurityMission() {
                   height={WINDOW_H}
                   onMouseMove={handlePointerMove}
                   onClick={handleClick}
+                  role="img"
+                  aria-label="Pantalla de cámara de vigilancia con zombis acercándose"
                 />
               </div>
-              <div className="mission-progress">{kills} / {KILLS_TARGET} eliminados</div>
+              <div className="mission-progress" role="status" aria-live="polite">{kills} / {KILLS_TARGET} eliminados</div>
               <button type="button" className="mission-cancel-btn" onClick={handleCancelClick}>
                 Cancelar (Esc)
               </button>

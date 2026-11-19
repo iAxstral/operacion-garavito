@@ -7,14 +7,44 @@ public record GameStateMessage(
         List<PlayerState> players,
         Set<String> claimedItemIds,
         LastEvent lastEvent,
-        RoundState round,
         List<ZombieState> zombies,
         WaveState wave,
         List<DoorState> doors,
         LobbyState lobby,
-        BossView boss) {
+        BossView boss,
+        List<ProjectileState> projectiles,
+        List<BarricadeState> barricades,
+        MatchSummary summary,
+        KinderEvent event,
+        List<PuddleState> puddles,
+        List<BlastState> blasts,
+        Travesuras.Estado travesuras,
+        List<String> unchanged,
+        boolean full) {
+
+    /** Estado completo (sin omitir nada). */
+    public GameStateMessage(List<PlayerState> players, Set<String> claimedItemIds, LastEvent lastEvent,
+            List<ZombieState> zombies, WaveState wave, List<DoorState> doors, LobbyState lobby, BossView boss,
+            List<ProjectileState> projectiles, List<BarricadeState> barricades, MatchSummary summary,
+            KinderEvent event, List<PuddleState> puddles) {
+        this(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles, barricades, summary,
+                event, puddles, List.of(), null, List.of(), true);
+    }
+
+    /** Copia con las explosiones que se estan viendo. */
+    public GameStateMessage withBlasts(List<BlastState> current) {
+        return new GameStateMessage(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles,
+                barricades, summary, event, puddles, current, travesuras, unchanged, full);
+    }
+
+    /** Copia con los duendes, renos y bolas de Navidad. */
+    public GameStateMessage withTravesuras(Travesuras.Estado current) {
+        return new GameStateMessage(players, claimedItemIds, lastEvent, zombies, wave, doors, lobby, boss, projectiles,
+                barricades, summary, event, puddles, blasts, current, unchanged, full);
+    }
 
     public static GameStateMessage eventOnly(LastEvent event) {
-        return new GameStateMessage(List.of(), Set.of(), event, null, List.of(), null, List.of(), null, null);
+        return new GameStateMessage(List.of(), Set.of(), event, List.of(), null, List.of(), null, null, List.of(), List.of(),
+                null, null, List.of());
     }
 }

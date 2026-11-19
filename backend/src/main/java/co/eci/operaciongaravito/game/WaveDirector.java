@@ -6,7 +6,11 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Director de los 5 Kinders de un edificio: respiro → Kinder activo → … → victoria.
+ * Director de los 5 Kinders de un edificio: respiro → Kinder activo → … → escape → victoria.
+ *
+ * Al caer el jefe del Kinder 5 empieza el escape: la horda sigue llegando y el equipo
+ * tiene {@link #ESCAPE_MS} para correr a la salida (la entrada del piso 1). GameSession
+ * decide quien escapo y llama {@link #win()}.
  *
  * Un Kinder se pasa matando su cuota de zombis, no limpiando todo el mapa: asi un
  * zombi varado en un piso vacio nunca traba la partida. Mientras el Kinder esta
@@ -19,7 +23,12 @@ import java.util.concurrent.ThreadLocalRandom;
  */
 public class WaveDirector {
 
-    private enum Phase { RESTING, ACTIVE, VICTORY }
+    private enum Phase { RESTING, ACTIVE, ESCAPE, VICTORY }
+
+    /** Tiempo para llegar a la salida tras vencer al jefe. */
+    public static final long ESCAPE_MS = 75_000;
+    /** Respiro corto antes de que la horda vuelva a llegar en el escape. */
+    static final long ESCAPE_GRACE_MS = 2_500;
 
     /** Un zombi nunca aparece mas cerca que esto de un jugador vivo de su piso. */
     static final double MIN_SPAWN_DISTANCE_PX = 320;
@@ -32,8 +41,20 @@ public class WaveDirector {
     private Phase phase = Phase.RESTING;
     private long nextEventAt;
     private long zombieSequence;
+    /** Turno de piso para la proxima aparicion: se reparten por turnos, no al azar. */
+    private int floorTurn;
     private boolean justCleared;
     private boolean bossDue;
+    private boolean bossDefeated;
+    /** Se cumplio la cuota (o cayo el jefe) pero faltan misiones: la horda sigue llegando. */
+    private boolean waitingForMissions;
+    private long escapeEndsAt;
+    private Difficulty difficulty = Difficulty.NORMAL;
+    /**
+     * Kinder con un jefe intermedio (0 = ninguno): ese Kinder se pasa con la cuota y,
+     * ademas, derribando al jefe (Papa Noel malvado en Navidad).
+     */
+    private int midBossKinder;
 
     public WaveDirector(long now, long startDelayMs, List<FloorGrid> floors) {
         this.nextEventAt = now + startDelayMs;
@@ -45,11 +66,66 @@ public class WaveDirector {
         boolean bossStage = phase == Phase.ACTIVE && blueprint.boss();
         int remaining = phase == Phase.ACTIVE && !bossStage ? Math.max(0, quota - kills) : 0;
         return new WaveState(kinder, WaveCurve.KINDER_COUNT, kills, quota, remaining,
-                restingSeconds(now), bossStage, phase == Phase.VICTORY);
+                restingSeconds(now), bossStage, phase == Phase.VICTORY,
+                phase == Phase.ACTIVE && waitingForMissions, 0, 0,
+                phase == Phase.ESCAPE, escapeSecondsLeft(now));
+    }
+
+    /** Kinder del jefe intermedio, o 0 para no tener ninguno. Rige desde el proximo Kinder. */
+    public synchronized void setMidBossKinder(int kinder) {
+        this.midBossKinder = kinder > 0 && kinder < WaveCurve.KINDER_COUNT ? kinder : 0;
+    }
+
+    /** True si el Kinder en curso es el del jefe intermedio. */
+    public synchronized boolean isMidBossKinder() {
+        return blueprint != null && midBossKinder > 0 && kinder == midBossKinder && !blueprint.boss();
+    }
+
+    /** True si hay un Kinder en curso (no respiro ni victoria). */
+    public synchronized boolean isActive() {
+        return phase == Phase.ACTIVE;
     }
 
     public synchronized int getKinder() {
         return kinder;
+    }
+
+    /**
+     * Kinder para el que se juegan las misiones ahora: el que viene durante el respiro,
+     * el activo durante el Kinder, 0 tras ganar.
+     */
+    public synchronized int upcomingKinder() {
+        return switch (phase) {
+            case RESTING -> Math.min(kinder + 1, WaveCurve.KINDER_COUNT);
+            case ACTIVE -> kinder;
+            case ESCAPE, VICTORY -> 0;
+        };
+    }
+
+    public synchronized void setDifficulty(Difficulty difficulty) {
+        this.difficulty = difficulty == null ? Difficulty.NORMAL : difficulty;
+    }
+
+    public synchronized boolean isEscaping() {
+        return phase == Phase.ESCAPE;
+    }
+
+    public synchronized int escapeSecondsLeft(long now) {
+        if (phase != Phase.ESCAPE) {
+            return 0;
+        }
+        return (int) Math.max(0, Math.ceil((escapeEndsAt - now) / 1000.0));
+    }
+
+    public synchronized boolean escapeTimedOut(long now) {
+        return phase == Phase.ESCAPE && now >= escapeEndsAt;
+    }
+
+    /** El equipo escapo: se gana la corrida. */
+    public synchronized void win() {
+        if (phase == Phase.ESCAPE) {
+            phase = Phase.VICTORY;
+        }
     }
 
     public synchronized boolean isVictory() {
@@ -68,6 +144,14 @@ public class WaveDirector {
      * ninguno). {@code alive} son los zombis vivos que ya hay en el mapa.
      */
     public synchronized List<Zombie> update(long now, int alive, Collection<Player> players) {
+        return update(now, alive, players, true);
+    }
+
+    /**
+     * Igual que {@link #update(long, int, Collection)}, pero el Kinder solo se pasa si
+     * ademas {@code missionsDone} (la barrera del MissionBoard esta abierta).
+     */
+    public synchronized List<Zombie> update(long now, int alive, Collection<Player> players, boolean missionsDone) {
         switch (phase) {
             case RESTING -> {
                 if (now >= nextEventAt) {
@@ -75,12 +159,22 @@ public class WaveDirector {
                 }
             }
             case ACTIVE -> {
-                if (!blueprint.boss() && kills >= blueprint.killQuota()) {
+                boolean goalMet = blueprint.boss() ? bossDefeated
+                        : kills >= blueprint.killQuota() && (!isMidBossKinder() || bossDefeated);
+                waitingForMissions = goalMet && !missionsDone;
+                if (goalMet && missionsDone) {
                     finishKinder(now);
                     return List.of();
                 }
                 if (now >= nextEventAt) {
                     nextEventAt = now + blueprint.spawnIntervalMs();
+                    return spawnBurst(alive, players);
+                }
+            }
+            case ESCAPE -> {
+                // La horda no para mientras corren a la salida (sin cuota que cumplir).
+                if (now >= nextEventAt) {
+                    nextEventAt = now + Math.max(400, blueprint.spawnIntervalMs() * 6 / 10);
                     return spawnBurst(alive, players);
                 }
             }
@@ -98,10 +192,11 @@ public class WaveDirector {
         }
     }
 
-    /** El jefe del ultimo Kinder cayo: se gana la corrida. */
+    /** Cayo el jefe del Kinder en curso (el del ultimo o el intermedio). */
     public synchronized void onBossDefeated(long now) {
-        if (phase == Phase.ACTIVE && blueprint.boss()) {
-            finishKinder(now);
+        if (phase == Phase.ACTIVE && (blueprint.boss() || isMidBossKinder())) {
+            // Se cierra en el proximo update, cuando tambien esten las misiones.
+            bossDefeated = true;
         }
     }
 
@@ -128,6 +223,8 @@ public class WaveDirector {
         blueprint = null;
         justCleared = false;
         bossDue = false;
+        bossDefeated = false;
+        waitingForMissions = false;
     }
 
     private void startKinder(long now, int number) {
@@ -136,13 +233,17 @@ public class WaveDirector {
         kills = 0;
         phase = Phase.ACTIVE;
         nextEventAt = now;
-        bossDue = blueprint.boss();
+        bossDue = blueprint.boss() || isMidBossKinder();
+        bossDefeated = false;
+        waitingForMissions = false;
     }
 
     private void finishKinder(long now) {
         justCleared = true;
         if (kinder >= WaveCurve.KINDER_COUNT) {
-            phase = Phase.VICTORY;
+            phase = Phase.ESCAPE;
+            escapeEndsAt = now + ESCAPE_MS;
+            nextEventAt = now + ESCAPE_GRACE_MS;
             return;
         }
         phase = Phase.RESTING;
@@ -150,28 +251,49 @@ public class WaveDirector {
     }
 
     private List<Zombie> spawnBurst(int alive, Collection<Player> players) {
+        int room = (int) Math.round(WaveCurve.maxAlive(blueprint, players.size()) * difficulty.maxAliveFactor()) - alive;
+        return spawn(Math.min(blueprint.spawnBurst(), room), players);
+    }
+
+    /**
+     * Horda extra (p. ej. si nadie recogio los suministros): {@code count} zombis del
+     * Kinder activo aunque se pase el tope de vivos. Vacia si no hay Kinder activo.
+     */
+    public synchronized List<Zombie> surge(Collection<Player> players, int count) {
+        if (phase != Phase.ACTIVE) {
+            return List.of();
+        }
+        return spawn(count, players);
+    }
+
+    private List<Zombie> spawn(int count, Collection<Player> players) {
         List<Player> living = players.stream().filter(Player::isAlive).toList();
         if (living.isEmpty()) {
             return List.of();
         }
-        int room = WaveCurve.maxAlive(blueprint, players.size()) - alive;
-        int count = Math.min(blueprint.spawnBurst(), room);
 
         ThreadLocalRandom random = ThreadLocalRandom.current();
         List<Zombie> burst = new ArrayList<>(Math.max(0, count));
+        // Pisos con gente viva, por turnos: asi la horda aparece en todos ellos (antes se
+        // sorteaba y a veces un piso ocupado se quedaba sin zombis) y nunca en uno vacio.
+        List<Integer> occupied = living.stream().map(Player::getFloor).distinct().sorted().toList();
         for (int i = 0; i < count; i++) {
-            // Se sortea un jugador vivo y se spawnea en SU piso: asi la horda aparece
-            // en todos los pisos donde hay gente, y nunca en uno que nadie pisa.
-            int floor = living.get(random.nextInt(living.size())).getFloor();
+            int floor = occupied.get(Math.floorMod(floorTurn++, occupied.size()));
             List<Player> onFloor = living.stream().filter(p -> p.getFloor() == floor).toList();
             FloorGrid.SpawnPoint point = pickSpawnPoint(floors.get(floor - 1).spawnPoints(), onFloor, random);
-            burst.add(new Zombie(
+            ZombieKind kind = WaveCurve.rollKind(blueprint, random.nextDouble());
+            int health = difficulty.scaleHealth(
+                    kind.health() > 0 ? kind.health() : WaveCurve.rollHealth(blueprint, random.nextDouble()));
+            Zombie zombie = new Zombie(
                     "z" + (++zombieSequence),
                     floor,
                     point.x(),
                     point.y(),
-                    WaveCurve.rollHealth(blueprint, random.nextDouble()),
-                    WaveCurve.rollSpeed(blueprint, random.nextDouble())));
+                    health,
+                    WaveCurve.rollSpeed(blueprint, random.nextDouble()) * kind.speedFactor() * difficulty.speedFactor(),
+                    kind);
+            zombie.setBiteBonus(difficulty.biteBonus());
+            burst.add(zombie);
         }
         return burst;
     }

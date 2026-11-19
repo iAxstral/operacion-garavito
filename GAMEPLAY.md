@@ -8,7 +8,8 @@
 
 El backend ya es dueño de la lógica de juego: `GameSession` administra
 jugadores, vida, Garavitos, inventario, items del mundo, misiones por zona y
-tienda; `RoundCoordinator` sincroniza las rondas. Los zombis entran **ahí**, no
+tienda; `MissionBoard` reparte 3 misiones por jugador en cada Kinder y hace de
+barrera para pasarlo. Los zombis entran **ahí**, no
 en el cliente.
 
 Eso obliga a resolver antes un hueco: **hoy el servidor no sabe dónde está
@@ -33,9 +34,8 @@ por el número de jugadores. Las posiciones viajan en el broadcast del tick.
 
 ## 2. El tick
 
-`GameSession` gana un bucle propio sobre el `ScheduledExecutorService` que ya
-recibe en el constructor (el mismo que usa `RoundCoordinator` para sus
-timeouts).
+El tick de cada sala corre sobre el `ScheduledExecutorService` de
+`GameSessionService` (antes lo compartia con el `RoundCoordinator`, ya retirado).
 
 | | Frecuencia | Por qué |
 |---|---|---|
@@ -132,12 +132,68 @@ generado: **entrada normalizada** (la diagonal deja de ir 41% más rápido) y
 **dash con `Shift`/`Espacio`** con invulnerabilidad breve, que es el único
 recurso defensivo antes del hacha.
 
+## 8. Lo que se agregó después (primera temporada, Halloween)
+
+- **Misiones**: cuatro minijuegos por rol (antes dos). `MissionBoard` reparte
+  tres distintos por Kinder y pone primero el que no tocó en el anterior.
+  - Seguridad: cámaras, código, ronda de vigilancia, calibrar sensores.
+  - Biomédica: cables, vacuna, tomar el pulso, ordenar medicamentos.
+  - Economía: cuentas, dar el cambio, cuadrar el presupuesto, revisar facturas.
+  - Infraestructura: torre, fusibles, conectar tuberías, nivelar la viga.
+- **Avisos al equipo** (`/ping`): `ZOMBIES`, `HELP`, `REVIVE`, `GO`, `AMMO`.
+  El servidor pone la posición que él conoce y limita uno cada 1,5 s por
+  jugador. Viajan como `LastEvent("PING", jugador, tipo, "piso,x,y")`. El
+  cliente los marca en el mapa y los dice en voz alta (Web Speech API) con
+  un tono y una velocidad distintos por rol.
+- **Apodos**: opcionales al unirse; el servidor los limpia (16 caracteres, sin
+  caracteres de control), los manda en `PlayerState.name` y en el resumen, y
+  se guardan en el historial (migración Flyway `V2`).
+- **Charcos de ácido**: el escupidor muerto deja un `AcidPuddle` que daña 2
+  cada 600 ms a quien esté encima durante 5 s (`GameStateMessage.puddles`).
+- **Logros**: se calculan en el cliente con el resumen de la corrida y se
+  guardan en el navegador (`game/achievements.js`).
+- **Accesibilidad**: formas sobre los zombis según su tipo para daltonismo y
+  volumen propio para las voces del equipo.
+- **App instalable** (PWA): manifiesto, íconos y service worker solo en
+  producción; el WebSocket y la API nunca pasan por la caché.
+
+## 9. Navidad sangrienta
+
+- **Solo Navidad**: hubo un tiempo con dos temporadas (Navidad y Halloween como
+  evento); en noviembre de 2026 se retiró Halloween para que el juego sea más
+  liviano (`docs/temporadas/SOLO-NAVIDAD.md`). Papá Noel malvado (Kinder 3) y
+  las travesuras de duendes y renos están siempre activos.
+- **Ambientación**: menús con el campus nevado y luces que fallan, árboles
+  marchitos y regalos rotos en el edificio, carámbanos, nieve, oscuridad azul,
+  zombis con gorro de Papá Noel, caja de música desafinada y cascabeles. La
+  moneda de la horda se llama "regalos". La tienda de objetos vende 11 objetos
+  navideños con rotación diaria.
+- Detalles y capturas en `docs/temporadas`.
+
+## 10. Rendimiento, FPS/ping y logros de Nochebuena
+
+- **Luces más livianas**: la capa de oscuridad estampa sellos ya horneados en vez
+  de crear un degradado por luz en cada cuadro, y los bombillos fuera de la vista
+  no se dibujan (`lightStamps.js`, `lightMath.js`).
+- **Calidad automática** (ajuste `autoPerf`, prendido por defecto): si el juego
+  va bajo 40 FPS por 5 s seguidos, se activa el modo de rendimiento y el HUD
+  avisa. Ese modo ahora se aplica al instante, sin cambiar de piso.
+- **Indicador de FPS y ping** (ajuste `showStats`): mide la latencia con
+  `GET /api/ping` cada 3 s mientras se ve.
+- **Travesuras en el resumen**: `PlayerSummary.snowballsTaken` y
+  `snowballsDodged`, en la tabla de resultados y en cinco logros nuevos (Cazador
+  de Papá Noel, Ágil como un reno, Muñeco de nieve, Nochebuena impecable y Regalo
+  para todos).
+- Spec y mediciones en `docs/rendimiento/SPEC-RENDIMIENTO-Y-LOGROS.md`.
+
 ## Fuera de alcance
 
-- Validación de movimiento en el servidor (anti-cheat).
-- Deltas o compresión binaria en el broadcast.
-- Navegación de zombis con pathfinding: persiguen en línea recta con
-  separación entre ellos, sin rodear muros.
-- Reanimar a un jugador `DOWNED` por otro jugador (por ahora solo revive al
-  terminar la oleada).
-- Zombis en pisos distintos del que está el jugador.
+- ~~Validación de movimiento en el servidor (anti-cheat).~~ Hecho:
+  `GameSession.isValidMove` y `POSITION_CORRECTED`.
+- Deltas o compresión binaria en el broadcast (ver `docs/ESCALABILIDAD.md`).
+- ~~Navegación de zombis con pathfinding.~~ Hecho: campo de distancias por
+  piso (`FloorGrid.distanceField`).
+- ~~Reanimar a un jugador `DOWNED` por otro jugador.~~ Hecho: solo Biomédica
+  revive, manteniendo E junto al caído.
+- ~~Zombis en pisos distintos del que está el jugador.~~ Hecho: cada zombi
+  tiene su piso.

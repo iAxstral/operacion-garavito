@@ -1,24 +1,23 @@
 import { useState } from 'react';
 import useMissionFlow from './useMissionFlow';
 
-const MISSION_ROLE = 'ECONOMIA';
-const QUESTIONS_TARGET = 5;
+const MISSION_TYPE = 'CUENTAS';
+const QUESTIONS_TARGET = 3;
 const OPTION_COUNT = 4;
-const WRONG_FLASH_MS = 450;
+const WRONG_FLASH_MS = 600;
 
 function randomInt(min, max) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
 function newQuestion() {
-  const terms = Math.random() < 0.4 ? 3 : 2;
-  const values = Array.from({ length: terms }, () => randomInt(2, 25));
+  const values = Array.from({ length: 2 }, () => randomInt(2, 18));
   const answer = values.reduce((sum, value) => sum + value, 0);
 
   const options = new Set([answer]);
   while (options.size < OPTION_COUNT) {
-    const candidate = answer + randomInt(-9, 9);
-    if (candidate > 0) options.add(candidate);
+    const candidate = answer + randomInt(-6, 6);
+    if (candidate > 0 && candidate !== answer) options.add(candidate);
   }
   return { text: `${values.join(' + ')} = ?`, answer, options: [...options].sort(() => Math.random() - 0.5) };
 }
@@ -28,7 +27,7 @@ export default function MathMission() {
   const [solved, setSolved] = useState(0);
   const [wrong, setWrong] = useState(null);
 
-  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_ROLE, () => {
+  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_TYPE, () => {
     setQuestion(newQuestion());
     setSolved(0);
     setWrong(null);
@@ -64,7 +63,7 @@ export default function MathMission() {
           {phase === 'active' && (
             <>
               <p>Resuelve las sumas para cerrar la caja.</p>
-              <div className="math-question">{question.text}</div>
+              <div className="math-question" role="heading" aria-level="4">{question.text}</div>
               <div className="math-options">
                 {question.options.map((option) => (
                   <button
@@ -72,12 +71,13 @@ export default function MathMission() {
                     type="button"
                     className={`math-option${wrong === option ? ' math-option--wrong' : ''}`}
                     onClick={() => handleAnswer(option)}
+                    aria-label={`Respuesta: ${option}`}
                   >
                     {option}
                   </button>
                 ))}
               </div>
-              <div className="mission-progress">{solved} / {QUESTIONS_TARGET} correctas</div>
+              <div className="mission-progress" role="status" aria-live="polite">{solved} / {QUESTIONS_TARGET} correctas</div>
               <button type="button" className="mission-cancel-btn" onClick={cancel}>
                 Cancelar (Esc)
               </button>

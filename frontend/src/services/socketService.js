@@ -4,10 +4,30 @@ import SockJS from 'sockjs-client';
 const SOCKET_URL = import.meta.env.VITE_WS_URL
   ?? `${window.location.protocol}//${window.location.hostname}:8080/ws`;
 
+/** Base de la API REST del mismo servidor (p. ej. /api/ranking). */
+export const API_BASE = SOCKET_URL.replace(/\/ws\/?$/, '');
+
 class SocketService {
   constructor() {
+    // Con varios nodos el cliente puede pasar al que tiene su sala (switchTo).
+    this.url = SOCKET_URL;
     this.client = null;
     this.connectListeners = new Set();
+    this.statusListeners = new Set();
+    this.status = 'connecting';
+  }
+
+  setStatus(status) {
+    if (this.status === status) return;
+    this.status = status;
+    this.statusListeners.forEach((cb) => cb(status));
+  }
+
+  /** 'connecting' | 'connected' | 'disconnected'. Llama de inmediato con el estado actual. */
+  onStatusChange(callback) {
+    this.statusListeners.add(callback);
+    callback(this.status);
+    return () => this.statusListeners.delete(callback);
   }
 
   connect({ onConnect, onError } = {}) {
@@ -20,9 +40,13 @@ class SocketService {
     if (this.client) return this.client;
 
     this.client = new Client({
-      webSocketFactory: () => new SockJS(SOCKET_URL),
+      webSocketFactory: () => new SockJS(this.url),
       reconnectDelay: 5000,
-      onConnect: (frame) => this.connectListeners.forEach((cb) => cb(frame)),
+      onConnect: (frame) => {
+        this.setStatus('connected');
+        this.connectListeners.forEach((cb) => cb(frame));
+      },
+      onWebSocketClose: () => this.setStatus('disconnected'),
       onStompError: (frame) => onError?.(frame),
     });
 
@@ -53,6 +77,19 @@ class SocketService {
     this.client = null;
   }
 
+  /**
+   * Se pasa a otro nodo del servidor (la sala vive alla). `nodeUrl` es su URL publica
+   * (p. ej. http://10.0.0.5:8082); se conecta a su /ws y espera a estar conectado.
+   */
+  async switchTo(nodeUrl) {
+    const target = /\/ws\/?$/.test(nodeUrl) ? nodeUrl : `${nodeUrl.replace(/\/$/, '')}/ws`;
+    if (target === this.url && this.isConnected()) return;
+    this.disconnect();
+    this.url = target;
+    this.setStatus('connecting');
+    await this.whenConnected();
+  }
+
   subscribe(destination, callback) {
     if (!this.client?.connected) {
       throw new Error('Socket client is not connected yet');
@@ -71,3 +108,8 @@ class SocketService {
 }
 
 export const socketService = new SocketService();
+
+if (import.meta.env.DEV) {
+  // Para pruebas: simular un corte con window.__socket.client.forceDisconnect().
+  window.__socket = socketService;
+}

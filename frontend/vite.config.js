@@ -9,4 +9,8 @@ export default defineConfig({
   define: {
     global: 'globalThis',
   },
+  build: {
+    // Phaser solo pesa ~1.4 MB y ya va en su propio chunk (se carga al entrar a la partida).
+    chunkSizeWarningLimit: 1600,
+  },
 })

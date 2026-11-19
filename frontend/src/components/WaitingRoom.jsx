@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
 import { ROLE_CATALOG, roleInfo } from '../game/roleCatalog';
 import { getLobbyCode, getMyRole, onStateChange, startGame } from '../game/gameSync';
+import NavidadCreatures from './NavidadCreatures';
+import { DAILY_RULES, MODES } from '../game/gameModes';
 
 export default function WaitingRoom({ onStarted, onLeave }) {
   const [state, setState] = useState({ players: [], lobby: null });
@@ -18,18 +20,27 @@ export default function WaitingRoom({ onStarted, onLeave }) {
   return (
     <div className="role-select">
       <div className="main-menu-vignette" />
+      <NavidadCreatures ornaments={2} snow={24} />
       <div className="role-select-content">
         <p className="main-menu-kicker">Código de la sala</p>
         <h2 className="waiting-code">{getLobbyCode()}</h2>
+        {state.lobby?.mode && state.lobby.mode !== 'NORMAL' && (
+          <p className={`waiting-mode lobby-mode--${state.lobby.mode.toLowerCase()}`}>
+            {MODES[state.lobby.mode]?.label}
+            {state.lobby.dailyRule && ` · ${DAILY_RULES[state.lobby.dailyRule]?.label}: ${DAILY_RULES[state.lobby.dailyRule]?.text}`}
+          </p>
+        )}
         <p className="lobby-help">Comparte este código con tu equipo. Deben estar en la misma red Wi-Fi.</p>
 
         <div className="waiting-players">
           {ROLE_CATALOG.map((entry) => {
             const present = joinedRoles.includes(entry.role);
+            const player = state.players.find((p) => p.role === entry.role);
             return (
               <div key={entry.role} className={`waiting-slot${present ? ' waiting-slot--present' : ''}`}>
                 <img src={entry.portrait} alt="" className="waiting-slot-portrait" />
                 <span className="waiting-slot-name">{entry.name}</span>
+                {player?.name && <span className="waiting-slot-nick">{player.name}</span>}
                 <span className="waiting-slot-tag">
                   {present
                     ? `${entry.role === state.lobby?.host ? 'Anfitrión' : 'Listo'}${entry.role === getMyRole() ? ' (tú)' : ''}`

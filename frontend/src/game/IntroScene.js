@@ -288,10 +288,10 @@ export default class IntroScene extends Phaser.Scene {
         });
 
         const totalDelay = globalIndex * LETTER_STAGGER_MS + 260;
-        this.time.delayedCall(totalDelay, () => this.onTitleImpact(letters));
+        this.time.delayedCall(totalDelay, () => this.onTitleImpact());
     }
 
-    onTitleImpact(letters) {
+    onTitleImpact() {
         this.cameras.main.shake(120, 0.004);
         const centerX = this.width / 2;
         this.emitImpactRing(centerX, this.centerY);

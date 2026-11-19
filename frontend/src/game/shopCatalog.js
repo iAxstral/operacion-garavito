@@ -6,10 +6,12 @@ export const CAFETERIA_MENU = [
   { itemId: 'shop-gaseosa', type: 'FOOD', itemName: 'Gaseosa', price: 6, healAmount: 5, icon: '/economia/item_gaseosa_48x72.png' },
 ];
 
+// Espejo de ShopCatalog.WEAPON_MACHINE_MENU. `detail` es lo que muestra la tienda.
 export const WEAPON_MACHINE_MENU = [
-  { itemId: 'shop-pistola', type: 'WEAPON', itemName: 'Pistola', price: 10, healAmount: 0, icon: '/economia/item_pistola_72.png' },
-  { itemId: 'shop-rifle', type: 'WEAPON', itemName: 'Rifle', price: 90, healAmount: 0, icon: '/economia/item_rifle_72.png' },
-  { itemId: 'shop-municion', type: 'AMMO', itemName: 'Munición', price: 1, healAmount: 0, icon: '/economia/item_municion_72.png' },
+  { itemId: 'shop-hacha', type: 'WEAPON', itemName: 'Hacha', price: 20, healAmount: 0, icon: '/economia/item_hacha.svg', detail: 'Cuerpo a cuerpo · 3 daño' },
+  { itemId: 'shop-pistola', type: 'WEAPON', itemName: 'Pistola', price: 35, healAmount: 0, icon: '/economia/item_pistola_72.png', detail: '8 balas · 2 daño' },
+  { itemId: 'shop-rifle', type: 'WEAPON', itemName: 'Rifle', price: 80, healAmount: 0, icon: '/economia/item_rifle_72.png', detail: '5 balas · atraviesa 3' },
+  { itemId: 'shop-municion', type: 'AMMO', itemName: 'Munición', price: 8, healAmount: 0, icon: '/economia/item_municion_72.png', detail: '+15 balas' },
 ];
 
 export const VENDORS = [

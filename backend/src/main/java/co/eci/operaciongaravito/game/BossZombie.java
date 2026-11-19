@@ -24,7 +24,7 @@ import java.util.random.RandomGenerator;
  */
 public class BossZombie {
 
-    public static final String NAME = "Ingeniero de Sistemas";
+    public static final String NAME = BossKind.INGENIERO.displayName();
 
     /** Radio del cuerpo contra las paredes: mas grande que un zombi pero cabe por una puerta. */
     private static final double BODY_RADIUS = 18;
@@ -33,6 +33,7 @@ public class BossZombie {
     private static final int PATROL_RADIUS_TILES = 6;
 
     private final String id;
+    private final BossKind kind;
     private final BossConfig config;
     private final RandomGenerator random;
 
@@ -53,11 +54,18 @@ public class BossZombie {
     private int pathComputations;
 
     public BossZombie(String id, int floor, double x, double y, BossConfig config, RandomGenerator random) {
+        this(id, BossKind.INGENIERO, floor, x, y, config, random);
+    }
+
+    /** Un jefe de otro tipo: {@code config} es la base, que el tipo ajusta ({@link BossKind#adjust}). */
+    public BossZombie(String id, BossKind kind, int floor, double x, double y, BossConfig config,
+            RandomGenerator random) {
         this.id = id;
+        this.kind = kind;
         this.floor = floor;
         this.x = x;
         this.y = y;
-        this.config = config;
+        this.config = kind.adjust(config);
         this.random = random;
         this.health = config.maxHealth();
     }
@@ -275,7 +283,12 @@ public class BossZombie {
         return pathComputations;
     }
 
+    public BossKind getKind() {
+        return kind;
+    }
+
     public synchronized BossView toView() {
-        return new BossView(id, NAME, floor, Math.round(x), Math.round(y), health, config.maxHealth(), state);
+        return new BossView(id, kind.displayName(), kind, floor, Math.round(x), Math.round(y), health,
+                config.maxHealth(), state);
     }
 }

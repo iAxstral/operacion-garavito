@@ -1,6 +1,7 @@
 # Integracion continua: en cada push y PR corre las pruebas del backend, el lint,
 # las pruebas y el build del frontend, las pruebas de punta a punta (Playwright)
-# y el análisis de calidad de código con SonarQube.
+# y el análisis de calidad de código con SonarQube, además de una prueba de carga corta
+# con k6 que falla si el juego se pone lento (umbrales en k6/partidas.js).
 #
 # Requiere los siguientes secretos en el repositorio:
 #   SONAR_TOKEN   — token generado en SonarQube (Administración → Tokens)
@@ -147,7 +148,6 @@ jobs:
           path: |
             k6-resumen.json
             backend.log
-
   sonar:
     name: Análisis SonarQube
     runs-on: ubuntu-latest

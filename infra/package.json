@@ -1,0 +1,21 @@
+{
+  "name": "infra",
+  "private": true,
+  "version": "0.0.0",
+  "bin": {
+    "infra": "bin/app.js"
+  },
+  "scripts": {
+    "cdk": "cdk"
+  },
+  "dependencies": {
+    "aws-cdk-lib": "2.273.0",
+    "constructs": "10.5.1"
+  },
+  "devDependencies": {
+    "aws-cdk": "2.1147.0",
+    "ts-node": "10.9.2",
+    "typescript": "5.9.3",
+    "@types/node": "24.9.1"
+  }
+}

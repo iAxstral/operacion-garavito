@@ -35,3 +35,4 @@ door f3-laboratorio 9 7
 door f3-servidores 27 7
 door f3-auditorio 9 16
 door f3-maquinas 27 16
+stairs down 64 640 192 256 352 736

@@ -29,12 +29,20 @@ for (const building of BUILDINGS) {
       .filter((deco) => deco.type === 'door')
       .map((deco) => `door ${deco.doorId} ${deco.x} ${deco.y}`);
 
+    // Escaleras (px): zona donde se toma y punto de llegada desde el otro piso. El
+    // servidor las usa para validar que un cambio de piso sea por la escalera.
+    const stairs = [['up', layout.upStairs], ['down', layout.downStairs]]
+      .filter(([, spec]) => spec)
+      .map(([kind, { zone, arrivalSpawn }]) =>
+        `stairs ${kind} ${zone.x} ${zone.y} ${zone.w} ${zone.h} ${arrivalSpawn.x} ${arrivalSpawn.y}`);
+
     const out = [
       '# GENERADO por frontend/scripts/export-floor-grid.mjs — no editar a mano.',
       `# Fuente: frontend/src/game/mapLayout.js (edificio ${building}, piso ${floor})`,
       `# ${MAP_COLS} columnas x ${MAP_ROWS} filas, tile de ${TILE}px. '#' solido, '.' caminable.`,
       ...rows,
       ...doors,
+      ...stairs,
       '',
     ].join('\n');
 

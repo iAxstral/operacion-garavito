@@ -16,10 +16,11 @@ public final class ShopCatalog {
 
     public static final List<ShopItem> WEAPON_MACHINE_MENU = List.of(
 
-            new ShopItem("shop-hacha", ItemType.WEAPON, "Hacha", MissionCatalog.REWARD_GARAVITOS, 0),
-            new ShopItem("shop-pistola", ItemType.WEAPON, "Pistola", 10, 0),
-            new ShopItem("shop-rifle", ItemType.WEAPON, "Rifle", 90, 0),
-            new ShopItem("shop-municion", ItemType.AMMO, "Munición", 1, 0)
+            new ShopItem("shop-hacha", ItemType.WEAPON, "Hacha", 20, 0),
+            new ShopItem("shop-pistola", ItemType.WEAPON, "Pistola", 35, 0),
+            new ShopItem("shop-rifle", ItemType.WEAPON, "Rifle", 80, 0),
+            // Paquete de Player.AMMO_PER_PACK balas: no ocupa espacio en el inventario.
+            new ShopItem("shop-municion", ItemType.AMMO, "Munición", 8, 0)
     );
 
     public static final ShopVendor CAFETERIA_VENDOR = new ShopVendor("cafeteria", 1, 1696, 1440, CAFETERIA_MENU);

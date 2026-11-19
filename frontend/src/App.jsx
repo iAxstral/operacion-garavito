@@ -1,24 +1,75 @@
-import { useState } from 'react';
-import GameCanvas from './game/GameCanvas';
+import { lazy, Suspense, useEffect, useState } from 'react';
+// Phaser (la mayor parte del peso) solo se descarga al entrar a la partida: el menu y
+// la sala abren rapido aun en el celular.
+const GameCanvas = lazy(() => import('./game/GameCanvas'));
 import Hud from './components/Hud';
 import SecurityMission from './components/SecurityMission';
 import WiresMission from './components/WiresMission';
 import MathMission from './components/MathMission';
 import StackMission from './components/StackMission';
+import CodeMission from './components/CodeMission';
+import VaccineMission from './components/VaccineMission';
+import CashMission from './components/CashMission';
+import FuseMission from './components/FuseMission';
+import RondaMission from './components/RondaMission';
+import SensoresMission from './components/SensoresMission';
+import PulsoMission from './components/PulsoMission';
+import MedicamentosMission from './components/MedicamentosMission';
+import PresupuestoMission from './components/PresupuestoMission';
+import FacturasMission from './components/FacturasMission';
+import TuberiasMission from './components/TuberiasMission';
+import NivelMission from './components/NivelMission';
 import TouchControls from './components/TouchControls';
+import SpectatorPanel from './components/SpectatorPanel';
+import TutorialHints from './components/TutorialHints';
+import PingControls from './components/PingControls';
+import PerkPanel from './components/PerkPanel';
+import PhonePanel from './components/PhonePanel';
+import TreasuryPanel from './components/TreasuryPanel';
 import GameOverScreen from './components/GameOverScreen';
 import ConnectionStatus from './components/ConnectionStatus';
 import MainMenu from './components/MainMenu';
+import FullscreenButton from './components/FullscreenButton';
 import BuildingSelect from './components/BuildingSelect';
 import RoleSelect from './components/RoleSelect';
 import LobbyEntry from './components/LobbyEntry';
 import WaitingRoom from './components/WaitingRoom';
-import { leaveGame } from './game/gameSync';
+import StatsOverlay from './components/StatsOverlay';
+import { leaveGame, resumeSession } from './game/gameSync';
+import { startAmbience } from './game/ambience';
 import './App.css';
+import './tema.css';
+import './navidad.css';
+import './minigames.css';
+
 
 function App() {
   const [view, setView] = useState('menu');
   const [building, setBuilding] = useState(null);
+
+  // Si se recargo la pagina en medio de una partida, se vuelve al mismo puesto.
+  useEffect(() => {
+    let cancelled = false;
+    resumeSession().then((resumed) => {
+      if (!cancelled && resumed) setView(resumed.started ? 'playing' : 'waiting');
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Cada pantalla entra con un fundido desde negro (la clave reinicia la animacion).
+  const fade = (screen) => (
+    <div key={view} className="hw-screen">
+      {screen}
+      <FullscreenButton />
+    </div>
+  );
+
+  // Viento, crujidos y gemidos: claros en las pantallas de afuera, apagados en la partida.
+  useEffect(() => {
+    startAmbience(view === 'playing' ? 'indoor' : 'outdoor');
+  }, [view]);
 
   const handleExitToMenu = () => {
     leaveGame();
@@ -26,11 +77,11 @@ function App() {
   };
 
   if (view === 'menu') {
-    return <MainMenu onPlay={() => setView('buildings')} />;
+    return fade(<MainMenu onPlay={() => setView('buildings')} />);
   }
 
   if (view === 'buildings') {
-    return (
+    return fade(
       <BuildingSelect
         onSelect={(id) => {
           setBuilding(id);
@@ -42,7 +93,7 @@ function App() {
   }
 
   if (view === 'lobby') {
-    return (
+    return fade(
       <LobbyEntry
         building={building}
         onEntered={() => setView('roles')}
@@ -52,7 +103,7 @@ function App() {
   }
 
   if (view === 'roles') {
-    return (
+    return fade(
       <RoleSelect
         onJoined={() => setView('waiting')}
         onBack={() => {
@@ -64,7 +115,7 @@ function App() {
   }
 
   if (view === 'waiting') {
-    return (
+    return fade(
       <WaitingRoom
         onStarted={() => setView('playing')}
         onLeave={() => {
@@ -76,18 +127,40 @@ function App() {
   }
 
   return (
-    <div id="game-root">
+    <div id="game-root" className="hw-screen">
       <div className="game-stage">
-        <GameCanvas />
-        <Hud />
+        <Suspense fallback={<div className="game-loading">Cargando el edificio…</div>}>
+          <GameCanvas />
+        </Suspense>
+        <Hud onExit={handleExitToMenu} />
+        <StatsOverlay />
         <SecurityMission />
         <WiresMission />
         <MathMission />
         <StackMission />
+        <CodeMission />
+        <VaccineMission />
+        <CashMission />
+        <FuseMission />
+        <RondaMission />
+        <SensoresMission />
+        <PulsoMission />
+        <MedicamentosMission />
+        <PresupuestoMission />
+        <FacturasMission />
+        <TuberiasMission />
+        <NivelMission />
         <TouchControls />
+        <SpectatorPanel />
+        <TutorialHints />
+        <PingControls />
+        <PerkPanel />
+        <PhonePanel />
+        <TreasuryPanel />
         <GameOverScreen onExitToMenu={handleExitToMenu} />
       </div>
       <ConnectionStatus />
+      <FullscreenButton />
     </div>
   );
 }

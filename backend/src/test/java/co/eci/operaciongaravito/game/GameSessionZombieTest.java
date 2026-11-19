@@ -22,7 +22,7 @@ class GameSessionZombieTest {
     @BeforeEach
     void setUp() {
         scheduler = Executors.newScheduledThreadPool(1);
-        session = new GameSession("test", Building.F, BossConfig.defaults(), scheduler, round -> { });
+        session = new GameSession("test", Building.F, BossConfig.defaults());
         assertNull(session.joinPlayer("SEGURIDAD"));
         assertTrue(session.start("SEGURIDAD"));
         player = session.getOrCreatePlayer("SEGURIDAD");
@@ -36,6 +36,7 @@ class GameSessionZombieTest {
 
     private void armPlayer() {
         player.tryAddItem(new InventorySlot(ItemType.WEAPON, "shop-hacha", "Hacha"));
+        assertTrue(session.attemptEquip("SEGURIDAD", "shop-hacha").success());
     }
 
     private void tickUntilZombies() {
@@ -79,6 +80,7 @@ class GameSessionZombieTest {
     @DisplayName("desarmado golpea pero no mata de un solo golpe")
     void unarmedTakesMoreThanOneHit() {
         ZombieState target = isolatedZombie();
+        player.reportPosition(target.x() - 20, target.y());
 
         AttackResult unarmed = session.attemptAttack("SEGURIDAD", AttackType.BASIC, target.x() - 20, target.y(), 0);
 
@@ -142,11 +144,11 @@ class GameSessionZombieTest {
     }
 
     @Test
-    @DisplayName("el hacha cuesta lo que paga una mision de rol")
-    void axeCostsExactlyOneMissionReward() {
-        ShopItem axe = ShopCatalog.itemById("shop-hacha");
-        assertEquals(MissionCatalog.REWARD_GARAVITOS, axe.price());
-        assertEquals(ItemType.WEAPON, axe.type());
+    @DisplayName("una mision alcanza para el hacha, pero el rifle exige ahorrar")
+    void weaponPricesForceChoices() {
+        assertTrue(ShopCatalog.itemById("shop-hacha").price() <= MissionCatalog.REWARD_GARAVITOS);
+        assertTrue(ShopCatalog.itemById("shop-rifle").price() > 2 * MissionCatalog.REWARD_GARAVITOS);
+        assertEquals(ItemType.AMMO, ShopCatalog.itemById("shop-municion").type());
     }
 
     @Test
@@ -167,12 +169,19 @@ class GameSessionZombieTest {
         assertTrue(session.waveState().restingSeconds() > 0, "deberia haber entrado al respiro");
     }
 
-    /** Registra kills en el director como si hubieran llegado por /attack. */
+    /**
+     * Registra kills en el director como si hubieran llegado por /attack, y completa las
+     * misiones del jugador: un Kinder pide las dos cosas.
+     */
     private void registerKills(int count) {
         try {
             java.lang.reflect.Field field = GameSession.class.getDeclaredField("waveDirector");
             field.setAccessible(true);
             ((WaveDirector) field.get(session)).onZombiesKilled(count);
+            java.lang.reflect.Field boardField = GameSession.class.getDeclaredField("missionBoard");
+            boardField.setAccessible(true);
+            MissionBoard board = (MissionBoard) boardField.get(session);
+            board.viewFor("SEGURIDAD").forEach(mission -> board.complete("SEGURIDAD", mission.missionId()));
         } catch (ReflectiveOperationException ex) {
             throw new AssertionError(ex);
         }
@@ -239,10 +248,62 @@ class GameSessionZombieTest {
         for (int k = 1; k < WaveCurve.KINDER_COUNT; k++) {
             now = tickUntilKinder(now, k);
             registerKills(WaveCurve.blueprint(k).killQuota());
+            defeatBossIfAny(now);
             now += 66;
             session.tick(now, 0.066);
         }
         return tickUntilKinder(now, WaveCurve.KINDER_COUNT);
+    }
+
+    /** Derriba al jefe que este en pie como si el golpe hubiera llegado por /attack. */
+    private void defeatBossIfAny(long now) {
+        BossZombie current = currentBoss();
+        if (current == null || !current.isAlive()) {
+            return;
+        }
+        current.hit(current.getHealth(), false, now);
+        try {
+            java.lang.reflect.Field field = GameSession.class.getDeclaredField("waveDirector");
+            field.setAccessible(true);
+            ((WaveDirector) field.get(session)).onBossDefeated(now);
+        } catch (ReflectiveOperationException ex) {
+            throw new AssertionError(ex);
+        }
+    }
+
+    @Test
+    @DisplayName("en Navidad, Papa Noel malvado aparece en el Kinder 3 y hay que derribarlo para pasarlo")
+    void papaNoelGuardsTheThirdKinder() {
+        long now = System.currentTimeMillis();
+        for (int k = 1; k < GameSession.PAPA_NOEL_KINDER; k++) {
+            now = tickUntilKinder(now, k);
+            registerKills(WaveCurve.blueprint(k).killQuota());
+            now += 66;
+            session.tick(now, 0.066);
+            assertNull(session.bossView(), "no hay jefe antes del Kinder 3");
+        }
+        now = tickUntilKinder(now, GameSession.PAPA_NOEL_KINDER);
+
+        BossView view = session.bossView();
+        assertTrue(view != null, "deberia haber aparecido Papa Noel");
+        assertEquals(BossKind.PAPA_NOEL, view.kind());
+        assertEquals("Papá Noel malvado", view.name());
+        assertTrue(view.maxHealth() < BossConfig.defaults().maxHealth(), "es mas debil que el jefe final");
+        assertFalse(session.waveState().bossStage(), "el Kinder 3 conserva su cuota");
+
+        registerKills(WaveCurve.blueprint(GameSession.PAPA_NOEL_KINDER).killQuota());
+        for (int i = 0; i < 5; i++) {
+            now += 66;
+            session.tick(now, 0.066);
+        }
+        assertEquals(GameSession.PAPA_NOEL_KINDER, session.waveState().number());
+        assertEquals(0, session.waveState().restingSeconds(), "con Papa Noel en pie el Kinder no se pasa");
+
+        defeatBossIfAny(now);
+        now += 66;
+        session.tick(now, 0.066);
+        assertNull(session.bossView());
+        assertTrue(session.waveState().restingSeconds() > 0, "derribado Papa Noel, llega el respiro");
     }
 
     @Test
@@ -254,6 +315,7 @@ class GameSessionZombieTest {
         BossView view = session.bossView();
         assertTrue(view != null, "deberia haber aparecido el jefe");
         assertEquals(BossZombie.NAME, view.name());
+        assertEquals(BossKind.INGENIERO, view.kind());
         assertEquals(player.getFloor(), view.floor());
         assertTrue(session.waveState().bossStage());
         assertTrue(Math.hypot(view.x() - player.getX(), view.y() - player.getY()) >= WaveDirector.MIN_SPAWN_DISTANCE_PX,
@@ -278,6 +340,18 @@ class GameSessionZombieTest {
         now += 66;
         session.tick(now, 0.066);
         assertNull(session.bossView());
+        assertFalse(session.waveState().victory(), "sin las misiones del Kinder 5 todavia no se gana");
+        assertTrue(session.waveState().waitingForMissions());
+
+        registerKills(0);
+        now += 66;
+        session.tick(now, 0.066);
+        assertTrue(session.waveState().escaping(), "vencido el jefe, a correr a la salida");
+        assertFalse(session.consumeVictory());
+
+        player.reportPosition(1, GameSession.EXIT_X, GameSession.EXIT_Y);
+        now += 66;
+        session.tick(now, 0.066);
         assertTrue(session.waveState().victory());
         assertTrue(session.consumeVictory());
         assertFalse(session.consumeVictory());
@@ -376,7 +450,7 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("mientras la sala no inicia no hay zombis")
     void nothingSpawnsBeforeStart() {
-        GameSession waiting = new GameSession("wait", Building.F, BossConfig.defaults(), scheduler, round -> { });
+        GameSession waiting = new GameSession("wait", Building.F, BossConfig.defaults());
         waiting.joinPlayer("SEGURIDAD");
         long now = System.currentTimeMillis();
         for (int i = 0; i < 400; i++) {
@@ -399,7 +473,7 @@ class GameSessionZombieTest {
     @Test
     @DisplayName("en el Edificio C (2 pisos) nunca aparece un zombi en un piso inexistente")
     void buildingCNeverSpawnsOnAMissingFloor() {
-        GameSession c = new GameSession("edc", Building.C, BossConfig.defaults(), scheduler, round -> { });
+        GameSession c = new GameSession("edc", Building.C, BossConfig.defaults());
         c.joinPlayer("SEGURIDAD");
         c.start("SEGURIDAD");
         // Antes el director sorteaba el piso 3 aunque el C no lo tiene: un zombi

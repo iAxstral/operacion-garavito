@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import useMissionFlow from './useMissionFlow';
 
-const MISSION_ROLE = 'INFRAESTRUCTURA';
+const MISSION_TYPE = 'TORRE';
 const WIDTH = 320;
 const HEIGHT = 380;
 const BLOCK_H = 26;
@@ -26,9 +26,9 @@ function freshState() {
 
 function draw(ctx, game) {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
-  ctx.fillStyle = '#18222b';
+  ctx.fillStyle = '#150b0d';
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
-  ctx.fillStyle = '#2a3944';
+  ctx.fillStyle = '#2a1518';
   ctx.fillRect(0, FLOOR_Y, WIDTH, HEIGHT - FLOOR_Y);
 
   const blockTop = (index) => FLOOR_Y - (index + 1) * BLOCK_H;
@@ -68,7 +68,7 @@ export default function StackMission() {
   const gameRef = useRef(freshState());
   const doneRef = useRef(false);
 
-  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_ROLE, () => {
+  const { phase, nearMission, finishSuccess, cancel } = useMissionFlow(MISSION_TYPE, () => {
     gameRef.current = freshState();
     doneRef.current = false;
     setPlaced(0);

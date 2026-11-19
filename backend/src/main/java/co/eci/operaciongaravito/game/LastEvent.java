@@ -27,8 +27,34 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("JOIN_REJECTED", clientId, null, reason);
     }
 
+    /** El servidor rechazo una posicion de este jugador: debe volver a la que tiene el servidor. */
+    public static LastEvent positionCorrected(String playerId) {
+        return new LastEvent("POSITION_CORRECTED", playerId, null, null);
+    }
+
+    public static LastEvent rejoinOk(String playerId, String clientId) {
+        return new LastEvent("REJOIN_OK", playerId, clientId, null);
+    }
+
+    public static LastEvent rejoinRejected(String clientId, String reason) {
+        return new LastEvent("REJOIN_REJECTED", clientId, null, reason);
+    }
+
     public static LastEvent lobbyOk(String clientId) {
         return new LastEvent("LOBBY_OK", clientId, null, null);
+    }
+
+    /** La sala esta en otro nodo: {@code reason} es su URL publica (el cliente se reconecta alla). */
+    public static LastEvent escapeStarted() {
+        return new LastEvent("ESCAPE_STARTED", null, null, null);
+    }
+
+    public static LastEvent playerEscaped(String playerId) {
+        return new LastEvent("PLAYER_ESCAPED", playerId, null, null);
+    }
+
+    public static LastEvent lobbyRedirect(String clientId, String nodeUrl) {
+        return new LastEvent("LOBBY_REDIRECT", clientId, null, nodeUrl);
     }
 
     public static LastEvent lobbyRejected(String clientId, String reason) {
@@ -71,8 +97,44 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("DOOR_REJECTED", playerId, doorId, reason);
     }
 
+    public static LastEvent equipRejected(String playerId, String itemId, String reason) {
+        return new LastEvent("EQUIP_REJECTED", playerId, itemId, reason);
+    }
+
+    public static LastEvent reloadRejected(String playerId, String reason) {
+        return new LastEvent("RELOAD_REJECTED", playerId, null, reason);
+    }
+
+    /** {@code playerId} volvio a la partida gracias a {@code itemId} (quien lo revivio). */
+    public static LastEvent revived(String revivedId, String reviverId) {
+        return new LastEvent("REVIVED", revivedId, reviverId, null);
+    }
+
+    public static LastEvent reviveRejected(String playerId, String targetId, String reason) {
+        return new LastEvent("REVIVE_REJECTED", playerId, targetId, reason);
+    }
+
+    /** {@code playerId} le envio {@code reason} Garavitos a {@code itemId}. */
+    public static LastEvent transfer(String fromId, String toId, int amount) {
+        return new LastEvent("TRANSFER", fromId, toId, String.valueOf(amount));
+    }
+
+    public static LastEvent abilityRejected(String playerId, String reason) {
+        return new LastEvent("ABILITY_REJECTED", playerId, null, reason);
+    }
+
     public static LastEvent useSuccess(String playerId, String itemId) {
         return new LastEvent("USE_SUCCESS", playerId, itemId, null);
+    }
+
+    /** Aviso al equipo: {@code itemId} es el tipo y {@code reason} "piso,x,y" donde estaba. */
+    /** {@code reason}: EMOTE o CHAT. */
+    public static LastEvent chat(String playerId, String phrase, boolean emote) {
+        return new LastEvent("CHAT", playerId, phrase, emote ? "EMOTE" : "CHAT");
+    }
+
+    public static LastEvent ping(String playerId, String kind, int floor, long x, long y) {
+        return new LastEvent("PING", playerId, kind, floor + "," + x + "," + y);
     }
 
     public static LastEvent useRejected(String playerId, String itemId, String reason) {

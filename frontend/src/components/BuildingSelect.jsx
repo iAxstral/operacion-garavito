@@ -1,71 +1,101 @@
 import { useState } from 'react';
-
-const IMAGE_W = 1024;
-const IMAGE_H = 572;
+import NavidadCreatures from './NavidadCreatures';
+import { playSfx } from '../game/sfx';
+import { buildingLabel } from '../game/mapLayout';
 
 const BUILDINGS = [
-  { id: 'F', enabled: true, button: [133, 105, 244, 146], marker: [820, 226, 866, 271] },
-  { id: 'G', button: [259, 105, 370, 146], marker: [700, 304, 745, 349], extra: [[634, 372, 656, 398]] },
-  { id: 'A', button: [385, 105, 497, 146], marker: [485, 287, 530, 331] },
-  { id: 'B', button: [511, 105, 623, 146], marker: [398, 218, 443, 262], extra: [[334, 306, 360, 334]] },
-  { id: 'C', enabled: true, button: [637, 105, 749, 146], marker: [197, 258, 243, 303] },
-  { id: 'Biblioteca', button: [763, 105, 889, 146], marker: [525, 232, 648, 266] },
+  { id: 'F', enabled: true, info: 'Edificio F · 3 pisos' },
+  { id: 'G', enabled: true, info: 'Edificio G · Ingeniería · 2 pisos' },
+  { id: 'A', enabled: true, info: 'Edificio A · Administrativo · 3 pisos' },
+  { id: 'B', enabled: true, info: 'Edificio B · Ciencias Básicas · 3 pisos' },
+  { id: 'C', enabled: true, info: 'Edificio C · 2 pisos' },
+  { id: 'BIBLIOTECA', enabled: true, info: 'Biblioteca · 2 pisos' },
 ];
 
-function toStyle([x0, y0, x1, y1]) {
-  return {
-    left: `${(x0 / IMAGE_W) * 100}%`,
-    top: `${(y0 / IMAGE_H) * 100}%`,
-    width: `${((x1 - x0) / IMAGE_W) * 100}%`,
-    height: `${((y1 - y0) / IMAGE_H) * 100}%`,
-  };
-}
+const DEFAULT_NOTICE = 'Elige un edificio para comenzar la operación.';
+// Cada edificio es una puerta del calendario de adviento (dia y apodo).
+const ADVIENTO = {
+  F: { dia: 19, apodo: 'El de las aulas' },
+  G: { dia: 20, apodo: 'Ingeniería' },
+  A: { dia: 21, apodo: 'Administrativo' },
+  B: { dia: 22, apodo: 'Ciencias Básicas' },
+  C: { dia: 23, apodo: 'Laboratorios' },
+  BIBLIOTECA: { dia: 24, apodo: 'Nochebuena' },
+};
 
 export default function BuildingSelect({ onSelect, onBack }) {
   const [notice, setNotice] = useState(null);
+  const [hovered, setHovered] = useState(null);
+  // Cambia en cada clic a un edificio cerrado para reiniciar la sacudida del aviso.
+  const [lockedTry, setLockedTry] = useState(0);
 
   const handleClick = (building) => {
     if (building.enabled) {
+      playSfx('click');
       onSelect(building.id);
       return;
     }
-    setNotice(`El edificio ${building.id} todavía no está disponible. Por ahora solo los edificios F y C.`);
+    playSfx('empty');
+    setLockedTry((n) => n + 1);
+    setNotice(`${building.id === 'BIBLIOTECA' ? 'La Biblioteca' : `El edificio ${building.id}`} está sellado.`);
   };
 
-  return (
-    <div className="building-select">
-      <div className="building-select-stage">
-        <img
-          className="building-select-map"
-          src="/mapa/seleccion-edificio.jpeg"
-          alt="Selecciona un edificio"
-          draggable={false}
-        />
+  const hoveredBuilding = BUILDINGS.find((b) => b.id === hovered);
+  const message = hoveredBuilding
+    ? `${hoveredBuilding.info}${hoveredBuilding.enabled ? ' — clic para entrar' : ''}`
+    : (notice ?? DEFAULT_NOTICE);
 
-        {BUILDINGS.flatMap((building) => {
-          const spots = [building.button, building.marker, ...(building.extra ?? [])];
-          return spots.map((box, index) => (
+  const bar = (
+    <div className="building-select-bar">
+      <button type="button" className="screen-back-btn" onClick={onBack}>
+        Volver
+      </button>
+      <span key={lockedTry} className={`building-select-notice${lockedTry && notice && !hoveredBuilding ? ' building-select-notice--locked' : ''}`}>
+        {message}
+      </span>
+    </div>
+  );
+
+  // Un calendario de adviento maldito hecho por codigo: cada puerta es un edificio; al
+  // pasar por encima se entreabre.
+  return (
+    <div className="building-select xa-screen">
+      <NavidadCreatures />
+      <header className="xa-header">
+        <p className="xa-kicker">Calendario de adviento · ECI</p>
+        <h1 className="xa-title">Elige tu edificio</h1>
+        <p className="xa-sub">Cada puerta abre un edificio. Ninguna trae chocolates.</p>
+      </header>
+      <div className="xa-calendar">
+        {BUILDINGS.map((building) => {
+          const { dia, apodo } = ADVIENTO[building.id];
+          return (
             <button
-              key={`${building.id}-${index}`}
+              key={building.id}
               type="button"
-              className={`building-hotspot${building.enabled ? ' building-hotspot--enabled' : ' building-hotspot--locked'}`}
-              style={toStyle(box)}
+              className={`xa-door${building.enabled ? '' : ' xa-door--locked'}${hovered === building.id ? ' xa-door--open' : ''}`}
               onClick={() => handleClick(building)}
-              aria-label={building.enabled ? `Edificio ${building.id}` : `Edificio ${building.id} (no disponible)`}
-              title={building.enabled ? `Entrar al edificio ${building.id}` : 'Próximamente'}
-            />
-          ));
+              onMouseEnter={() => setHovered(building.id)}
+              onMouseLeave={() => setHovered(null)}
+              onFocus={() => setHovered(building.id)}
+              onBlur={() => setHovered(null)}
+              aria-label={building.enabled ? buildingLabel(building.id) : `${buildingLabel(building.id)} (no disponible)`}
+            >
+              <span className="xa-inside" aria-hidden="true">
+                <span className="xa-eyes"><span /><span /></span>
+                <span className="xa-enter">Entrar</span>
+              </span>
+              <span className="xa-leaf" aria-hidden="true">
+                <span className="xa-day">{dia}</span>
+                <span className="xa-letter">{building.id === 'BIBLIOTECA' ? 'Bib' : building.id}</span>
+                <span className="xa-name">{apodo}</span>
+                <span className="xa-info">{building.info.split(' · ').at(-1)}</span>
+              </span>
+            </button>
+          );
         })}
       </div>
-
-      <div className="building-select-bar">
-        <button type="button" className="screen-back-btn" onClick={onBack}>
-          Volver
-        </button>
-        <span className="building-select-notice">
-          {notice ?? 'Elige el edificio F o el edificio C para comenzar la operación.'}
-        </span>
-      </div>
+      {bar}
     </div>
   );
 }

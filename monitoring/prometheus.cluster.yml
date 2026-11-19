@@ -1,0 +1,15 @@
+# Prometheus para el modo de varios nodos (docker-compose.cluster.yml): consulta cada
+# nodo por su nombre de servicio. La etiqueta node coincide con NODE_NAME de cada uno.
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: garavito
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["node1:8080"]
+        labels:
+          node: nodo-1
+      - targets: ["node2:8080"]
+        labels:
+          node: nodo-2

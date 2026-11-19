@@ -57,23 +57,26 @@ class FloorGridTest {
 
     @ParameterizedTest
     @EnumSource(Building.class)
-    @DisplayName("todas las zonas de mision son alcanzables en su piso")
-    void missionZonesAreWalkable(Building building) {
-        MissionCatalog.zonesFor(building).forEach(zone -> {
-            assertTrue(building.hasFloor(zone.floor()), "mision en un piso que no existe: " + zone.missionId());
-            assertTrue(FloorGrid.forFloor(building, zone.floor()).isWalkable(zone.x(), zone.y()),
-                    building + ": la mision " + zone.missionId() + " quedo dentro de una pared");
+    @DisplayName("todas las salas de mision son alcanzables en su piso")
+    void missionSitesAreWalkable(Building building) {
+        MissionCatalog.sitesFor(building).forEach(site -> {
+            assertTrue(building.hasFloor(site.floor()), "sala en un piso que no existe: " + site.siteId());
+            FloorGrid grid = FloorGrid.forFloor(building, site.floor());
+            assertTrue(grid.isWalkable(site.x(), site.y()),
+                    building + ": la sala " + site.siteId() + " quedo dentro de una pared");
+            int[][] field = grid.distanceField(PLAYER_SPAWN_X, PLAYER_SPAWN_Y);
+            int[] cell = FloorGrid.cellOf(site.x(), site.y());
+            assertTrue(field[cell[1]][cell[0]] >= 0,
+                    building + ": no hay camino desde el vestibulo hasta " + site.siteId());
         });
     }
 
     @ParameterizedTest
     @EnumSource(Building.class)
-    @DisplayName("cada rol tiene al menos una mision en cada edificio")
-    void everyRoleHasAMission(Building building) {
-        for (Role role : Role.values()) {
-            assertTrue(MissionCatalog.zonesFor(building).stream().anyMatch(z -> z.role().equals(role.name())),
-                    building + " sin mision para " + role);
-        }
+    @DisplayName("hay salas suficientes para repartir 3 misiones distintas")
+    void enoughMissionSites(Building building) {
+        assertTrue(MissionCatalog.sitesFor(building).size() >= MissionBoard.MISSIONS_PER_KINDER * 2,
+                building + " tiene muy pocas salas de mision");
     }
 
     @ParameterizedTest

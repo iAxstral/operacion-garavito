@@ -1,11 +1,48 @@
 
-import { socketService } from '../services/socketService';
+import { API_BASE, socketService } from '../services/socketService';
+import { getNickname } from './profile';
+import { getEquippedCostume } from './costumes';
+import { mergeDelta } from './deltaMerge';
 
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const EVENT_TIMEOUT_MS = 6000;
 
 let gameId = null;
+// Secreto de este jugador para volver a su puesto si se cae la conexion o recarga.
+let seatToken = null;
+const SEAT_KEY = 'garavito.seat';
+
+function saveSeat() {
+  try {
+    sessionStorage.setItem(SEAT_KEY, JSON.stringify({
+      gameId, role: myRole, token: seatToken, building: myBuilding, node: socketService.url,
+    }));
+  } catch {
+    // Sin almacenamiento no se puede volver tras recargar, pero si tras un corte.
+  }
+}
+
+function loadSeat() {
+  try {
+    return JSON.parse(sessionStorage.getItem(SEAT_KEY) ?? 'null');
+  } catch {
+    return null;
+  }
+}
+
+function clearSeat() {
+  try {
+    sessionStorage.removeItem(SEAT_KEY);
+  } catch {
+    // nada que limpiar
+  }
+}
+
+function newToken() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return Array.from({ length: 4 }, () => Math.random().toString(36).slice(2)).join('');
+}
 let myRole = 'SEGURIDAD';
 let currentFloor = 1;
 // Edificio de la sala. Lo decide quien la crea; quien entra con un codigo adopta el
@@ -13,7 +50,7 @@ let currentFloor = 1;
 let myBuilding = 'F';
 
 function emptyState() {
-  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null, boss: null };
+  return { players: [], claimedItemIds: [], lastEvent: null, zombies: [], wave: null, doors: [], lobby: null, boss: null, projectiles: [], barricades: [] };
 }
 
 let latestState = emptyState();
@@ -25,6 +62,9 @@ let lastMoveSentAt = 0;
 let lastSentX = null;
 let lastSentY = null;
 const listeners = new Set();
+// Cada evento del servidor, uno por uno y en orden. `latestState.lastEvent` solo guarda
+// el ultimo: si dos jugadores actuan casi a la vez, React puede ver solo el segundo.
+const eventListeners = new Set();
 let joined = false;
 let topicSubscription = null;
 
@@ -40,6 +80,21 @@ let nearDoor = null;
 const doorListeners = new Set();
 
 let nearStairs = null;
+
+// Compañero caido al lado (solo lo usa Biomedica para revivir con E).
+let nearDowned = null;
+const downedListeners = new Set();
+
+// Barricada al lado (solo la usa Infraestructura para repararla con E).
+let nearBarricade = null;
+
+// Paneles de habilidad abiertos: 'phone' (Seguridad), 'treasury' (Economia) o null.
+let abilityPanel = null;
+const abilityPanelListeners = new Set();
+
+// A quien sigue la camara mientras este jugador esta caido.
+let spectateTarget = null;
+const spectateListeners = new Set();
 
 function notify() {
   listeners.forEach((callback) => callback(latestState));
@@ -57,7 +112,7 @@ export function getMyBuilding() {
   return myBuilding;
 }
 
-export const touchInput = { moveX: 0, moveY: 0, attack: false, dash: false, charged: false };
+export const touchInput = { moveX: 0, moveY: 0, attack: false, dash: false, charged: false, reload: false, cycleWeapon: false, ability: false };
 
 export function isTouchDevice() {
   return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -81,6 +136,17 @@ export function onStateChange(callback) {
   return () => listeners.delete(callback);
 }
 
+/** Llama a `callback(evento)` por cada evento nuevo que llegue del servidor. */
+export function onGameEvent(callback) {
+  eventListeners.add(callback);
+  return () => eventListeners.delete(callback);
+}
+
+/** Avisa a los oyentes de un evento que nace en este cliente (no viene del servidor). */
+export function emitLocalEvent(event) {
+  eventListeners.forEach((callback) => callback(event));
+}
+
 function awaitEvent(predicate) {
   return new Promise((resolve, reject) => {
     const waiter = { predicate, resolve };
@@ -93,10 +159,11 @@ function awaitEvent(predicate) {
 
 function handleMessage(body) {
   latestState = {
-    ...body,
+    ...mergeDelta(body, latestState),
     lastEvent: body.lastEvent ?? latestState.lastEvent,
   };
   if (body.lastEvent) {
+    eventListeners.forEach((callback) => callback(body.lastEvent));
     eventWaiters.forEach((waiter) => {
       if (waiter.predicate(body.lastEvent)) {
         eventWaiters.delete(waiter);
@@ -111,15 +178,15 @@ export function generateLobbyCode() {
   return Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('');
 }
 
-export async function openLobby(code, create, building) {
+export async function openLobby(code, create, building, redirected = false, mode = 'NORMAL') {
   await socketService.whenConnected();
   resetLocalState();
   gameId = code;
   topicSubscription = socketService.subscribe(`/topic/game/${code}`, handleMessage);
 
   const reply = awaitEvent((event) => event.playerId === CLIENT_ID
-    && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED'));
-  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building });
+    && (event.type === 'LOBBY_OK' || event.type === 'LOBBY_REJECTED' || event.type === 'LOBBY_REDIRECT'));
+  socketService.publish(`/app/game/${code}/lobby`, { clientId: CLIENT_ID, create, building, mode });
 
   let event;
   try {
@@ -127,6 +194,13 @@ export async function openLobby(code, create, building) {
   } catch (error) {
     closeTopic();
     throw error;
+  }
+  if (event.type === 'LOBBY_REDIRECT') {
+    // La sala esta en otro nodo: se pasa alla y se pide de nuevo (una sola vez).
+    closeTopic();
+    if (redirected) throw new Error('lobby_not_found');
+    await socketService.switchTo(event.reason);
+    return openLobby(code, create, building, true, mode);
   }
   if (event.type === 'LOBBY_REJECTED') {
     closeTopic();
@@ -137,15 +211,72 @@ export async function openLobby(code, create, building) {
 }
 
 export async function joinAs(role) {
+  const token = newToken();
   const reply = awaitEvent((event) => (event.type === 'JOIN_OK' && event.itemId === CLIENT_ID)
     || (event.type === 'JOIN_REJECTED' && event.playerId === CLIENT_ID));
-  socketService.publish(`/app/game/${gameId}/join`, { role, clientId: CLIENT_ID });
+  socketService.publish(`/app/game/${gameId}/join`, {
+    role, clientId: CLIENT_ID, token, name: getNickname() || null, costume: getEquippedCostume(),
+  });
 
   const event = await reply;
   if (event.type === 'JOIN_REJECTED') throw new Error(event.reason);
   myRole = role;
+  seatToken = token;
   joined = true;
+  saveSeat();
   return role;
+}
+
+function sendRejoin() {
+  socketService.publish(`/app/game/${gameId}/rejoin`, {
+    role: myRole, clientId: CLIENT_ID, token: seatToken, name: getNickname() || null, costume: getEquippedCostume(),
+  });
+}
+
+// Al reconectarse el socket (corte de Wi-Fi, celular que se bloqueo) la suscripcion
+// anterior ya no existe: se vuelve a suscribir y a reclamar el puesto.
+function handleReconnect() {
+  if (!joined || !gameId || !seatToken) return;
+  topicSubscription = socketService.subscribe(`/topic/game/${gameId}`, handleMessage);
+  sendRejoin();
+}
+socketService.connect({ onConnect: handleReconnect });
+
+/**
+ * Al abrir la pagina: si en esta pestaña habia una partida (se recargo), intenta
+ * volver al mismo puesto. Devuelve { started } o null si no habia o ya vencio.
+ */
+export async function resumeSession() {
+  const seat = loadSeat();
+  if (!seat?.gameId || !seat?.token) return null;
+  // Con varios nodos se vuelve al nodo donde estaba la sala.
+  if (seat.node && seat.node !== socketService.url) await socketService.switchTo(seat.node);
+  await socketService.whenConnected();
+  resetLocalState();
+  gameId = seat.gameId;
+  myRole = seat.role;
+  myBuilding = seat.building ?? 'F';
+  seatToken = seat.token;
+  topicSubscription = socketService.subscribe(`/topic/game/${gameId}`, handleMessage);
+
+  const reply = awaitEvent((event) => (event.type === 'REJOIN_OK' && event.itemId === CLIENT_ID)
+    || (event.type === 'REJOIN_REJECTED' && event.playerId === CLIENT_ID));
+  sendRejoin();
+  let event;
+  try {
+    event = await reply;
+  } catch {
+    event = null;
+  }
+  if (!event || event.type === 'REJOIN_REJECTED') {
+    closeTopic();
+    clearSeat();
+    resetLocalState();
+    return null;
+  }
+  joined = true;
+  myBuilding = latestState.lobby?.building ?? myBuilding;
+  return { started: Boolean(latestState.lobby?.started) };
 }
 
 export function startGame() {
@@ -157,7 +288,11 @@ export function getLobbyCode() {
 }
 
 function closeTopic() {
-  topicSubscription?.unsubscribe();
+  try {
+    topicSubscription?.unsubscribe();
+  } catch {
+    // La conexion ya se habia caido: no hay nada que desuscribir.
+  }
   topicSubscription = null;
   gameId = null;
   joined = false;
@@ -175,12 +310,18 @@ function resetLocalState() {
   setNearMission(null);
   setNearDoor(null);
   setNearStairs(null);
+  setNearDowned(null);
+  setSpectateTarget(null);
+  setNearBarricade(null);
+  setAbilityPanel(null);
 }
 
 export function leaveGame() {
   if (joined && socketService.isConnected()) {
     socketService.publish(`/app/game/${gameId}/leave`, { playerId: myRole });
   }
+  clearSeat();
+  seatToken = null;
   closeTopic();
   resetLocalState();
   notify();
@@ -212,6 +353,172 @@ export function requestAttack(type, x, y, facing) {
   socketService.publish(`/app/game/${gameId}/attack`, { playerId: myRole, type, x, y, facing });
 }
 
+/** Equipa un arma del inventario (null = guardarla y pelear a puños). */
+export function requestEquip(itemId) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/equip`, { playerId: myRole, itemId });
+}
+
+export function requestReload() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/reload`, { playerId: myRole });
+}
+
+export function requestReviveStart(targetId) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/revive/start`, { playerId: myRole, targetId });
+}
+
+export function requestReviveCancel() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/revive/cancel`, { playerId: myRole });
+}
+
+export function requestPlaceBarricade(x, y, facing) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/barricade/place`, { playerId: myRole, x, y, facing });
+}
+
+export function requestRepairBarricade(barricadeId) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/barricade/repair`, { playerId: myRole, barricadeId });
+}
+
+export function requestDismantleBarricade(barricadeId) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/barricade/dismantle`, { playerId: myRole, barricadeId });
+}
+
+export function requestTransfer(targetId, amount) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/transfer`, { playerId: myRole, targetId, amount });
+}
+
+/** Evento del Kinder en curso ({ id, type: 'BLACKOUT'|'SUPPLY', room, floor, x, y, endsInMs }) o null. */
+export function getKinderEvent() {
+  return latestState.event ?? null;
+}
+
+export function requestEventInteract() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/event/interact`, { playerId: myRole });
+}
+
+let nearEvent = false;
+
+export function setNearEvent(near) {
+  nearEvent = near;
+}
+
+export function getNearEvent() {
+  return nearEvent;
+}
+
+/** Barricadas de Infraestructura ({ id, ownerId, floor, col, row, health, maxHealth }). */
+export function getBarricades() {
+  return latestState.barricades ?? [];
+}
+
+// Armarios para esconderse: fijos por edificio, se piden una vez al servidor.
+const hideSpotsByBuilding = new Map();
+let nearHide = null;
+
+export function loadHideSpots(building) {
+  if (!hideSpotsByBuilding.has(building)) {
+    hideSpotsByBuilding.set(building, fetch(`${API_BASE}/api/buildings/${building}/hide-spots`)
+      .then((response) => (response.ok ? response.json() : []))
+      .catch(() => []));
+  }
+  return hideSpotsByBuilding.get(building);
+}
+
+export function setNearHide(spot) {
+  nearHide = spot;
+}
+
+export function getNearHide() {
+  return nearHide;
+}
+
+/** Entra al armario cercano o sale del que esta. */
+export function requestChat(phrase) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/chat`, { playerId: myRole, phrase });
+}
+
+export function requestPerk(perk) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/perk`, { playerId: myRole, perk });
+}
+
+export function requestHide() {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/hide`, { playerId: myRole });
+}
+
+export function setNearBarricade(barricade) {
+  nearBarricade = barricade;
+}
+
+export function getNearBarricade() {
+  return nearBarricade;
+}
+
+export function getAbilityPanel() {
+  return abilityPanel;
+}
+
+export function setAbilityPanel(panel) {
+  if (abilityPanel === panel) return;
+  abilityPanel = panel;
+  abilityPanelListeners.forEach((callback) => callback(abilityPanel));
+}
+
+export function onAbilityPanelChange(callback) {
+  abilityPanelListeners.add(callback);
+  callback(abilityPanel);
+  return () => abilityPanelListeners.delete(callback);
+}
+
+export function setNearDowned(player) {
+  if (nearDowned?.playerId === player?.playerId) return;
+  nearDowned = player;
+  downedListeners.forEach((callback) => callback(nearDowned));
+}
+
+export function getNearDowned() {
+  return nearDowned;
+}
+
+export function onNearDownedChange(callback) {
+  downedListeners.add(callback);
+  callback(nearDowned);
+  return () => downedListeners.delete(callback);
+}
+
+export function setSpectateTarget(playerId) {
+  if (spectateTarget === playerId) return;
+  spectateTarget = playerId;
+  spectateListeners.forEach((callback) => callback(spectateTarget));
+}
+
+export function getSpectateTarget() {
+  return spectateTarget;
+}
+
+export function onSpectateChange(callback) {
+  spectateListeners.add(callback);
+  callback(spectateTarget);
+  return () => spectateListeners.delete(callback);
+}
+
+/** Compañeros vivos a los que se puede mirar en modo espectador, en orden estable. */
+export function spectatableTeammates() {
+  return latestState.players
+    .filter((p) => p.playerId !== myRole && p.lifeState !== 'DOWNED')
+    .sort((a, b) => a.playerId.localeCompare(b.playerId));
+}
+
 export function requestUseItem(itemId) {
   socketService.publish(`/app/game/${gameId}/use`, { playerId: myRole, itemId });
 }
@@ -220,21 +527,38 @@ export function getZombies() {
   return latestState.zombies ?? [];
 }
 
+/** Bolas de acido de los escupidores ({ id, floor, x, y, angle }). */
+export function getProjectiles() {
+  return latestState.projectiles ?? [];
+}
+
+/** Charcos de acido que dejan los escupidores al morir ({ id, floor, x, y, remainingMs }). */
+export function getPuddles() {
+  return latestState.puddles ?? [];
+}
+
+/** Aviso al equipo: ZOMBIES, HELP, REVIVE, GO o AMMO. El servidor le pone la posicion. */
+export function requestPing(kind) {
+  if (!joined || !socketService.isConnected()) return;
+  socketService.publish(`/app/game/${gameId}/ping`, { playerId: myRole, kind });
+}
+
 export function getWave() {
   return latestState.wave ?? null;
 }
 
 /** El jefe del Kinder 5 ({ id, name, floor, x, y, health, maxHealth, state }) o null. */
+/** Duendes, renos, bolas y golpes de Navidad ({ bromistas, bolas, golpes }) o null. */
+export function getTravesuras() {
+  return latestState.travesuras ?? null;
+}
+
 export function getBoss() {
   return latestState.boss ?? null;
 }
 
 export function requestPickup(itemId, x, y) {
   socketService.publish(`/app/game/${gameId}/pickup`, { playerId: myRole, itemId, x, y });
-}
-
-export function submitDecision(action) {
-  socketService.publish(`/app/game/${gameId}/decide`, { playerId: myRole, action });
 }
 
 export function purchaseItem(itemId, x, y) {
@@ -335,7 +659,6 @@ if (import.meta.env.DEV) {
     startGame,
     leaveGame,
     requestPickup,
-    submitDecision,
     purchaseItem,
     requestMissionComplete,
     requestMissionStart,
@@ -347,10 +670,15 @@ if (import.meta.env.DEV) {
     getDoors,
     requestAttack,
     requestUseItem,
+    requestEquip,
+    requestReload,
     changeFloor,
     reportPosition,
     getZombies,
     getBoss,
     getWave,
+    // Solo para revisar pantallas a mano o en pruebas: dispara un evento como si
+    // viniera del servidor (p. ej. { type: 'TEAM_WIPED' }).
+    emitEventForTest: (event) => eventListeners.forEach((callback) => callback(event)),
   };
 }

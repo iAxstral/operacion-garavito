@@ -1,54 +1,133 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS, buildFloorLayout, floorCount } from './mapLayout';
 import { ROLE_CATALOG, roleInfo } from './roleCatalog';
+import { displayName } from './profile';
+import PingLayer from './PingLayer';
+import { pollGamepad } from './gamepad';
+import { bakeCostumes, costumeKey, COSTUME_LAYOUT, DEFAULT_COSTUME, HEAD_Y, NECK_Y } from './costumeArt';
+import { setStamina } from './stamina';
+import { ENERGIA_DRAIN_FACTOR, LINTERNA_CONE_FACTOR, hasPerk } from './perks';
+import { NIGHT_CONE_FACTOR } from './gameModes';
+import { playSample, preloadSamples, setListener, setOcclusion } from './audioBank';
+import { bakeAllWalkFrames, walkFrameAt, walkKey } from './walkFrames';
+import CharacterRig, { footOffsetFor, hideHostSprite, preloadCharacterRigs } from './CharacterRig';
+import { cameraZoomFor } from './screenScale';
+import { CHAT_PHRASES, EMOTES, PING_KINDS } from './voice';
 import { FOOD_ITEMS, PICKUP_RANGE_PX } from './itemCatalog';
+import { COMIDA_TEXTURES, texturaDeComida } from './comidas';
 import { VENDORS, SHOP_RANGE_PX } from './shopCatalog';
-import { missionZonesFor, MISSION_RANGE_PX } from './missionCatalog';
+import { missionSitesFor, missionType, MISSION_RANGE_PX } from './missionCatalog';
 import {
   changeFloor,
+  emitLocalEvent,
   getLatestState,
   getMyBuilding,
+  getMyPlayerState,
   getMyRole,
   getBoss,
+  getTravesuras,
+  getProjectiles,
+  loadHideSpots,
+  setNearHide,
+  requestHide,
+  getPuddles,
   getZombies,
   isInputLocked,
   onStateChange,
   reportPosition,
   requestAttack,
   requestPickup,
+  requestEquip,
+  requestReload,
+  requestReviveStart,
+  requestReviveCancel,
+  setNearDowned,
+  getSpectateTarget,
+  setSpectateTarget,
+  spectatableTeammates,
+  getBarricades,
+  requestPlaceBarricade,
+  requestRepairBarricade,
+  requestDismantleBarricade,
+  setNearBarricade,
+  getAbilityPanel,
+  setAbilityPanel,
+  onGameEvent,
+  getKinderEvent,
+  requestEventInteract,
+  setNearEvent,
   setNearVendor,
   setNearMission,
   setNearDoor,
   setNearStairs,
   touchInput,
-  requestMissionComplete,
 } from './gameSync';
 import ZombieLayer from './ZombieLayer';
+import WeaponLayer from './WeaponLayer';
+import { ownedWeapons, weaponById } from './weaponCatalog';
+import { BARRICADE_REPAIR_RANGE_PX } from './abilityCatalog';
+import { channelVolume, getSettings, onSettingsChange, updateSettings, vibrate } from './settings';
+import { createPerfMonitor } from './perfMonitor';
+import { publishFps, resetLiveStats } from './liveStats';
+import { playSfx } from './sfx';
+import { setMusicIntensity, startMusic } from './music';
 import BossLayer, { preloadBoss } from './BossLayer';
+import TravesurasLayer from './TravesurasLayer';
+import { clearScreenFx } from './screenFx';
 import Lighting from './Lighting';
+import { bakeBaseTextures, GoreFx, SHADOW_KEY, LOCKER_KEY } from './BaseDecor';
+import { bakeNavidadTextures, decorateFloorNavidad, startSnow } from './NavidadDecor';
 import { OUTSIDE_MARGIN_TILES, PROPS_KEY, SHEET_KEY, preloadOutside, renderOutside } from './outsideDecor';
+
+// Cada cuanto se le pasan los FPS al monitor de la calidad automatica (ms).
+const PERF_SAMPLE_MS = 250;
 
 const DASH_SPEED = 420;
 const DASH_MS = 180;
 const DASH_COOLDOWN_MS = 1200;
 
 const ATTACK_REQUEST_MS = 400;
+const LOCAL_HOLDER = '__me';
+// Con el mouse quieto este tiempo se vuelve a apuntar hacia donde camina.
+const MOUSE_AIM_MS = 2500;
+// Asistencia de apuntado (teclado y celular): el zombi mas cercano dentro de este cono.
+const AIM_ASSIST_RAD = Math.PI / 4;
+const SHOT_STEP_PX = 8;
+const SHOT_RADIUS = { normal: 16, tough: 20, boss: 30 };
+const EMPTY_CLICK_MS = 300;
+const WEAPON_KEYS = ['ONE', 'TWO', 'THREE', 'FOUR'];
+const AIM_DIRECTIONS = ['right', 'down', 'left', 'up'];
+// Debe coincidir con GameSession.REVIVE_RANGE_PX / REVIVER_ROLE.
+const REVIVE_RANGE_PX = 80;
+const REVIVER_ROLE = 'SALUD';
+// Con el telefono de camaras abierto, Seguridad camina a esta fraccion de su velocidad.
+const PHONE_SPEED_FACTOR = 0.5;
+const BARRICADE_TEXTURE = 'barricade_planks';
 const CHARGED_COOLDOWN_MS = 6000;
 const CHARGED_RADIUS = 150;
 const FLOOR_FADE_MS = 180;
 const ROAR_RANGE_PX = 260;
 const GROAN_RANGE_PX = 170;
-const BITE_RANGE_PX = 48;
 const FAR_COOLDOWN_MS = 6000;
 const NEAR_COOLDOWN_MS = 1800;
 const MAX_ROAR_VOLUME = 0.75;
 const MAX_GROAN_VOLUME = 0.5;
-const BITE_COOLDOWN_MS = 1500;
+const MAX_BITE_VOLUME = 0.6;
+// Distancia hasta la que se oyen las mordidas, golpes y avisos de otros zombis.
+const COMBAT_HEARING_PX = 520;
+// Solo se avisa con sonido la preparacion de un zombi que esta encima de ti.
+const WINDUP_WARN_PX = 70;
 const RAIN_MIN_VOLUME = 0.3;
 const RAIN_MAX_VOLUME = 0.6;
 const RAIN_SWELL_MS = 11000;
 const TOUCH_DEADZONE = 0.3;
 const REMOTE_LERP_PER_SECOND = 10;
+// Compañeros: su velocidad se mide sobre esta ventana de posiciones del servidor y se
+// suaviza para animar los pasos sin tirones; un salto mayor que REMOTE_JUMP_PX es una
+// correccion, no velocidad.
+const REMOTE_SPEED_WINDOW_MS = 300;
+const REMOTE_VELOCITY_SMOOTH_PER_S = 8;
+const REMOTE_JUMP_PX = 120;
 
 const FACING_RADIANS = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 };
 
@@ -60,9 +139,31 @@ const PLAYER_BODY_FOOT_INSET = 6;
 const MAP_PIXEL_WIDTH = MAP_COLS * TILE;
 const MAP_PIXEL_HEIGHT = MAP_ROWS * TILE;
 const PLAYER_SPEED = 160;
+// Movimiento con inercia: cuanto se acerca por segundo a la velocidad pedida.
+const ACCEL_PER_S = 12;
+const DECEL_PER_S = 16;
+// Correr (Espacio, o el joystick al tope): mas rapido mientras haya energia. El
+// servidor acepta hasta 240 px/s, asi que 1,35x (216) no provoca correcciones.
+const SPRINT_FACTOR = 1.35;
+const STAMINA_DRAIN_PER_S = 0.34;
+// La salida del escape final (GameSession.EXIT_X/EXIT_Y en el servidor).
+const EXIT_POINT = { x: 608, y: 800 };
+const STAMINA_REGEN_PER_S = 0.24;
+const STAMINA_REGEN_DELAY_MS = 600;
+const STAMINA_RECOVERED = 0.35;
+const TOUCH_SPRINT = 0.95;
+// Ayuda en las esquinas: si choca con el borde de una pared, se le corre de lado.
+const CORNER_PROBE_PX = 14;
+const CORNER_NUDGE_SPEED = 110;
+
+const BANNER_TOP_PX = 70;
 
 const WALK_WOBBLE_HZ = 3;
-const WALK_WOBBLE_DEG = 2.5;
+// Letra gotica del tema (GameCanvas espera a que cargue antes de crear la escena).
+const GOTHIC_FONT = '"Pirata One", Georgia, serif';
+const WALK_WOBBLE_DEG = 1.5;
+// Cada cuanto suena un paso al caminar (dos por ciclo de cuatro cuadros).
+const STEP_MS = 230;
 
 const TILE_TEXTURE_FILES = {
   v2_floor_terrazo: 'v2_floor_terrazo_64.png',
@@ -94,9 +195,6 @@ const STAIRS_ARROW_GLYPH = { up: '▲', down: '▼' };
 
 const ITEM_TYPE_COLORS = { WEAPON: 0x8a3b3b, FOOD: 0x3b8a4e, AMMO: 0x8a7a3b };
 
-// Las 4 misiones son interactivas (abren un minijuego), sin importar en cual de las
-// 3 salas de su rol viva cada instancia — por eso se compara por rol, no por missionId.
-const INTERACTIVE_MISSION_ROLES = new Set(['SEGURIDAD', 'SALUD', 'ECONOMIA', 'INFRAESTRUCTURA']);
 
 const DIRECTIONS = ['down', 'up', 'right', 'left'];
 
@@ -119,7 +217,7 @@ export default class MainScene extends Phaser.Scene {
     this.doors = [];
     this.foodItems = [];
     this.vendors = [];
-    this.missionZones = [];
+    this.missionMarkers = new Map();
     this.unsubscribeGameState = null;
     this.zombieLayer = null;
     this.remotePlayers = new Map();
@@ -140,8 +238,17 @@ export default class MainScene extends Phaser.Scene {
 
   init(data) {
     this.remotePlayers = new Map();
-    this.floor = data?.floor ?? 1;
-    this.spawnOverride = data?.spawn ?? null;
+    // Al volver de una desconexion la escena arranca donde el servidor tiene al jugador.
+    const me = getMyPlayerState();
+    this.floor = data?.floor ?? me?.floor ?? 1;
+    this.spawnOverride = data?.spawn ?? (me ? { x: me.x, y: me.y } : null);
+    // Caido y mirando a un compañero: la escena muestra el piso de ese compañero.
+    this.spectating = Boolean(data?.spectating);
+    this.reviving = null;
+    // Los sprites del piso anterior ya se destruyeron con la escena.
+    this.acidSprites = new Map();
+    this.barricadeSprites = new Map();
+    this.eventMarker = null;
     this.changingFloor = false;
     this.spritePrefix = roleInfo(getMyRole()).spritePrefix;
   }
@@ -151,6 +258,7 @@ export default class MainScene extends Phaser.Scene {
   }
 
   preload() {
+    preloadCharacterRigs(this);
     ROLE_CATALOG.forEach(({ spritePrefix }) => {
       DIRECTIONS.forEach((direction) => {
         this.load.image(`${spritePrefix}_${direction}`, `/sprites/${spritePrefix}_${direction}.png`);
@@ -161,6 +269,7 @@ export default class MainScene extends Phaser.Scene {
       this.load.image(key, `/tiles/${file}`);
     });
 
+    Object.entries(COMIDA_TEXTURES).forEach(([key, file]) => this.load.image(key, file));
     VENDORS.forEach((vendor) => {
       this.load.image(vendor.sprite, vendor.spriteFile);
     });
@@ -177,13 +286,285 @@ export default class MainScene extends Phaser.Scene {
   startRain() {
     // El sound manager es global: la lluvia sigue sonando al cambiar de piso.
     if (this.sound.get('rain')) return;
-    this.sound.add('rain', { loop: true, volume: RAIN_MIN_VOLUME }).play();
+    this.sound.add('rain', { loop: true, volume: RAIN_MIN_VOLUME * channelVolume('ambient') }).play();
   }
 
-  playZombieSound(key, volume) {
+  playZombieSound(key, volume, pan = 0) {
     const sound = this.sound.get(key) ?? this.sound.add(key);
     if (sound.isPlaying) return;
-    sound.play({ volume });
+    sound.play({ volume: volume * channelVolume('zombies'), pan });
+  }
+
+  // 1 pegado al jugador, bajando hasta 0 a COMBAT_HEARING_PX.
+  // Energia: baja mientras corre, se recupera despues de un rato sin correr. Si se
+  // agota, no deja correr hasta recuperar un tercio.
+  updateStamina(time, delta, moving) {
+    const wants = this.sprintKey.isDown || touchInput.sprint || Math.hypot(touchInput.moveX, touchInput.moveY) >= TOUCH_SPRINT;
+    const sprinting = wants && moving && !this.exhausted && this.stamina > 0;
+    if (sprinting) {
+      const drain = STAMINA_DRAIN_PER_S * (hasPerk(getMyPlayerState(), 'ENERGIA') ? ENERGIA_DRAIN_FACTOR : 1);
+      this.stamina = Math.max(0, this.stamina - (drain * delta) / 1000);
+      this.lastSprintAt = time;
+      if (this.stamina === 0) this.exhausted = true;
+    } else if (time - this.lastSprintAt > STAMINA_REGEN_DELAY_MS) {
+      this.stamina = Math.min(1, this.stamina + (STAMINA_REGEN_PER_S * delta) / 1000);
+      if (this.exhausted && this.stamina >= STAMINA_RECOVERED) this.exhausted = false;
+    }
+    setStamina(this.stamina, this.exhausted);
+    return sprinting;
+  }
+
+  // Si va derecho contra una pared pero un costado del cuerpo cabe por el hueco de al
+  // lado (una puerta, una esquina), lo corre hacia el hueco en vez de trabarlo.
+  cornerNudge(vx, vy) {
+    const body = this.player.body;
+    const nudge = { x: 0, y: 0 };
+    if (vx !== 0 && vy === 0 && (body.blocked.left || body.blocked.right)) {
+      const aheadX = vx > 0 ? body.right + 4 : body.left - 4;
+      const topOpen = this.isOpenAt(aheadX, body.top - CORNER_PROBE_PX);
+      const bottomOpen = this.isOpenAt(aheadX, body.bottom + CORNER_PROBE_PX);
+      if (topOpen && !bottomOpen) nudge.y = -CORNER_NUDGE_SPEED;
+      else if (bottomOpen && !topOpen) nudge.y = CORNER_NUDGE_SPEED;
+    } else if (vy !== 0 && vx === 0 && (body.blocked.up || body.blocked.down)) {
+      const aheadY = vy > 0 ? body.bottom + 4 : body.top - 4;
+      const leftOpen = this.isOpenAt(body.left - CORNER_PROBE_PX, aheadY);
+      const rightOpen = this.isOpenAt(body.right + CORNER_PROBE_PX, aheadY);
+      if (leftOpen && !rightOpen) nudge.x = -CORNER_NUDGE_SPEED;
+      else if (rightOpen && !leftOpen) nudge.x = CORNER_NUDGE_SPEED;
+    }
+    return nudge;
+  }
+
+  // Armarios: E junto a uno libre para esconderse y E otra vez para salir. Mientras
+  // esta adentro el jugador no se mueve ni ataca. Devuelve true si esta escondido.
+  updateHide() {
+    const me = getMyPlayerState();
+    const hiddenIn = me?.hidingIn ?? null;
+    const occupied = new Set(getLatestState().players.map((p) => p.hidingIn).filter(Boolean));
+    let near = null;
+    if (!hiddenIn && !this.spectating) {
+      this.lockers.forEach((locker) => {
+        const distance = Math.hypot(this.player.x - locker.x, this.player.y - locker.y);
+        if (distance <= 70 && !occupied.has(locker.id) && (!near || distance < near.distance)) near = { ...locker, distance };
+      });
+    }
+    setNearHide(hiddenIn ? { hidden: true, ms: me.hiddenMs } : near && { id: near.id });
+    this.lockers.forEach((locker) => {
+      // El armario ocupado tiembla un poco de vez en cuando.
+      const shaking = occupied.has(locker.id) && Math.random() < 0.04;
+      locker.image.setX(locker.x + (shaking ? (Math.random() - 0.5) * 3 : 0));
+    });
+    if ((near || hiddenIn) && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      requestHide();
+      const locker = this.lockers.find((l) => l.id === (hiddenIn ?? near.id));
+      if (locker) playSample(hiddenIn ? 'doorOpen' : 'doorClose', { channel: 'ambient', volume: 0.6, rate: 1.4 });
+    }
+    this.player.setAlpha(hiddenIn ? 0.12 : 1);
+    this.playerShadow?.setVisible(!hiddenIn && this.player.visible);
+    return Boolean(hiddenIn);
+  }
+
+  /**
+   * Cada 250 ms publica los FPS (para el indicador) y se los pasa al monitor de la
+   * calidad automatica: si este pide bajar la calidad y el jugador lo permite, activa el
+   * modo de rendimiento y avisa en el HUD.
+   */
+  watchPerformance(time) {
+    if (time - this.perfSampleAt < PERF_SAMPLE_MS) return;
+    this.perfSampleAt = time;
+    publishFps(this.game.loop.actualFps);
+    const settings = getSettings();
+    if (!settings.autoPerf || settings.lowPerf) return;
+    if (this.perfMonitor.sample(this.game.loop.actualFps, time) !== 'lower') return;
+    updateSettings({ lowPerf: true });
+    emitLocalEvent({ type: 'AUTO_PERF', playerId: getMyRole() });
+  }
+
+  /**
+   * Modo de rendimiento en vivo: luz mas simple y sin neblina, menos sangre y sin nieve.
+   * Se llama al crear el piso y cada vez que cambia el ajuste.
+   */
+  applyLowPerf(lowPerf) {
+    if (this.appliedLowPerf === lowPerf) return;
+    this.appliedLowPerf = lowPerf;
+    this.lighting?.setLowPerf(lowPerf);
+    this.gore?.setLowPerf(lowPerf);
+    if (lowPerf) {
+      this.snow?.destroy();
+      this.snow = null;
+    } else if (!this.snow && this.player) {
+      this.snow = startSnow(this, this.player);
+    }
+  }
+
+  // Disfraz encima del personaje. `holder` guarda la imagen. Sin disfraz, el personaje
+  // de 16 direcciones lleva el gorro de Santa sincronizado con cada pose (CharacterRig);
+  // un disfraz de cabeza se lo saca y uno de cuello (bufanda, guirnalda) va con el.
+  // Sin rig (o sin gorro en el atlas) se usa el gorrito de lana de siempre.
+  syncCostume(holder, sprite, id, rig = null) {
+    const santaHat = Boolean(rig?.hasHat);
+    const wanted = id ?? (santaHat ? null : DEFAULT_COSTUME);
+    const costume = wanted && COSTUME_LAYOUT[wanted] ? wanted : null;
+    rig?.setHat(!costume || COSTUME_LAYOUT[costume].anchor !== 'head');
+    if (holder.costumeId !== costume) {
+      holder.costumeImage?.destroy();
+      holder.costumeImage = costume ? this.add.image(sprite.x, sprite.y, costumeKey(costume)) : null;
+      holder.costumeId = costume;
+    }
+    const image = holder.costumeImage;
+    if (!image) return;
+    const layout = COSTUME_LAYOUT[costume];
+    if (rig) {
+      // Sobre la cabeza de la pose que se esta dibujando (16 direcciones, acostado...).
+      const head = rig.headPoint((layout.anchor === 'neck' ? NECK_Y : HEAD_Y) + layout.dy - 1);
+      image
+        .setPosition(head.x, head.y)
+        .setScale(layout.scale)
+        .setAngle(head.angle)
+        .setFlipX(head.flip)
+        .setVisible(sprite.visible)
+        .setAlpha(sprite.alpha)
+        .setDepth(rig.depth + (layout.anchor === 'neck' ? -0.2 : 0.2));
+      return;
+    }
+    const top = sprite.y - sprite.displayHeight / 2;
+    const y = top + (layout.anchor === 'neck' ? NECK_Y : HEAD_Y) + layout.dy;
+    image
+      .setPosition(sprite.x, y)
+      .setScale(layout.scale)
+      .setAngle(sprite.angle)
+      .setFlipX(sprite.texture.key.includes('_left'))
+      .setVisible(sprite.visible)
+      .setAlpha(sprite.alpha)
+      .setDepth(sprite.depth + (layout.anchor === 'neck' ? -0.2 : 0.2));
+  }
+
+  // Superficie bajo los pies: escalera y descanso de madera, el resto baldosa/concreto.
+  surfaceAt(x, y) {
+    const cell = this.layoutGrid?.[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
+    if (cell?.type === 'stair' || cell?.type === 'landing') return 'stepWood';
+    return 'stepConcrete';
+  }
+
+  // Un paso cada vez que el ciclo de caminar cruza un apoyo (cada STEP_MS).
+  stepSounds(fromMs, toMs, x, y, volume, located = false) {
+    if (Math.floor(toMs / STEP_MS) === Math.floor(fromMs / STEP_MS)) return;
+    const at = located ? { x, y, floor: this.floor } : null;
+    playSample(this.surfaceAt(x, y + 40), { channel: 'ambient', volume, variance: 0.12, at });
+  }
+
+  // true si entre los dos puntos hay una pared o una puerta cerrada (cada 24 px).
+  wallBetween(x1, y1, x2, y2) {
+    const steps = Math.ceil(Math.hypot(x2 - x1, y2 - y1) / 24);
+    for (let i = 1; i < steps; i += 1) {
+      if (!this.isOpenAt(x1 + ((x2 - x1) * i) / steps, y1 + ((y2 - y1) * i) / steps)) return true;
+    }
+    return false;
+  }
+
+  hearing(x, y) {
+    if (!this.player) return 0;
+    const distance = Math.hypot(this.player.x - x, this.player.y - y);
+    return Math.max(0, 1 - distance / COMBAT_HEARING_PX) ** 1.5;
+  }
+
+  // Jugador (local o remoto) mas cercano: hacia ahi embiste el zombi al morder.
+  nearestPlayerTo(x, y) {
+    let best = this.player ? { x: this.player.x, y: this.player.y } : null;
+    let bestDistance = best ? Math.hypot(best.x - x, best.y - y) : Infinity;
+    this.remotePlayers.forEach(({ sprite }) => {
+      const distance = Math.hypot(sprite.x - x, sprite.y - y);
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        best = { x: sprite.x, y: sprite.y };
+      }
+    });
+    return best;
+  }
+
+  zombieHooks() {
+    return {
+      onWindup: (entry) => {
+        if (entry.screaming) {
+          // Griton: alarido agudo y ondas violetas.
+          playSample('ghost', { channel: 'zombies', volume: 1, rate: 1.7, at: { x: entry.x, y: entry.y, floor: this.floor } });
+          [0, 180, 360].forEach((delay) => {
+            const wave = this.add.circle(entry.x, entry.y, 20, 0xd94aff, 0).setStrokeStyle(4, 0xd94aff, 0.8).setDepth(5002);
+            this.tweens.add({ targets: wave, radius: 260, alpha: 0, delay, duration: 700, onComplete: () => wave.destroy() });
+          });
+          return;
+        }
+        if (entry.spitting) {
+          playSfx('spitCharge', this.hearing(entry.x, entry.y));
+          return;
+        }
+        if (Math.hypot(this.player.x - entry.x, this.player.y - entry.y) <= WINDUP_WARN_PX) playSfx('warn');
+      },
+      onStrike: (entry) => {
+        if (entry.spitting) {
+          playSfx('spit', this.hearing(entry.x, entry.y));
+          return;
+        }
+        const volume = MAX_BITE_VOLUME * this.hearing(entry.x, entry.y) * channelVolume('zombies');
+        if (volume > 0.01) this.sound.play('zombie_attack', { volume });
+      },
+      onStagger: (entry) => playSfx('stagger', this.hearing(entry.x, entry.y)),
+      onHit: (entry, amount) => {
+        playSfx('hit', this.hearing(entry.x, entry.y), { x: entry.x, y: entry.y, floor: this.floor });
+        const from = this.nearestPlayerTo(entry.x, entry.y) ?? { x: entry.x, y: entry.y - 1 };
+        this.gore.splatter(entry.x, entry.y, from.x, from.y);
+        this.gore.blood(entry.x, entry.y);
+        // La vida de los zombis es de pocos puntos: se muestra por 10 para que se sienta.
+        if (amount > 0) this.gore.damageNumber(entry.x, entry.y - 34, amount * 10, { crit: amount >= 3 });
+      },
+      onDeath: (entry) => {
+        if (entry.deathStyle === 'corpse') this.gore.blood(entry.x, entry.y + 4, { big: true });
+        else this.gore.burst(entry.x, entry.y + 6, entry.kind === 'SPITTER' ? 0x7fdc2a : 0x6e0b0b);
+      },
+    };
+  }
+
+  // Mordida (o golpe del jefe) recibida: destello, sacudida, numero flotante y vibracion.
+  checkDamageTaken() {
+    const me = getMyPlayerState();
+    if (!me) return;
+    const previous = this.lastHealth;
+    this.lastHealth = me.health;
+    if (previous == null || me.health >= previous) return;
+
+    const amount = previous - me.health;
+    this.player.setTint(0xff4040);
+    this.time.delayedCall(140, () => {
+      if (!this.spectating) this.player?.clearTint();
+    });
+    if (getSettings().screenShake) this.cameras.main.shake(140, 0.006);
+    playSfx('hurt');
+    vibrate(amount >= 7 ? [70, 40, 70] : 60);
+
+    const label = this.add
+      .text(this.player.x, this.player.y - this.player.height / 2, `-${amount}`, {
+        fontFamily: 'sans-serif',
+        fontSize: '20px',
+        fontStyle: 'bold',
+        color: '#ff5a5a',
+        stroke: '#1a0000',
+        strokeThickness: 4,
+      })
+      .setOrigin(0.5)
+      .setDepth(6000);
+    this.tweens.add({
+      targets: label,
+      y: label.y - 34,
+      alpha: 0,
+      duration: 650,
+      ease: 'Cubic.easeOut',
+      onComplete: () => label.destroy(),
+    });
+  }
+
+  applyCameraZoom() {
+    const { width, height } = this.scale;
+    this.cameras.main.setZoom(cameraZoomFor(width, height));
   }
 
   // La lluvia sube y baja despacio para no ser un ruido constante.
@@ -191,33 +572,31 @@ export default class MainScene extends Phaser.Scene {
     const rain = this.sound.get('rain');
     if (!rain) return;
     const swell = 0.5 + 0.5 * Math.sin((time / RAIN_SWELL_MS) * Math.PI * 2);
-    rain.setVolume(RAIN_MIN_VOLUME + (RAIN_MAX_VOLUME - RAIN_MIN_VOLUME) * swell);
+    rain.setVolume((RAIN_MIN_VOLUME + (RAIN_MAX_VOLUME - RAIN_MIN_VOLUME) * swell) * channelVolume('ambient'));
   }
 
   // Cuanto mas cerca el zombi, mas fuerte y mas seguido suena.
   updateZombieAudio(time) {
     let nearest = null;
-    let bite = false;
 
     this.zombiesOnFloor().forEach((zombie) => {
       const distance = Math.hypot(this.player.x - zombie.x, this.player.y - zombie.y);
-      if (distance <= BITE_RANGE_PX) bite = true;
       const range = zombie.tough ? ROAR_RANGE_PX : GROAN_RANGE_PX;
       if (distance > range) return;
       const closeness = 1 - distance / range;
-      if (!nearest || closeness > nearest.closeness) nearest = { closeness, tough: zombie.tough };
+      if (!nearest || closeness > nearest.closeness) {
+        const behindWall = this.wallBetween(this.player.x, this.player.y, zombie.x, zombie.y);
+        nearest = { closeness: behindWall ? closeness * 0.55 : closeness, tough: zombie.tough, dx: zombie.x - this.player.x };
+      }
     });
 
-    if (bite && time >= this.nextBiteSoundAt) {
-      this.nextBiteSoundAt = time + BITE_COOLDOWN_MS;
-      this.playZombieSound('zombie_attack', 0.5);
-    }
     if (!nearest || time < this.nextZombieSoundAt) return;
 
-    const { closeness, tough } = nearest;
+    const { closeness, tough, dx } = nearest;
     this.nextZombieSoundAt = time + FAR_COOLDOWN_MS - (FAR_COOLDOWN_MS - NEAR_COOLDOWN_MS) * closeness;
     const volume = (tough ? MAX_ROAR_VOLUME : MAX_GROAN_VOLUME) * (0.15 + 0.85 * closeness * closeness);
-    this.playZombieSound(tough ? 'zombie_roar' : 'zombie_groan', volume);
+    // Se oye del lado de donde viene el zombi.
+    this.playZombieSound(tough ? 'zombie_roar' : 'zombie_groan', volume, Math.max(-0.85, Math.min(0.85, dx / 520)));
   }
 
   create() {
@@ -226,10 +605,25 @@ export default class MainScene extends Phaser.Scene {
     this.createMap(layout);
 
     const spawn = this.spawnOverride ?? layout.spawn;
+    bakeAllWalkFrames(this, ROLE_CATALOG.map((entry) => entry.spritePrefix));
+    bakeCostumes(this);
     this.player = this.physics.add.sprite(spawn.x, spawn.y, this.roleTexture('down'));
 
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10);
+    // El sprite con fisica no cambia (mismas texturas y cuerpo de colision); lo que se ve
+    // es el personaje de 16 direcciones que lo sigue.
+    hideHostSprite(this.player);
+    this.playerFootOffset = footOffsetFor(this, this.spritePrefix);
+    this.playerRig = new CharacterRig(this, this.spritePrefix, spawn.x, spawn.y + this.playerFootOffset);
+    this.playerShadow = this.add.image(spawn.x, spawn.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
+    // La escena se reusa al cambiar de piso: la nieve vieja ya se destruyo con ella.
+    this.snow = null;
+    this.appliedLowPerf = undefined;
+    this.applyLowPerf(getSettings().lowPerf);
+    this.perfMonitor = createPerfMonitor();
+    this.perfSampleAt = 0;
+    const offSettings = onSettingsChange((settings) => this.applyLowPerf(settings.lowPerf));
 
     this.player.body.setSize(PLAYER_BODY_WIDTH, PLAYER_BODY_HEIGHT);
     this.player.body.setOffset(
@@ -242,17 +636,41 @@ export default class MainScene extends Phaser.Scene {
     const outside = OUTSIDE_MARGIN_TILES * TILE;
     this.cameras.main.setBounds(-outside, -outside, MAP_PIXEL_WIDTH + 2 * outside, MAP_PIXEL_HEIGHT + 2 * outside);
     this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.applyCameraZoom();
+    this.scale.on('resize', this.applyCameraZoom, this);
 
     this.cursors = this.input.keyboard.createCursorKeys();
     this.dashKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SHIFT);
+    this.sprintKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
+    this.stamina = 1;
+    this.exhausted = false;
+    this.lastSprintAt = -Infinity;
     this.attackKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.Q);
     this.attackAltKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.J);
     this.chargedKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.C);
     this.interactKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.E);
     this.input.keyboard.addCapture([Phaser.Input.Keyboard.KeyCodes.Q, Phaser.Input.Keyboard.KeyCodes.C]);
     this.input.mouse?.disableContextMenu();
-    this.zombieLayer = new ZombieLayer(this);
+    this.weaponLayer = new WeaponLayer(this, { onDraw: () => playSfx('draw') });
+    this.weaponKeys = WEAPON_KEYS.map((name) => this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes[name]));
+    this.reloadKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+    this.abilityKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+    this.dismantleKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.T);
+    this.bakeBarricadeTexture();
+    this.aimAngle = this.facingAngle;
+    this.mouseAimAt = -Infinity;
+    this.weaponSynced = false;
+    this.wasReloading = false;
+    this.nextEmptyClickAt = 0;
+    this.input.on('pointermove', (pointer) => {
+      if (!pointer.wasTouch) this.mouseAimAt = this.time.now;
+    });
+    this.zombieLayer = new ZombieLayer(this, {
+      hooks: this.zombieHooks(),
+      findTarget: (x, y) => this.nearestPlayerTo(x, y),
+    });
     this.bossLayer = new BossLayer(this);
+    this.travesurasLayer = new TravesurasLayer(this);
     this.wasd = this.input.keyboard.addKeys({
       up: Phaser.Input.Keyboard.KeyCodes.W,
       down: Phaser.Input.Keyboard.KeyCodes.S,
@@ -260,35 +678,73 @@ export default class MainScene extends Phaser.Scene {
       right: Phaser.Input.Keyboard.KeyCodes.D,
     });
 
-    this.nextBiteSoundAt = 0;
     this.nextZombieSoundAt = 0;
+    this.lastHealth = null;
+    startMusic(this.musicLevel());
     this.startRain();
     this.createFoodItems();
     this.createVendors();
-    this.createMissionZones();
-    changeFloor(this.floor, Math.round(spawn.x), Math.round(spawn.y));
+    this.missionMarkers = new Map();
+    if (this.spectating) {
+      this.enterSpectate();
+    } else {
+      changeFloor(this.floor, Math.round(spawn.x), Math.round(spawn.y));
+    }
+    this.reviveGfx = this.add.graphics().setDepth(5500);
     this.cameras.main.fadeIn(FLOOR_FADE_MS);
     this.showFloorBanner(layout.name);
+    this.pingLayer = new PingLayer(this);
+    this.lockers = [];
+    loadHideSpots(getMyBuilding()).then((spots) => {
+      if (!this.sys.isActive()) return;
+      this.lockers = spots.filter((spot) => spot.floor === this.floor).map((spot) => ({
+        ...spot,
+        image: this.add.image(spot.x, spot.y - 6, LOCKER_KEY).setDepth(spot.y + 30),
+      }));
+    });
+    preloadSamples();
+    setOcclusion((x1, y1, x2, y2) => this.wallBetween(x1, y1, x2, y2));
+    // El servidor rechazo una posicion (movimiento imposible): se vuelve a la suya.
+    // Los avisos del equipo de este piso se marcan en el mapa.
+    const offCorrection = onGameEvent((event) => {
+      if (event.type === 'POSITION_CORRECTED' && event.playerId === getMyRole()) this.applyServerPosition();
+      if (event.type === 'PING') this.showPing(event);
+      if (event.type === 'CHAT') this.showChat(event);
+    });
     this.events.once('shutdown', () => {
+      offCorrection();
+      offSettings();
+      resetLiveStats();
+      this.scale.off('resize', this.applyCameraZoom, this);
+      this.weaponLayer?.destroy();
+      setNearBarricade(null);
+      if (this.reviving) requestReviveCancel();
+      setNearDowned(null);
       this.unsubscribeGameState?.();
       this.lighting?.destroy();
       setNearVendor(null);
       setNearStairs(null);
+      this.travesurasLayer?.destroy();
+      clearScreenFx();
     });
   }
 
   showFloorBanner(name) {
+    // Fijo a la pantalla: con zoom el texto se compensa para quedar arriba y del mismo tamano.
+    const zoom = this.cameras.main.zoom;
+    const { width, height } = this.scale;
     const banner = this.add
-      .text(this.scale.width / 2, 70, name, {
-        fontFamily: 'sans-serif',
-        fontSize: '30px',
-        fontStyle: 'bold',
-        color: '#f2fbe2',
-        stroke: '#0b120b',
-        strokeThickness: 6,
+      .text(width / 2, height / 2 + (BANNER_TOP_PX - height / 2) / zoom, name, {
+        fontFamily: GOTHIC_FONT,
+        fontSize: '40px',
+        color: '#ecdfcc',
+        stroke: '#3a0505',
+        strokeThickness: 7,
+        shadow: { offsetX: 0, offsetY: 0, color: '#e8321f', blur: 14, fill: true, stroke: true },
       })
       .setOrigin(0.5)
       .setScrollFactor(0)
+      .setScale(1 / zoom)
       .setDepth(6000);
     this.tweens.add({ targets: banner, alpha: 0, delay: 1200, duration: 700, onComplete: () => banner.destroy() });
   }
@@ -301,30 +757,49 @@ export default class MainScene extends Phaser.Scene {
     });
   }
 
-  createMissionZones() {
-    this.missionZones = missionZonesFor(getMyBuilding()).filter((zone) => zone.floor === this.floor).map((zone) => {
-      const mine = zone.role === getMyRole();
-      // En vez del nombre del salón, se marca con el objeto característico del rol
-      // (p.ej. 🧮 para Economía) y solo dice "Misión" — así no delata cuál de las 3
-      // salas posibles de ese rol es, en cualquier piso.
-      this.add
-        .text(zone.x, zone.y, `${roleInfo(zone.role).missionIcon}\nMisión`, {
-          fontFamily: 'sans-serif',
-          fontSize: '13px',
-          color: '#ffffff',
+  // Marcadores de MIS misiones pendientes en este piso (las reparte el servidor por Kinder).
+  syncMissionMarkers() {
+    const me = getMyPlayerState();
+    const pending = (me?.missions ?? []).filter((m) => !m.done && m.floor === this.floor);
+    const keep = new Set(pending.map((m) => m.missionId));
+
+    this.missionMarkers.forEach((marker, id) => {
+      if (keep.has(id)) return;
+      this.tweens.killTweensOf(marker.text);
+      marker.text.destroy();
+      this.missionMarkers.delete(id);
+    });
+    pending.forEach((mission) => {
+      if (this.missionMarkers.has(mission.missionId)) return;
+      const info = missionType(mission.type);
+      const text = this.add
+        .text(mission.x, mission.y, `${info.icon}\nMisión`, {
+          fontFamily: GOTHIC_FONT,
+          fontSize: '16px',
+          color: '#e8b64a',
           align: 'center',
-          backgroundColor: mine ? '#5b3fa0' : '#3a3a44',
-          padding: { x: 5, y: 3 },
+          backgroundColor: 'rgba(30, 8, 10, 0.9)',
+          padding: { x: 7, y: 4 },
+          stroke: '#120406',
+          strokeThickness: 2,
         })
         .setOrigin(0.5)
         .setDepth(4)
-        .setAlpha(mine ? 0.95 : 0.55);
-      return { ...zone, mine, inRange: false };
+        .setAlpha(0.95);
+      this.tweens.add({ targets: text, scale: 1.12, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.missionMarkers.set(mission.missionId, { text, mission });
     });
   }
 
   createFoodItems() {
     this.foodItems = FOOD_ITEMS.filter((item) => item.floor === this.floor).map((item) => {
+      // En Navidad la comida se ve como lo que es (bunuelo, natilla...) y flota un poco.
+      const texture = texturaDeComida(item.itemId);
+      if (texture && this.textures.exists(texture)) {
+        const rect = this.add.image(item.x, item.y, texture).setScale(0.55).setDepth(3);
+        this.tweens.add({ targets: rect, y: item.y - 5, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+        return { ...item, rect, inRange: false };
+      }
       const rect = this.add
         .rectangle(item.x, item.y, 26, 26, ITEM_TYPE_COLORS[item.type])
         .setStrokeStyle(2, 0x1f5c2e)
@@ -342,6 +817,11 @@ export default class MainScene extends Phaser.Scene {
         door.open = doorState.open;
         door.image.setTexture(doorState.open ? 'v2_door_madera_open' : 'v2_door_madera');
         door.image.body.enable = !doorState.open;
+        const at = { x: door.x, y: door.y, floor: this.floor };
+        playSample(doorState.open ? 'doorOpen' : 'doorClose', { channel: 'ambient', at });
+        if (doorState.open && Math.random() < 0.6) {
+          this.time.delayedCall(80, () => playSample('creak', { channel: 'ambient', volume: 0.7, at }));
+        }
       });
     });
   }
@@ -382,7 +862,7 @@ export default class MainScene extends Phaser.Scene {
       if (!entry) {
         const sprite = this.add.sprite(state.x, state.y, `${prefix}_down`).setDepth(9);
         const label = this.add
-          .text(state.x, state.y, roleInfo(state.role).name, {
+          .text(state.x, state.y, displayName(state), {
             fontFamily: 'sans-serif',
             fontSize: '11px',
             color: '#ffffff',
@@ -391,44 +871,449 @@ export default class MainScene extends Phaser.Scene {
           })
           .setOrigin(0.5, 1)
           .setDepth(11);
-        entry = { sprite, label, prefix };
+        const shadow = this.add.image(state.x, state.y, SHADOW_KEY).setDisplaySize(36, 13).setDepth(1.6);
+        hideHostSprite(sprite);
+        const footOffset = footOffsetFor(this, prefix);
+        const rig = new CharacterRig(this, prefix, state.x, state.y + footOffset);
+        entry = {
+          sprite, shadow, label, prefix, rig, footOffset, vx: 0, vy: 0,
+          aim: Math.PI / 2, shotSeq: state.shotSeq ?? 0, weaponSeen: false,
+        };
         this.remotePlayers.set(state.playerId, entry);
       }
 
       const dx = state.x - entry.sprite.x;
       const dy = state.y - entry.sprite.y;
       if (Math.hypot(dx, dy) > 3) {
-        const direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
-        entry.sprite.setTexture(`${entry.prefix}_${direction}`);
+        entry.direction = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 'right' : 'left') : (dy > 0 ? 'down' : 'up');
+        entry.aim = Math.atan2(dy, dx);
+        this.stepSounds(entry.walkMs ?? 0, (entry.walkMs ?? 0) + delta, entry.sprite.x, entry.sprite.y, 0.35, true);
+        entry.walkMs = (entry.walkMs ?? 0) + delta;
+        entry.sprite.setTexture(walkKey(entry.prefix, entry.direction, walkFrameAt(entry.walkMs)));
+      } else if (entry.walkMs) {
+        entry.walkMs = 0;
+        entry.sprite.setTexture(`${entry.prefix}_${entry.direction ?? 'down'}`);
+      }
+      if ((state.shotSeq ?? 0) > entry.shotSeq) {
+        // Un compañero disparo: se dibuja su bala con la direccion que reporto el servidor.
+        entry.shotSeq = state.shotSeq;
+        entry.aim = state.shotFacing;
+        const weapon = weaponById(state.weapon);
+        const end = this.traceShot(entry.sprite.x, entry.sprite.y, state.shotFacing, weapon);
+        this.weaponLayer.fire(state.playerId, end, { heavy: weapon.id === 'RIFLE' });
+        playSfx(weapon.id === 'RIFLE' ? 'rifle' : 'pistol', 0.7 * this.hearing(entry.sprite.x, entry.sprite.y),
+          { x: entry.sprite.x, y: entry.sprite.y, floor: this.floor });
       }
       const blend = Math.min(1, (delta / 1000) * REMOTE_LERP_PER_SECOND);
       entry.sprite.x += dx * blend;
       entry.sprite.y += dy * blend;
-      entry.sprite.setAlpha(state.lifeState === 'DOWNED' ? 0.4 : 1);
+      this.trackRemoteVelocity(entry, state.x, state.y, delta);
+      const downed = state.lifeState === 'DOWNED';
+      entry.sprite.setAlpha(downed ? 0.75 : 1).setAngle(downed ? 90 : 0);
+      if (downed) entry.sprite.setTint(0x9a9a9a);
+      else entry.sprite.clearTint();
+      entry.downed = downed;
+      // Un compañero escondido en un armario (o que ya escapo) no se ve.
+      const hidden = Boolean(state.hidingIn) || Boolean(state.escaped);
+      entry.sprite.setVisible(!hidden);
+      entry.label.setVisible(!hidden);
+      entry.shadow.setVisible(!hidden);
       entry.label.setPosition(entry.sprite.x, entry.sprite.y - entry.sprite.height / 2 - 2);
+      entry.shadow.setPosition(entry.sprite.x, entry.sprite.y + entry.footOffset - 3);
+      const labelText = state.connected === false ? `${displayName(state)} (desconectado)` : displayName(state);
+      if (entry.label.text !== labelText) entry.label.setText(labelText);
+      entry.sprite.setAlpha(state.connected === false ? 0.45 : entry.sprite.alpha);
+      entry.rig.update(delta, entry.sprite, {
+        x: entry.sprite.x,
+        y: entry.sprite.y + entry.footOffset,
+        vx: entry.vx,
+        vy: entry.vy,
+        aim: entry.aim,
+      });
+      this.syncCostume(entry, entry.sprite, state.costume, entry.rig);
+      this.weaponLayer.update(state.playerId, {
+        x: entry.sprite.x,
+        y: entry.sprite.y,
+        aim: entry.aim,
+        depth: entry.rig.depth,
+        weaponId: state.lifeState === 'DOWNED' ? 'FISTS' : (state.weapon ?? 'FISTS'),
+        silent: !entry.weaponSeen,
+      });
+      entry.weaponSeen = true;
     });
 
     this.remotePlayers.forEach((entry, id) => {
       if (seen.has(id)) return;
       entry.sprite.destroy();
+      entry.rig.destroy();
+      entry.shadow.destroy();
+      entry.costumeImage?.destroy();
       entry.label.destroy();
+      this.weaponLayer.remove(id);
       this.remotePlayers.delete(id);
+    });
+  }
+
+  // Velocidad de un compañero para animar sus pasos: lo que avanzo su posicion del
+  // servidor en la ultima ventana de tiempo (las posiciones llegan a tirones por la red,
+  // asi que medir cuadro a cuadro daria picos). El dash de un compañero no se dibuja:
+  // el servidor no lo informa y adivinarlo por la velocidad daba dashes falsos.
+  trackRemoteVelocity(entry, targetX, targetY, delta) {
+    const now = this.time.now;
+    const track = entry.track ?? (entry.track = []);
+    const last = track[track.length - 1];
+    // Un salto (correccion del servidor) no es velocidad: se empieza a medir de nuevo.
+    if (last && Math.hypot(targetX - last.x, targetY - last.y) > REMOTE_JUMP_PX) track.length = 0;
+    track.push({ t: now, x: targetX, y: targetY });
+    while (track.length > 2 && now - track[1].t >= REMOTE_SPEED_WINDOW_MS) track.shift();
+    const oldest = track[0];
+    const span = Math.max(now - oldest.t, 1) / 1000;
+    const wx = (targetX - oldest.x) / span;
+    const wy = (targetY - oldest.y) / span;
+    const k = 1 - Math.exp(-(REMOTE_VELOCITY_SMOOTH_PER_S * delta) / 1000);
+    entry.vx += (wx - entry.vx) * k;
+    entry.vy += (wy - entry.vy) * k;
+  }
+
+  // Evento del Kinder: apagon (oscuridad + tablero) o caja de suministros.
+  syncKinderEvent() {
+    const event = getKinderEvent();
+    this.lighting?.setBlackout(event?.type === 'BLACKOUT');
+    const here = event && event.floor === this.floor ? event : null;
+    if (this.eventMarker && this.eventMarker.id !== here?.id) {
+      this.tweens.killTweensOf(this.eventMarker.text);
+      this.eventMarker.text.destroy();
+      this.eventMarker.glow.destroy();
+      this.eventMarker = null;
+    }
+    if (here && !this.eventMarker) {
+      const blackout = here.type === 'BLACKOUT';
+      const glow = this.add.circle(here.x, here.y, 34, blackout ? 0xffd23f : 0x6fd36f, 0.35)
+        .setDepth(5300).setBlendMode(Phaser.BlendModes.ADD);
+      const text = this.add.text(here.x, here.y, blackout ? '⚡\nTablero' : '📦\nSuministros', {
+        fontFamily: 'sans-serif',
+        fontSize: '14px',
+        fontStyle: 'bold',
+        color: '#ffffff',
+        align: 'center',
+        backgroundColor: blackout ? '#7a5a00' : '#2d6a2d',
+        padding: { x: 6, y: 3 },
+      }).setOrigin(0.5).setDepth(5301);
+      this.tweens.add({ targets: [text, glow], scale: 1.15, duration: 500, yoyo: true, repeat: -1 });
+      this.eventMarker = { id: here.id, text, glow };
+    }
+
+    const near = Boolean(here && this.player && !this.spectating
+      && Math.hypot(this.player.x - here.x, this.player.y - here.y) <= 90);
+    setNearEvent(near);
+    if (near && this.interactKey && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+      requestEventInteract();
+      playSfx(here.type === 'BLACKOUT' ? 'hammer' : 'coins');
+    }
+  }
+
+  bakeBarricadeTexture() {
+    if (this.textures.exists(BARRICADE_TEXTURE)) return;
+    const g = this.make.graphics({ x: 0, y: 0, add: false });
+    g.fillStyle(0x4a2e17, 1).fillRect(6, 10, 6, 48).fillRect(52, 10, 6, 48);
+    [[2, 14], [2, 30], [2, 46]].forEach(([x, y]) => {
+      g.fillStyle(0x8a5a2b, 1).fillRect(x, y, 60, 10);
+      g.fillStyle(0xa8743c, 1).fillRect(x, y, 60, 3);
+      g.fillStyle(0x2b2e33, 1).fillRect(x + 6, y + 4, 3, 3).fillRect(x + 51, y + 4, 3, 3);
+    });
+    g.lineStyle(5, 0x6b4322, 1).lineBetween(8, 54, 56, 16);
+    g.generateTexture(BARRICADE_TEXTURE, 64, 64);
+    g.destroy();
+  }
+
+  // Barricadas de este piso: solidas para el jugador, con barra de vida.
+  syncBarricades() {
+    const seen = new Set();
+    getBarricades().filter((b) => b.floor === this.floor).forEach((b) => {
+      seen.add(b.id);
+      let entry = this.barricadeSprites.get(b.id);
+      if (!entry) {
+        const x = b.col * TILE + TILE / 2;
+        const y = b.row * TILE + TILE / 2;
+        const image = this.physics.add.staticImage(x, y, BARRICADE_TEXTURE).setDepth(y + 20);
+        const collider = this.physics.add.collider(this.player, image);
+        const bar = this.add.graphics().setDepth(5600);
+        image.setScale(0.4);
+        this.tweens.add({ targets: image, scale: 1, duration: 220, ease: 'Back.easeOut', onUpdate: () => image.refreshBody() });
+        entry = { image, collider, bar, x, y, health: b.health };
+        this.barricadeSprites.set(b.id, entry);
+        playSfx('build', this.hearing(x, y), { x, y, floor: this.floor });
+      }
+      if (b.health < entry.health) {
+        this.tweens.add({ targets: entry.image, x: { from: entry.x - 3, to: entry.x + 3 }, duration: 50, yoyo: true, onComplete: () => entry.image.setX(entry.x) });
+      }
+      entry.health = b.health;
+      const pct = b.health / b.maxHealth;
+      entry.bar.clear();
+      entry.bar.fillStyle(0x000000, 0.6).fillRect(entry.x - 26, entry.y - 42, 52, 7);
+      entry.bar.fillStyle(pct > 0.5 ? 0xe8c34a : pct > 0.25 ? 0xe07a3a : 0xc0392b, 1).fillRect(entry.x - 25, entry.y - 41, 50 * pct, 5);
+    });
+    this.barricadeSprites.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      for (let i = 0; i < 6; i += 1) {
+        const plank = this.add.rectangle(entry.x, entry.y, 18, 5, 0x8a5a2b).setDepth(entry.y + 21);
+        this.tweens.add({
+          targets: plank,
+          x: entry.x + Phaser.Math.Between(-40, 40),
+          y: entry.y + Phaser.Math.Between(-30, 30),
+          angle: Phaser.Math.Between(-180, 180),
+          alpha: 0,
+          duration: 500,
+          onComplete: () => plank.destroy(),
+        });
+      }
+      playSfx('breakWood', this.hearing(entry.x, entry.y), { x: entry.x, y: entry.y, floor: this.floor });
+      this.physics.world.removeCollider(entry.collider);
+      entry.image.destroy();
+      entry.bar.destroy();
+      this.barricadeSprites.delete(id);
+    });
+  }
+
+  // Tecla F / boton ★: la habilidad del rol. E repara la barricada (solo Infra). X desmonta para cualquiera.
+  updateAbility() {
+    const me = getMyPlayerState();
+    if (!me) return;
+    const pressed = Phaser.Input.Keyboard.JustDown(this.abilityKey) || touchInput.ability;
+    touchInput.ability = false;
+
+    let near = null;
+    this.barricadeSprites.forEach((entry, id) => {
+      if (Math.hypot(this.player.x - entry.x, this.player.y - entry.y) <= BARRICADE_REPAIR_RANGE_PX) near = { id, ...entry };
+    });
+    setNearBarricade(near ? { barricadeId: near.id, health: near.health } : null);
+
+    if (me.role === 'INFRAESTRUCTURA') {
+      if (near && Phaser.Input.Keyboard.JustDown(this.interactKey)) {
+        requestRepairBarricade(near.id);
+        playSfx('hammer');
+      }
+    }
+
+    if (near && Phaser.Input.Keyboard.JustDown(this.dismantleKey)) {
+      requestDismantleBarricade(near.id);
+      playSfx('hammer');
+    }
+
+    if (!pressed) return;
+    if (me.role === 'SEGURIDAD') {
+      setAbilityPanel(getAbilityPanel() === 'phone' ? null : 'phone');
+      playSfx('click');
+    } else if (me.role === 'ECONOMIA') {
+      setAbilityPanel(getAbilityPanel() === 'treasury' ? null : 'treasury');
+      playSfx('click');
+    } else if (me.role === 'INFRAESTRUCTURA') {
+      requestPlaceBarricade(Math.round(this.player.x), Math.round(this.player.y), this.aimAngle);
+    }
+  }
+
+  // Bolas de acido de los escupidores en este piso: bola verde con estela y salpicadura.
+  syncProjectiles(delta) {
+    if (!this.acidSprites) this.acidSprites = new Map();
+    const seen = new Set();
+    const blend = Math.min(1, (delta / 1000) * 14);
+    getProjectiles().filter((p) => p.floor === this.floor).forEach((p) => {
+      seen.add(p.id);
+      let entry = this.acidSprites.get(p.id);
+      if (!entry) {
+        const glow = this.add.circle(p.x, p.y, 13, 0x9dff3a, 0.25).setDepth(5200).setBlendMode(Phaser.BlendModes.ADD);
+        const ball = this.add.circle(p.x, p.y, 7, 0xb6ff5a, 1).setStrokeStyle(2, 0x3d5a10).setDepth(5201);
+        entry = { glow, ball };
+        this.acidSprites.set(p.id, entry);
+      }
+      const x = entry.ball.x + (p.x - entry.ball.x) * blend;
+      const y = entry.ball.y + (p.y - entry.ball.y) * blend;
+      entry.ball.setPosition(x, y);
+      entry.glow.setPosition(x, y).setScale(0.9 + Math.sin(this.time.now / 60) * 0.15);
+      if (Math.random() < 0.35) {
+        const drop = this.add.circle(x, y, 3, 0x9dff3a, 0.6).setDepth(5199);
+        this.tweens.add({ targets: drop, alpha: 0, scale: 0.3, duration: 260, onComplete: () => drop.destroy() });
+      }
+    });
+    this.acidSprites.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      const splash = this.add.ellipse(entry.ball.x, entry.ball.y + 4, 30, 14, 0x9dff3a, 0.55).setDepth(3);
+      this.tweens.add({ targets: splash, alpha: 0, scaleX: 1.6, duration: 600, onComplete: () => splash.destroy() });
+      playSfx('splash', this.hearing(entry.ball.x, entry.ball.y));
+      entry.ball.destroy();
+      entry.glow.destroy();
+      this.acidSprites.delete(id);
+    });
+  }
+
+  // Emote o frase del chat rapido sobre la cabeza de quien la mando (si esta a la vista).
+  showChat(event) {
+    const mine = event.playerId === getMyRole();
+    const sprite = mine ? this.player : this.remotePlayers.get(event.playerId)?.sprite;
+    if (!sprite?.visible) return;
+    const emote = event.reason === 'EMOTE';
+    const text = emote ? EMOTES[event.itemId] : CHAT_PHRASES[event.itemId];
+    if (!text) return;
+    const bubble = this.add.text(sprite.x, sprite.y - sprite.displayHeight / 2 - 26, text, emote
+      ? { fontSize: '30px' }
+      : { fontFamily: 'Georgia, serif', fontSize: '15px', color: '#1a0d08', backgroundColor: '#f3e6d8', padding: { x: 6, y: 3 } })
+      .setOrigin(0.5).setDepth(6000);
+    const follow = () => bubble.setPosition(sprite.x, bubble.y);
+    this.events.on('update', follow);
+    this.tweens.add({
+      targets: bubble,
+      y: bubble.y - 22,
+      alpha: { from: 1, to: 0 },
+      ease: 'Quad.easeIn',
+      duration: emote ? 2200 : 2800,
+      onComplete: () => {
+        this.events.off('update', follow);
+        bubble.destroy();
+      },
+    });
+  }
+
+  showPing(event) {
+    const [floor, x, y] = String(event.reason ?? '').split(',').map(Number);
+    if (floor !== this.floor || !Number.isFinite(x)) return;
+    const who = displayName(getLatestState().players.find((p) => p.playerId === event.playerId) ?? { role: event.playerId });
+    this.pingLayer.add({ kind: event.itemId, x, y, label: `${who}: ${PING_KINDS[event.itemId]?.label ?? '¡Aquí!'}` });
+  }
+
+  // Escape final: la salida (entrada del piso 1) brilla y una flecha en el borde de la
+  // pantalla apunta hacia ella; si estoy en otro piso, la flecha no aparece (el HUD lo dice).
+  syncExit(time) {
+    const wave = getLatestState().wave;
+    const escaping = Boolean(wave?.escaping);
+    if (escaping && !this.exitMarker) {
+      this.exitMarker = this.add.container(EXIT_POINT.x, EXIT_POINT.y).setDepth(4);
+      const glow = this.add.circle(0, 0, 90, 0x3cff7a, 0.18).setBlendMode(Phaser.BlendModes.ADD);
+      const ring = this.add.circle(0, 0, 90).setStrokeStyle(4, 0x3cff7a, 0.9);
+      const label = this.add.text(0, -110, 'SALIDA', {
+        fontFamily: GOTHIC_FONT, fontSize: '28px', color: '#7dffa6', stroke: '#06140a', strokeThickness: 6,
+      }).setOrigin(0.5);
+      this.exitMarker.add([glow, ring, label]);
+      this.tweens.add({ targets: [glow, ring], scale: 1.15, alpha: 0.5, yoyo: true, repeat: -1, duration: 600 });
+      this.exitArrow = this.add.triangle(0, 0, 0, -14, 10, 10, -10, 10, 0x3cff7a).setDepth(6000).setScrollFactor(0);
+      playSample('creak', { channel: 'sfx', volume: 0.9, rate: 0.7 });
+      if (getSettings().screenShake) this.cameras.main.shake(400, 0.006);
+    } else if (!escaping && this.exitMarker) {
+      this.exitMarker.destroy();
+      this.exitArrow.destroy();
+      this.exitMarker = null;
+      this.exitArrow = null;
+    }
+    if (!this.exitMarker) return;
+    const onExitFloor = this.floor === 1;
+    this.exitMarker.setVisible(onExitFloor);
+    const view = this.cameras.main.worldView;
+    const offscreen = !view.contains(EXIT_POINT.x, EXIT_POINT.y);
+    const me = getMyPlayerState();
+    this.exitArrow.setVisible(onExitFloor && offscreen && !me?.escaped);
+    if (this.exitArrow.visible) {
+      const cam = this.cameras.main;
+      const angle = Math.atan2(EXIT_POINT.y - this.player.y, EXIT_POINT.x - this.player.x);
+      const radius = Math.min(cam.width, cam.height) / 2 - 40;
+      this.exitArrow
+        .setPosition(cam.width / 2 + Math.cos(angle) * radius, cam.height / 2 + Math.sin(angle) * radius)
+        .setRotation(angle + Math.PI / 2)
+        .setAlpha(0.65 + 0.35 * Math.sin(time / 120));
+    }
+  }
+
+  // Explosiones de zombis explosivos: destello, fuego, sangre, sacudida y estruendo.
+  syncBlasts() {
+    if (!this.seenBlasts) this.seenBlasts = new Set();
+    (getLatestState().blasts ?? []).filter((b) => b.floor === this.floor && !this.seenBlasts.has(b.id)).forEach((b) => {
+      this.seenBlasts.add(b.id);
+      const at = { x: b.x, y: b.y, floor: this.floor };
+      playSample('plankBreak', { channel: 'zombies', volume: 1, rate: 0.6, at });
+      playSample('hitHeavy', { channel: 'zombies', volume: 1, rate: 0.5, at });
+      this.lighting?.pulse(b.x, b.y, 300, 260);
+      this.gore.burst(b.x, b.y, 0xff6a1a);
+      const fire = this.add.circle(b.x, b.y, 18, 0xffb347, 0.9).setDepth(5004).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: fire, radius: 95, alpha: 0, duration: 380, onComplete: () => fire.destroy() });
+      const scorch = this.add.ellipse(b.x, b.y + 10, 120, 60, 0x0d0705, 0.55).setDepth(1.5);
+      this.tweens.add({ targets: scorch, alpha: 0, delay: 8000, duration: 1500, onComplete: () => scorch.destroy() });
+      if (getSettings().screenShake && Math.hypot(this.player.x - b.x, this.player.y - b.y) < 500) {
+        this.cameras.main.shake(220, 0.01);
+      }
+    });
+    if (this.seenBlasts.size > 200) this.seenBlasts.clear();
+  }
+
+  // Charcos de acido de los escupidores muertos: verdes, burbujean y se secan.
+  syncPuddles() {
+    if (!this.puddleSprites) this.puddleSprites = new Map();
+    const seen = new Set();
+    getPuddles().filter((p) => p.floor === this.floor).forEach((p) => {
+      seen.add(p.id);
+      let entry = this.puddleSprites.get(p.id);
+      if (!entry) {
+        const pool = this.add.ellipse(p.x, p.y + 10, 20, 9, 0x7fdc2a, 0.7).setDepth(1.55);
+        const glow = this.add.ellipse(p.x, p.y + 10, 90, 40, 0x9dff3a, 0.18).setDepth(1.56).setBlendMode(Phaser.BlendModes.ADD);
+        this.tweens.add({ targets: pool, width: 76, height: 32, duration: 260, ease: 'Quad.easeOut' });
+        entry = { pool, glow, x: p.x, y: p.y + 10 };
+        this.puddleSprites.set(p.id, entry);
+      }
+      const life = Math.min(1, p.remainingMs / 1500);
+      entry.pool.setAlpha(0.7 * life);
+      entry.glow.setAlpha((0.14 + Math.sin(this.time.now / 180) * 0.05) * life);
+      if (Math.random() < 0.12) {
+        const bubble = this.add.circle(entry.x + (Math.random() - 0.5) * 50, entry.y + (Math.random() - 0.5) * 18, 2 + Math.random() * 2, 0xc8ff7a, 0.8).setDepth(1.57);
+        this.tweens.add({ targets: bubble, scale: 1.8, alpha: 0, duration: 380, onComplete: () => bubble.destroy() });
+      }
+    });
+    this.puddleSprites.forEach((entry, id) => {
+      if (seen.has(id)) return;
+      this.tweens.add({ targets: [entry.pool, entry.glow], alpha: 0, duration: 400, onComplete: () => {
+        entry.pool.destroy();
+        entry.glow.destroy();
+      } });
+      this.puddleSprites.delete(id);
     });
   }
 
   // El jefe solo se dibuja si esta en el piso de este jugador.
   syncBoss(delta) {
+    this.syncProjectiles(delta);
+    this.syncBarricades();
+    this.syncKinderEvent();
     const boss = getBoss();
     this.bossLayer.sync(boss && boss.floor === this.floor ? boss : null);
     this.bossLayer.update(delta);
+    this.travesurasLayer.sync(getTravesuras(), this.floor, this.spectating ? null : getMyRole(), delta);
   }
 
   update(time, delta) {
     if (!this.player) return;
+    this.watchPerformance(time);
     this.syncRemotePlayers(delta);
-    this.lighting.update(time, this.player, this.remotePlayers);
+    this.syncPlayerRig(delta);
+    this.playerShadow
+      .setPosition(this.player.x, this.player.y + this.playerFootOffset - 3)
+      .setVisible(this.player.visible);
+    this.syncCostume(this, this.player, getMyPlayerState()?.costume, this.playerRig);
+    // La linterna apunta hacia donde mira el jugador (o el compañero que se espectea).
+    const watched = this.spectating ? this.remotePlayers.get(getSpectateTarget()) : null;
+    const flashlightAim = this.spectating ? (watched?.aim ?? null) : this.aimAngle;
+    this.lighting.coneFactor = (!this.spectating && hasPerk(getMyPlayerState(), 'LINTERNA') ? LINTERNA_CONE_FACTOR : 1)
+      * (getLatestState().lobby?.dailyRule === 'NOCHE_CERRADA' ? NIGHT_CONE_FACTOR : 1);
+    this.lighting.update(time, this.focusSprite(), this.remotePlayers, flashlightAim);
+    const ear = this.focusSprite();
+    if (ear) setListener(ear.x, ear.y, this.floor);
+    this.syncPuddles();
+    this.syncBlasts();
+    this.syncExit(time);
+    this.pingLayer?.update(time);
+    this.checkDamageTaken();
+    this.drawReviveProgress();
+    if (this.updateSpectate(delta)) return;
+    this.updateRevive();
 
-    if (isInputLocked()) {
+    // Control de consola: escribe en las mismas entradas que los botones tactiles.
+    this.padAim = pollGamepad();
+    if (this.updateHide() || isInputLocked()) {
       this.player.setVelocity(0, 0);
       this.zombieLayer.sync(this.zombiesOnFloor());
       this.zombieLayer.update(delta);
@@ -451,9 +1336,11 @@ export default class MainScene extends Phaser.Scene {
     else if (down) direction = direction ?? 'down';
 
     const magnitude = Math.hypot(vx, vy);
+    const sprinting = this.updateStamina(time, delta, magnitude > 0);
+    const speed = PLAYER_SPEED * (getAbilityPanel() === 'phone' ? PHONE_SPEED_FACTOR : 1) * (sprinting ? SPRINT_FACTOR : 1);
     if (magnitude > 0) {
-      vx = (vx / magnitude) * PLAYER_SPEED;
-      vy = (vy / magnitude) * PLAYER_SPEED;
+      vx = (vx / magnitude) * speed;
+      vy = (vy / magnitude) * speed;
 
       this.facingAngle = Math.atan2(vy, vx);
     }
@@ -464,28 +1351,49 @@ export default class MainScene extends Phaser.Scene {
 
       this.player.setVelocity(this.dashVx, this.dashVy);
     } else {
-      this.player.setVelocity(vx, vy);
+      // Inercia: arranca y frena en un instante corto en vez de en seco.
+      const body = this.player.body.velocity;
+      const rate = Math.min(1, ((magnitude > 0 ? ACCEL_PER_S : DECEL_PER_S) * delta) / 1000);
+      let nextX = body.x + (vx - body.x) * rate;
+      let nextY = body.y + (vy - body.y) * rate;
+      if (Math.abs(nextX) < 4 && vx === 0) nextX = 0;
+      if (Math.abs(nextY) < 4 && vy === 0) nextY = 0;
+      const nudge = this.cornerNudge(vx, vy);
+      this.player.setVelocity(nextX + nudge.x, nextY + nudge.y);
 
       if ((this.dashKey.isDown || touchInput.dash) && time >= this.dashReadyAt) {
 
-        const dx = magnitude > 0 ? vx / PLAYER_SPEED : Math.cos(this.facingAngle);
-        const dy = magnitude > 0 ? vy / PLAYER_SPEED : Math.sin(this.facingAngle);
+        const dx = magnitude > 0 ? vx / speed : Math.cos(this.facingAngle);
+        const dy = magnitude > 0 ? vy / speed : Math.sin(this.facingAngle);
         this.dashVx = dx * DASH_SPEED;
         this.dashVy = dy * DASH_SPEED;
         this.dashUntil = time + DASH_MS;
         this.dashReadyAt = time + DASH_COOLDOWN_MS;
-        this.spawnDashTrail();
+        this.playerRig.dash(Math.atan2(dy, dx), DASH_MS);
       }
     }
 
     reportPosition(Math.round(this.player.x), Math.round(this.player.y), time);
+    this.updateAim(time);
+    if (this.padAim != null) this.aimAngle = this.padAim;
+    this.updateWeaponSelection();
+    this.updateAbility();
     this.updateAttack(time);
     this.zombieLayer.sync(this.zombiesOnFloor());
     this.zombieLayer.update(delta);
     this.syncBoss(delta);
 
-    this.player.setTexture(this.roleTexture(this.currentDirection));
+    if (time - this.mouseAimAt < MOUSE_AIM_MS || this.padAim != null) {
+      // Con el mouse (o la palanca derecha) el personaje mira hacia donde apunta.
+      const quarter = Math.round(Phaser.Math.Angle.Wrap(this.aimAngle) / (Math.PI / 2));
+      this.currentDirection = AIM_DIRECTIONS[(quarter + 4) % 4];
+    }
+    this.player.setTexture(direction
+      ? walkKey(this.spritePrefix, this.currentDirection, walkFrameAt(this.walkWobblePhaseMs))
+      : this.roleTexture(this.currentDirection));
+    this.syncLocalWeapon();
     if (direction) {
+      this.stepSounds(this.walkWobblePhaseMs, this.walkWobblePhaseMs + delta, this.player.x, this.player.y, 0.45);
       this.walkWobblePhaseMs += delta;
       const wobble = Math.sin((this.walkWobblePhaseMs / 1000) * WALK_WOBBLE_HZ * Math.PI * 2);
       this.player.setAngle(wobble * WALK_WOBBLE_DEG);
@@ -502,6 +1410,270 @@ export default class MainScene extends Phaser.Scene {
     this.updateMissionProximity();
     this.updateZombieAudio(time);
     this.updateRain(time);
+    setMusicIntensity(this.musicLevel());
+  }
+
+  // Calma en el respiro, latido en el Kinder, peligro con el jefe, cuando ya solo
+  // faltan misiones (la horda no para) o con poca vida.
+  musicLevel() {
+    const wave = getLatestState().wave;
+    const me = getMyPlayerState();
+    if (!wave || wave.victory || wave.restingSeconds > 0) return 0;
+    if (wave.bossStage || wave.waitingForMissions || (me && me.health > 0 && me.health <= 30)) return 2;
+    return 1;
+  }
+
+  applyServerPosition() {
+    const me = getMyPlayerState();
+    if (!me || this.spectating || this.changingFloor) return;
+    this.corrections = (this.corrections ?? 0) + 1;
+    if (me.floor !== this.floor) {
+      this.changingFloor = true;
+      this.scene.restart({ floor: me.floor, spawn: { x: me.x, y: me.y } });
+      return;
+    }
+    this.player.setPosition(me.x, me.y);
+    this.player.setVelocity(0, 0);
+    changeFloor(this.floor, Math.round(me.x), Math.round(me.y));
+  }
+
+  // Lo que ilumina la luz "del jugador": el compañero que se mira si esta caido.
+  focusSprite() {
+    if (!this.spectating) return this.player;
+    return this.remotePlayers.get(getSpectateTarget())?.sprite ?? this.player;
+  }
+
+  enterSpectate() {
+    this.spectating = true;
+    this.player.setVelocity(0, 0);
+    if (this.reviving) {
+      requestReviveCancel();
+      this.reviving = null;
+    }
+    setNearDowned(null);
+    const me = getMyPlayerState();
+    // El cuerpo propio queda tirado donde cayo, si es este piso.
+    if (me && me.floor === this.floor) {
+      this.player.setPosition(me.x, me.y).setAngle(90).setTint(0x9a9a9a).setVisible(true);
+    } else {
+      this.player.setVisible(false);
+    }
+    this.player.body.enable = false;
+    this.cameras.main.stopFollow();
+  }
+
+  exitSpectate(me) {
+    if (me.floor !== this.floor) {
+      this.scene.restart({ floor: me.floor, spawn: { x: me.x, y: me.y } });
+      return;
+    }
+    this.spectating = false;
+    this.player.body.enable = true;
+    this.player.setPosition(me.x, me.y).setAngle(0).clearTint().setVisible(true);
+    this.cameras.main.startFollow(this.player, true, 0.12, 0.12);
+    this.lastHealth = me.health;
+    setSpectateTarget(null);
+  }
+
+  /**
+   * Caido: la camara sigue al compañero elegido (si esta en otro piso, la escena se
+   * recarga en ese piso sin mover al jugador). Devuelve true mientras dura.
+   */
+  updateSpectate(delta) {
+    const me = getMyPlayerState();
+    if (!me) return false;
+    const downed = me.lifeState === 'DOWNED';
+    if (!downed) {
+      if (this.spectating) this.exitSpectate(me);
+      return this.spectating;
+    }
+    if (!this.spectating) this.enterSpectate();
+
+    const teammates = spectatableTeammates();
+    let target = teammates.find((p) => p.playerId === getSpectateTarget());
+    if (!target && teammates.length > 0) {
+      target = teammates[0];
+      setSpectateTarget(target.playerId);
+    }
+    if (target && target.floor !== this.floor && !this.changingFloor) {
+      this.changingFloor = true;
+      this.cameras.main.fadeOut(FLOOR_FADE_MS);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.scene.restart({ floor: target.floor, spawn: { x: target.x, y: target.y }, spectating: true });
+      });
+    } else if (target) {
+      const sprite = this.remotePlayers.get(target.playerId)?.sprite;
+      const camera = this.cameras.main;
+      const goal = sprite ?? target;
+      const blend = Math.min(1, (delta / 1000) * 6);
+      camera.centerOn(
+        camera.midPoint.x + (goal.x - camera.midPoint.x) * blend,
+        camera.midPoint.y + (goal.y - camera.midPoint.y) * blend,
+      );
+    }
+
+    this.zombieLayer.sync(this.zombiesOnFloor());
+    this.zombieLayer.update(delta);
+    this.syncBoss(delta);
+    this.updateRain(this.time.now);
+    return true;
+  }
+
+  // Biomedica: mantener E al lado de un compañero caido lo revive (lo decide el servidor).
+  updateRevive() {
+    const me = getMyPlayerState();
+    if (!me || me.role !== REVIVER_ROLE || me.lifeState === 'DOWNED') {
+      setNearDowned(null);
+      return;
+    }
+    let near = null;
+    let best = REVIVE_RANGE_PX;
+    getLatestState().players.forEach((p) => {
+      if (p.playerId === me.playerId || p.lifeState !== 'DOWNED' || p.floor !== this.floor) return;
+      const distance = Math.hypot(p.x - this.player.x, p.y - this.player.y);
+      if (distance <= best) {
+        best = distance;
+        near = { playerId: p.playerId, role: p.role, name: displayName(p) };
+      }
+    });
+    setNearDowned(near);
+
+    const holding = this.interactKey.isDown && near && !isInputLocked();
+    if (holding && this.reviving !== near.playerId) {
+      this.reviving = near.playerId;
+      requestReviveStart(near.playerId);
+    } else if (!holding && this.reviving) {
+      this.reviving = null;
+      requestReviveCancel();
+    }
+  }
+
+  // Anillo de progreso sobre cada caido que esta siendo revivido.
+  drawReviveProgress() {
+    const gfx = this.reviveGfx;
+    if (!gfx) return;
+    gfx.clear();
+    const players = getLatestState().players;
+    players.forEach((reviver) => {
+      if (!reviver.reviving || reviver.reviveProgress <= 0) return;
+      const target = players.find((p) => p.playerId === reviver.reviving);
+      if (!target || target.floor !== this.floor) return;
+      const body = target.playerId === getMyRole() ? this.player : this.remotePlayers.get(target.playerId)?.sprite;
+      const x = body?.x ?? target.x;
+      const y = (body?.y ?? target.y) - 46;
+      gfx.fillStyle(0x000000, 0.55).fillCircle(x, y, 17);
+      gfx.lineStyle(5, 0x9bf0b8, 1);
+      gfx.beginPath();
+      gfx.arc(x, y, 14, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * reviver.reviveProgress);
+      gfx.strokePath();
+      gfx.fillStyle(0x9bf0b8, 1).fillRect(x - 2, y - 7, 4, 14).fillRect(x - 7, y - 2, 14, 4);
+    });
+  }
+
+  myWeapon() {
+    const me = getMyPlayerState();
+    return { me, weapon: weaponById(me?.weapon) };
+  }
+
+  // Apunta al mouse si se esta usando; si no, hacia donde camina, corrigiendo hacia el
+  // zombi mas cercano dentro de un cono (en celular no hay como apuntar fino).
+  updateAim(time) {
+    if (time - this.mouseAimAt < MOUSE_AIM_MS) {
+      const pointer = this.input.activePointer;
+      const world = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+      this.aimAngle = Math.atan2(world.y - this.player.y, world.x - this.player.x);
+      return;
+    }
+    const { weapon } = this.myWeapon();
+    const reach = weapon.ranged ? weapon.range : weapon.range + 40;
+    let best = null;
+    const targets = [...this.zombiesOnFloor()];
+    const boss = getBoss();
+    if (boss && boss.floor === this.floor) targets.push(boss);
+    targets.forEach((target) => {
+      const distance = Math.hypot(target.x - this.player.x, target.y - this.player.y);
+      if (distance > reach) return;
+      const angle = Math.atan2(target.y - this.player.y, target.x - this.player.x);
+      if (Math.abs(Phaser.Math.Angle.Wrap(angle - this.facingAngle)) > AIM_ASSIST_RAD) return;
+      if (!best || distance < best.distance) best = { distance, angle };
+    });
+    this.aimAngle = best ? best.angle : this.facingAngle;
+  }
+
+  // Teclas 1-4 (puños + armas del inventario en orden), boton de cambiar en celular y R para recargar.
+  updateWeaponSelection() {
+    const { me, weapon } = this.myWeapon();
+    if (!me) return;
+    const owned = ownedWeapons(me.inventory);
+    let wanted = null;
+    this.weaponKeys.forEach((key, index) => {
+      if (Phaser.Input.Keyboard.JustDown(key) && owned[index]) wanted = owned[index];
+    });
+    if (touchInput.cycleWeapon) {
+      touchInput.cycleWeapon = false;
+      const index = owned.findIndex((entry) => entry.id === weapon.id);
+      wanted = owned[(index + 1) % owned.length];
+    }
+    if (wanted && wanted.id !== weapon.id) requestEquip(wanted.itemId);
+
+    const wantsReload = Phaser.Input.Keyboard.JustDown(this.reloadKey) || touchInput.reload;
+    touchInput.reload = false;
+    if (wantsReload && weapon.ranged && me.reloadingMs === 0 && me.magazine < weapon.magazineSize && me.reserveAmmo > 0) {
+      requestReload();
+    }
+
+    const reloading = me.reloadingMs > 0;
+    if (reloading && !this.wasReloading) {
+      this.weaponLayer.reload(LOCAL_HOLDER, me.reloadingMs);
+      playSfx('reload');
+    }
+    this.wasReloading = reloading;
+  }
+
+  syncLocalWeapon() {
+    const me = getMyPlayerState();
+    this.weaponLayer.update(LOCAL_HOLDER, {
+      x: this.player.x,
+      y: this.player.y,
+      aim: this.aimAngle,
+      depth: this.playerRig.depth,
+      weaponId: me && me.lifeState !== 'DOWNED' ? (me.weapon ?? 'FISTS') : 'FISTS',
+      // Al cambiar de piso la escena se recrea: no se repite la animacion de sacar el arma.
+      silent: !this.weaponSynced,
+    });
+    this.weaponSynced = Boolean(me);
+  }
+
+  isOpenAt(x, y) {
+    const cell = this.layoutGrid?.[Math.floor(y / TILE)]?.[Math.floor(x / TILE)];
+    if (!cell || SOLID_GRID_TYPES.has(cell.type)) return false;
+    const col = Math.floor(x / TILE);
+    const row = Math.floor(y / TILE);
+    return !this.doors.some((door) => !door.open && door.col === col && door.row === row);
+  }
+
+  // Mismo calculo que GameSession.shoot en el servidor, solo para dibujar hasta donde llega la bala.
+  traceShot(x, y, angle, weapon) {
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+    let reach = 0;
+    while (reach < weapon.range && this.isOpenAt(x + dirX * (reach + SHOT_STEP_PX), y + dirY * (reach + SHOT_STEP_PX))) {
+      reach += SHOT_STEP_PX;
+    }
+    const hits = [];
+    const consider = (target, radius) => {
+      const dx = target.x - x;
+      const dy = target.y - y;
+      const along = dx * dirX + dy * dirY;
+      if (along < 0 || along > reach + radius) return;
+      if (Math.abs(dx * dirY - dy * dirX) <= radius) hits.push(along);
+    };
+    this.zombiesOnFloor().forEach((zombie) => consider(zombie, zombie.tough ? SHOT_RADIUS.tough : SHOT_RADIUS.normal));
+    const boss = getBoss();
+    if (boss && boss.floor === this.floor) consider(boss, SHOT_RADIUS.boss);
+    hits.sort((a, b) => a - b);
+    const end = hits.length >= weapon.pierce ? hits[weapon.pierce - 1] : reach;
+    return { x: x + dirX * end, y: y + dirY * end };
   }
 
   updateAttack(time) {
@@ -511,9 +1683,34 @@ export default class MainScene extends Phaser.Scene {
       || (!this.input.activePointer.wasTouch && this.input.activePointer.leftButtonDown());
     if (!wants || time < this.nextAttackAt) return;
 
-    this.nextAttackAt = time + ATTACK_REQUEST_MS;
-    requestAttack('BASIC', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
-    this.drawSwing(this.facingAngle);
+    const { me, weapon } = this.myWeapon();
+    const x = Math.round(this.player.x);
+    const y = Math.round(this.player.y);
+    if (weapon.ranged) {
+      if (!me || me.reloadingMs > 0) return;
+      if (me.magazine <= 0) {
+        // Gatillo en seco: el servidor empieza a recargar solo si hay balas de reserva.
+        if (time >= this.nextEmptyClickAt) {
+          this.nextEmptyClickAt = time + EMPTY_CLICK_MS;
+          playSfx('empty');
+          requestAttack('BASIC', x, y, this.aimAngle);
+        }
+        return;
+      }
+      this.nextAttackAt = time + weapon.cooldownMs;
+      requestAttack('BASIC', x, y, this.aimAngle);
+      const heavy = weapon.id === 'RIFLE';
+      this.weaponLayer.fire(LOCAL_HOLDER, this.traceShot(this.player.x, this.player.y, this.aimAngle, weapon), { heavy });
+      playSfx(heavy ? 'rifle' : 'pistol');
+      if (heavy && getSettings().screenShake) this.cameras.main.shake(90, 0.003);
+      return;
+    }
+
+    this.nextAttackAt = time + Math.max(ATTACK_REQUEST_MS, weapon.cooldownMs);
+    requestAttack('BASIC', x, y, this.aimAngle);
+    this.drawSwing(this.aimAngle, weapon.range);
+    this.weaponLayer.swing(LOCAL_HOLDER);
+    playSfx('swing');
   }
 
   updateChargedAttack(time) {
@@ -522,8 +1719,9 @@ export default class MainScene extends Phaser.Scene {
     if (!pressed || time < this.chargedReadyAt) return;
 
     this.chargedReadyAt = time + CHARGED_COOLDOWN_MS;
-    requestAttack('CHARGED', Math.round(this.player.x), Math.round(this.player.y), this.facingAngle);
+    requestAttack('CHARGED', Math.round(this.player.x), Math.round(this.player.y), this.aimAngle);
     this.drawShockwave();
+    playSfx('charged');
   }
 
   drawShockwave() {
@@ -544,22 +1742,30 @@ export default class MainScene extends Phaser.Scene {
       ease: 'Cubic.easeOut',
       onComplete: () => ring.destroy(),
     });
-    this.cameras.main.shake(160, 0.004);
+    if (getSettings().screenShake) this.cameras.main.shake(160, 0.004);
   }
 
-  drawSwing(facing) {
+  drawSwing(facing, radius = 62) {
     const arc = this.add.graphics();
     arc.setDepth(this.player.y + 1);
     arc.fillStyle(0xfff2c4, 0.45);
-    arc.slice(this.player.x, this.player.y, 62, facing - Math.PI / 4, facing + Math.PI / 4);
+    arc.slice(this.player.x, this.player.y, radius, facing - Math.PI / 4, facing + Math.PI / 4);
     arc.fillPath();
     this.tweens.add({ targets: arc, alpha: 0, duration: 160, onComplete: () => arc.destroy() });
   }
 
-  spawnDashTrail() {
-    const ghost = this.add.sprite(this.player.x, this.player.y, this.player.texture.key);
-    ghost.setDepth(this.player.depth - 1).setAlpha(0.45).setTint(0x7ec8ff);
-    this.tweens.add({ targets: ghost, alpha: 0, duration: 220, onComplete: () => ghost.destroy() });
+  // El personaje que se ve: sigue al sprite con fisica, mira hacia donde apunta y camina
+  // segun la velocidad real del cuerpo.
+  syncPlayerRig(delta) {
+    const body = this.player.body;
+    const moving = body.enable && !this.spectating;
+    this.playerRig.update(delta, this.player, {
+      x: this.player.x,
+      y: this.player.y + this.playerFootOffset,
+      vx: moving ? body.velocity.x : 0,
+      vy: moving ? body.velocity.y : 0,
+      aim: this.aimAngle ?? this.facingAngle,
+    });
   }
 
   updateVendorProximity() {
@@ -582,29 +1788,18 @@ export default class MainScene extends Phaser.Scene {
   }
 
   updateMissionProximity() {
-    const px = this.player.x;
-    const py = this.player.y;
-
-    this.missionZones.forEach((zone) => {
-      const dx = px - zone.x;
-      const dy = py - zone.y;
-      const withinRange = dx * dx + dy * dy <= MISSION_RANGE_PX * MISSION_RANGE_PX;
-
-      if (withinRange && !zone.inRange) {
-        zone.inRange = true;
-        if (!zone.mine) return;
-        if (INTERACTIVE_MISSION_ROLES.has(zone.role)) {
-          setNearMission(zone);
-        } else {
-          requestMissionComplete(zone.missionId, px, py);
-        }
-      } else if (!withinRange && zone.inRange) {
-        zone.inRange = false;
-        if (zone.mine && INTERACTIVE_MISSION_ROLES.has(zone.role)) {
-          setNearMission(null);
-        }
+    this.syncMissionMarkers();
+    let closest = null;
+    let closestDistance = MISSION_RANGE_PX;
+    this.missionMarkers.forEach(({ mission }) => {
+      const distance = Math.hypot(this.player.x - mission.x, this.player.y - mission.y);
+      if (distance <= closestDistance) {
+        closest = mission;
+        closestDistance = distance;
       }
     });
+    // El minijuego que se abre depende del tipo de mision, no del rol.
+    setNearMission(closest ? { ...closest, role: missionType(closest.type).role } : null);
   }
 
   updateDoorProximity() {
@@ -645,7 +1840,7 @@ export default class MainScene extends Phaser.Scene {
     setNearStairs(active ? { kind: active.kind } : null);
 
     const pressed = Phaser.Input.Keyboard.JustDown(this.interactKey);
-    if (pressed && active && !this.changingFloor) {
+    if (pressed && active && !this.changingFloor && !this.reviving) {
       this.travel(active.kind);
     }
   }
@@ -670,13 +1865,29 @@ export default class MainScene extends Phaser.Scene {
     this.stairsZones = [];
     this.doors = [];
 
+    this.layoutGrid = layout.grid;
     this.lighting = new Lighting(this);
+    bakeBaseTextures(this);
+    bakeNavidadTextures(this);
+    this.gore = new GoreFx(this, { lowPerf: getSettings().lowPerf });
     renderOutside(this, layout.grid, this.lighting, getMyBuilding());
     this.renderGridTiles(layout.grid);
     this.renderDecorations(layout.decorations);
     this.renderFurniture(layout.furniture);
     this.renderLabels(layout.labels);
     this.addInteriorLights(layout);
+    decorateFloorNavidad(this, layout.grid, this.lighting, { building: getMyBuilding(), floor: this.floor });
+    // Velo azul helado sobre todo el mapa (debajo de la oscuridad): enfria el piso y
+    // las luces calidas sin borrar el rojo de la sangre.
+    // El multiply oscurece lo calido; el ADD suma un poco de azul para que se sienta frio.
+    this.add.rectangle(-MAP_PIXEL_WIDTH, -MAP_PIXEL_HEIGHT, MAP_PIXEL_WIDTH * 3, MAP_PIXEL_HEIGHT * 3, 0xc4d4ee)
+      .setOrigin(0, 0)
+      .setBlendMode(Phaser.BlendModes.MULTIPLY)
+      .setDepth(4989);
+    this.add.rectangle(-MAP_PIXEL_WIDTH, -MAP_PIXEL_HEIGHT, MAP_PIXEL_WIDTH * 3, MAP_PIXEL_HEIGHT * 3, 0x08162c)
+      .setOrigin(0, 0)
+      .setBlendMode(Phaser.BlendModes.ADD)
+      .setDepth(4989.5);
 
     [
       { kind: 'up', stairs: layout.upStairs },
@@ -694,9 +1905,10 @@ export default class MainScene extends Phaser.Scene {
             {
               fontFamily: 'sans-serif',
               fontSize: '13px',
-              color: '#ffffff',
-              backgroundColor: '#1f6f43',
-              padding: { x: 6, y: 3 },
+              fontStyle: 'bold',
+              color: '#ecdfcc',
+              backgroundColor: 'rgba(40, 10, 12, 0.92)',
+              padding: { x: 7, y: 4 },
             },
           )
           .setDepth(20)
@@ -711,12 +1923,12 @@ export default class MainScene extends Phaser.Scene {
     const modes = ['flicker', 'steady', 'broken'];
     layout.decorations
       .filter((deco) => deco.type === 'column')
-      .filter((deco, i) => i % 2 === 0)
+      .filter((deco, i) => i % 3 === 0)
       .forEach((deco, i) => {
         this.lighting.addLight({
           x: deco.x * TILE + TILE / 2,
           y: (deco.y + 2.5) * TILE,
-          radius: 260,
+          radius: 220,
           mode: modes[i % modes.length],
         });
       });
@@ -724,8 +1936,12 @@ export default class MainScene extends Phaser.Scene {
     VENDORS.filter((vendor) => vendor.floor === this.floor).forEach((vendor) => {
       this.lighting.addLight({ x: vendor.x, y: vendor.y, radius: 150, mode: 'steady', bulb: false });
     });
-    missionZonesFor(getMyBuilding()).filter((zone) => zone.floor === this.floor).forEach((zone) => {
-      this.lighting.addLight({ x: zone.x, y: zone.y, radius: 130, mode: 'steady', bulb: false });
+    // Salones: en algunos el bombillo esta fallando (parpadea o se va por ratos).
+    const roomModes = ['broken', null, 'flicker', null, 'broken', 'flicker'];
+    missionSitesFor(getMyBuilding()).filter((site) => site.floor === this.floor).forEach((site, i) => {
+      const mode = roomModes[i % roomModes.length];
+      if (mode) this.lighting.addLight({ x: site.x, y: site.y - TILE, radius: 230, mode });
+      else this.lighting.addLight({ x: site.x, y: site.y, radius: 130, mode: 'steady', bulb: false });
     });
 
     // Luces fluorescentes del techo del corredor porticado: parejas, sin foco visible.
@@ -880,7 +2096,7 @@ export default class MainScene extends Phaser.Scene {
 
         this.solids.add(image);
         image.body.enable = false;
-        this.doors.push({ image, x: cx, y: cy, open: true, doorId: deco.doorId });
+        this.doors.push({ image, x: cx, y: cy, open: true, doorId: deco.doorId, col: deco.x, row: deco.y });
       }
     });
   }
@@ -897,11 +2113,11 @@ export default class MainScene extends Phaser.Scene {
     labels.forEach((label) => {
       this.add
         .text(label.x, label.y, label.text, {
-          fontFamily: 'sans-serif',
-          fontSize: '13px',
-          color: '#3a2f22',
-          backgroundColor: '#e8e2d4',
-          padding: { x: 4, y: 2 },
+          fontFamily: GOTHIC_FONT,
+          fontSize: '16px',
+          color: '#e8d9b8',
+          backgroundColor: 'rgba(26, 12, 10, 0.82)',
+          padding: { x: 6, y: 2 },
         })
         .setDepth(15);
     });

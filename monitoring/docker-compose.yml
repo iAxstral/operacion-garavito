@@ -40,7 +40,6 @@ services:
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
-
   sonar-db:
     image: postgres:16-alpine
     environment:

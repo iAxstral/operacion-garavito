@@ -131,6 +131,13 @@ class WaveDirectorTest {
         director.onBossDefeated(now);
         now = run(director, now, now + 100, players, new ArrayList<>());
         assertTrue(director.consumeJustCleared());
+        assertFalse(director.isVictory(), "primero hay que escapar");
+        assertTrue(director.state(now).escaping());
+        assertEquals(WaveDirector.ESCAPE_MS / 1000, director.state(now).escapeSeconds(), 1);
+        List<Zombie> during = new ArrayList<>();
+        now = run(director, now, now + 6_000, players, during);
+        assertFalse(during.isEmpty(), "la horda sigue llegando en el escape");
+        director.win();
         assertTrue(director.isVictory());
         assertTrue(director.state(now).victory());
 

@@ -1,40 +1,72 @@
 import Phaser from 'phaser';
 import { TILE, MAP_COLS, MAP_ROWS } from './mapLayout';
 import { OUTSIDE_MARGIN_TILES } from './outsideDecor';
+import { getSettings } from './settings';
+import { circleTouches, darknessView, lightVisible, stampTransform, toTexture } from './lightMath';
+import { STAMP_RADIUS, makeConeStamp, makeHaloStamp } from './lightStamps';
 
 const DARK_KEY = 'darkness_layer';
 const GLOW_KEY = 'light_glow';
 const FOG_KEY = 'fog_puffs';
 const BULB_KEY = 'bulb_fixture';
-const DARKNESS_COLOR = 'rgba(6, 12, 20, 0.58)';
+// Nochebuena: penumbra azul helada.
+const DARKNESS_COLOR = 'rgba(3, 8, 20, 0.74)';
 const RESOLUTION = 0.5;
+// Modo de rendimiento: la capa de oscuridad a menor resolucion y sin efectos extra.
+const LOW_PERF_RESOLUTION = 0.33;
 
 const PLAYER_RADIUS = 340;
+// Linterna: halo corto alrededor del jugador y un cono largo hacia donde apunta. Lo
+// que queda a la espalda se ve poco: los zombis aparecen de la oscuridad.
+const HALO_RADIUS = 150;
+const CONE_LENGTH = 470;
+const CONE_HALF_ANGLE = 0.5;
+// Pasadas del cono: una ancha y suave y otra angosta y fuerte (en modo de rendimiento,
+// solo la angosta). [medio angulo, potencia]
+const CONE_PASSES = [[CONE_HALF_ANGLE * 1.35, 0.45], [CONE_HALF_ANGLE, 1]];
+const LOW_PERF_CONE_PASSES = [[CONE_HALF_ANGLE, 1]];
+const REMOTE_CONE_LENGTH = 300;
+const BLACKOUT_CONE_LENGTH = 260;
+// Apagon: casi negro, solo una linterna corta alrededor de cada jugador.
+const BLACKOUT_COLOR = 'rgba(2, 4, 8, 0.94)';
+const BLACKOUT_PLAYER_RADIUS = 170;
 const REMOTE_RADIUS = 140;
 
 const DEPTH_FOG = 4990;
 const DEPTH_DARKNESS = 5000;
 const DEPTH_GLOW = 5001;
 const FOG_SIZE = 256;
+// Margen (px de pantalla) que la capa de oscuridad cubre de mas por cada lado: se ubica
+// en el mundo con la vista del cuadro anterior y asi no se ven bordes al mover la camara.
+const OVERSCAN = 64;
 
-// Neblina leve, solo fuera del edificio: cuatro franjas alrededor del mapa, en coordenadas del mundo.
+// Neblina leve fuera del edificio (cuatro franjas alrededor del mapa) y una mas tenue
+// que se arrastra por los pasillos de adentro.
 const FOG_LAYERS = [
   { speed: 0.012, alpha: 0.09, scale: 2.2 },
   { speed: -0.007, alpha: 0.06, scale: 3.4 },
 ];
+const INDOOR_FOG = { speed: 0.009, alpha: 0.07, scale: 2.8 };
+// Vineta: lejos de la linterna todo se oscurece un poco mas, aunque haya luz.
+const VIGNETTE_ALPHA = 0.68;
 
 // Penumbra con neblina y luz alrededor del jugador (estilo Among Us), mas algunos bombillos
 // que parpadean. La capa de oscuridad es un canvas a media resolucion al que se le "perforan"
-// circulos de luz.
+// circulos de luz estampando sellos ya horneados (ver lightStamps.js).
 export default class Lighting {
   constructor(scene) {
     this.scene = scene;
     this.lights = [];
+    this.pulses = [];
     this.fog = [];
     this.makeGlowTexture();
     this.makeFogTexture();
     this.makeBulbTexture();
-    this.makeFog();
+    this.haloStamp = makeHaloStamp();
+    this.coneStamps = new Map(CONE_PASSES.map(([half]) => [half, makeConeStamp(half)]));
+    this.lowPerf = getSettings().lowPerf;
+    this.resolution = this.lowPerf ? LOW_PERF_RESOLUTION : RESOLUTION;
+    if (!this.lowPerf) this.makeFog();
     this.build();
     scene.scale.on('resize', this.build, this);
   }
@@ -109,6 +141,16 @@ export default class Lighting {
       [-m, 0, m, h],
       [w, 0, m, h],
     ];
+    const indoor = this.scene.add
+      .tileSprite(0, 0, w, h, FOG_KEY)
+      .setOrigin(0, 0)
+      .setDepth(DEPTH_FOG)
+      .setAlpha(INDOOR_FOG.alpha)
+      .setTint(0xa898c0)
+      .setTileScale(INDOOR_FOG.scale);
+    indoor.fogLayer = INDOOR_FOG;
+    this.fog.push(indoor);
+
     FOG_LAYERS.forEach((layer) => {
       strips.forEach(([x, y, sw, sh]) => {
         const sprite = this.scene.add
@@ -124,23 +166,54 @@ export default class Lighting {
     });
   }
 
+  // La capa de oscuridad es un objeto del mundo que cubre la vista de la camara (mas un
+  // margen). Antes era fija a la pantalla, lo que se descuadraba con el zoom de celular.
   build() {
-    const { width, height } = this.scene.scale;
+    const camera = this.scene.cameras.main;
+    const width = camera.width + 2 * OVERSCAN;
+    const height = camera.height + 2 * OVERSCAN;
+    this.builtFor = `${camera.width}x${camera.height}@${camera.zoom}`;
     this.image?.destroy();
     if (this.scene.textures.exists(DARK_KEY)) this.scene.textures.remove(DARK_KEY);
 
     this.texture = this.scene.textures.createCanvas(
       DARK_KEY,
-      Math.max(2, Math.ceil(width * RESOLUTION)),
-      Math.max(2, Math.ceil(height * RESOLUTION)),
+      Math.max(2, Math.ceil(width * this.resolution)),
+      Math.max(2, Math.ceil(height * this.resolution)),
     );
     this.texture.setFilter(Phaser.Textures.FilterMode.LINEAR);
     this.image = this.scene.add
       .image(0, 0, DARK_KEY)
       .setOrigin(0, 0)
-      .setScrollFactor(0)
       .setDepth(DEPTH_DARKNESS)
-      .setDisplaySize(width, height);
+      .setDisplaySize(width / camera.zoom, height / camera.zoom);
+  }
+
+  /**
+   * Cambia el modo de rendimiento sin rehacer la escena: la capa de oscuridad se vuelve a
+   * crear a la otra resolucion y la neblina se crea o se quita.
+   */
+  setLowPerf(on) {
+    const lowPerf = Boolean(on);
+    if (lowPerf === this.lowPerf) return;
+    this.lowPerf = lowPerf;
+    this.resolution = lowPerf ? LOW_PERF_RESOLUTION : RESOLUTION;
+    if (lowPerf) {
+      this.fog.forEach((layer) => layer.destroy());
+      this.fog = [];
+    } else if (!this.fog.length) {
+      this.makeFog();
+    }
+    this.build();
+  }
+
+  /** Susto: los bombillos fallan `ms` (la linterna sigue funcionando). */
+  failLights(ms) {
+    this.failUntil = this.scene.time.now + ms;
+  }
+
+  setBlackout(on) {
+    this.blackout = Boolean(on);
   }
 
   // mode: 'steady' | 'flicker' | 'broken'. Con bulb=true dibuja el foco con su resplandor.
@@ -156,6 +229,11 @@ export default class Lighting {
     this.lights.push({ x, y, radius, mode, glow, halo, fixture, phase: Math.random() * 100 });
   }
 
+  /** Luz breve (fogonazo, explosion): se apaga sola en `ms`. */
+  pulse(x, y, radius = 160, ms = 90) {
+    this.pulses.push({ x, y, radius, ms, born: this.scene.time.now });
+  }
+
   intensity(light, time) {
     const t = time / 1000 + light.phase;
     if (light.mode === 'steady') return 1;
@@ -167,23 +245,37 @@ export default class Lighting {
   }
 
   punch(ctx, view, x, y, radius, strength) {
-    const sx = (x - view.x) * RESOLUTION;
-    const sy = (y - view.y) * RESOLUTION;
-    const r = radius * RESOLUTION;
-    if (sx < -r || sy < -r || sx > this.texture.width + r || sy > this.texture.height + r) return;
+    const { sx, sy } = toTexture(view, x, y);
+    const r = radius * view.scale;
+    if (!circleTouches(sx, sy, r, this.texture.width, this.texture.height)) return;
 
-    const g = ctx.createRadialGradient(sx, sy, r * 0.12, sx, sy, r);
-    g.addColorStop(0, `rgba(0,0,0,${strength})`);
-    g.addColorStop(0.55, `rgba(0,0,0,${strength * 0.6})`);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(sx, sy, r, 0, Math.PI * 2);
-    ctx.fill();
+    if (strength <= 0) return;
+    ctx.globalAlpha = Math.min(1, strength);
+    ctx.drawImage(this.haloStamp, sx - r, sy - r, r * 2, r * 2);
+    ctx.globalAlpha = 1;
   }
 
-  update(time, player, remotePlayers) {
-    const view = this.scene.cameras.main.worldView;
+  // Cono de luz: el sello del sector girado hacia donde apunta (dos pasadas, ancha y
+  // suave, angosta y fuerte).
+  punchCone(ctx, view, x, y, angle, length, strength) {
+    const { sx, sy } = toTexture(view, x, y);
+    const r = length * view.scale;
+    if (!circleTouches(sx, sy, r, this.texture.width, this.texture.height)) return;
+    const passes = this.lowPerf ? LOW_PERF_CONE_PASSES : CONE_PASSES;
+    ctx.setTransform(...stampTransform(sx, sy, angle, r, STAMP_RADIUS));
+    passes.forEach(([half, power]) => {
+      ctx.globalAlpha = Math.min(1, strength * power);
+      ctx.drawImage(this.coneStamps.get(half), -STAMP_RADIUS, -STAMP_RADIUS);
+    });
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+
+  update(time, player, remotePlayers, aimAngle = null) {
+    const camera = this.scene.cameras.main;
+    if (this.builtFor !== `${camera.width}x${camera.height}@${camera.zoom}`) this.build();
+    const view = darknessView(camera.worldView, camera.zoom, this.resolution, OVERSCAN);
+    this.image.setPosition(view.x, view.y);
     const ctx = this.texture.context;
     const { width, height } = this.texture;
 
@@ -195,12 +287,20 @@ export default class Lighting {
 
     ctx.globalCompositeOperation = 'source-over';
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = DARKNESS_COLOR;
+    ctx.fillStyle = this.blackout ? BLACKOUT_COLOR : DARKNESS_COLOR;
     ctx.fillRect(0, 0, width, height);
 
     ctx.globalCompositeOperation = 'destination-out';
     this.lights.forEach((light) => {
-      const level = this.intensity(light, time);
+      // Fuera de la vista no se calcula nada y sus sprites no se dibujan.
+      const visible = lightVisible(view, light.x, light.y, light.radius, width, height);
+      if (light.visible !== visible) {
+        light.visible = visible;
+        [light.glow, light.halo, light.fixture].forEach((sprite) => sprite?.setVisible(visible));
+      }
+      if (!visible) return;
+      let level = this.blackout ? 0 : this.intensity(light, time);
+      if (time < (this.failUntil ?? 0)) level *= Math.random() < 0.2 ? 0.6 : 0.04;
       if (light.glow) {
         light.glow.setAlpha(0.5 * level).setDisplaySize(70 + 40 * level, 70 + 40 * level);
         light.halo.setAlpha(0.22 * level).setDisplaySize(light.radius * 0.9, light.radius * 0.9);
@@ -208,8 +308,33 @@ export default class Lighting {
       }
       this.punch(ctx, view, light.x, light.y, light.radius * (0.85 + 0.15 * level), 0.9 * level);
     });
-    remotePlayers?.forEach((entry) => this.punch(ctx, view, entry.sprite.x, entry.sprite.y, REMOTE_RADIUS, 0.85));
-    if (player) this.punch(ctx, view, player.x, player.y - 8, PLAYER_RADIUS, 1);
+    remotePlayers?.forEach((entry) => {
+      this.punch(ctx, view, entry.sprite.x, entry.sprite.y, REMOTE_RADIUS * 0.75, 0.85);
+      if (entry.aim != null && !entry.downed) {
+        this.punchCone(ctx, view, entry.sprite.x, entry.sprite.y - 8, entry.aim, REMOTE_CONE_LENGTH, 0.8);
+      }
+    });
+    if (player && aimAngle == null) {
+      this.punch(ctx, view, player.x, player.y - 8, this.blackout ? BLACKOUT_PLAYER_RADIUS : PLAYER_RADIUS, 1);
+    } else if (player) {
+      this.punch(ctx, view, player.x, player.y - 8, this.blackout ? HALO_RADIUS * 0.7 : HALO_RADIUS, 1);
+      const coneLength = (this.blackout ? BLACKOUT_CONE_LENGTH : CONE_LENGTH) * (this.coneFactor ?? 1);
+      this.punchCone(ctx, view, player.x, player.y - 8, aimAngle, coneLength, 1);
+    }
+    this.pulses = this.pulses.filter((p) => time - p.born < p.ms);
+    this.pulses.forEach((p) => this.punch(ctx, view, p.x, p.y, p.radius, 1 - (time - p.born) / p.ms));
+
+    if (player && !this.blackout && !this.lowPerf) {
+      ctx.globalCompositeOperation = 'source-over';
+      const { sx: cx, sy: cy } = toTexture(view, player.x, player.y);
+      const inner = PLAYER_RADIUS * 0.55 * view.scale;
+      const outer = Math.max(width, height) * 0.75;
+      const g = ctx.createRadialGradient(cx, cy, inner, cx, cy, outer);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(1, `rgba(0,0,0,${VIGNETTE_ALPHA})`);
+      ctx.fillStyle = g;
+      ctx.fillRect(0, 0, width, height);
+    }
 
     this.texture.refresh();
   }
