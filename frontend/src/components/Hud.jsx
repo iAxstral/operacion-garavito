@@ -201,7 +201,7 @@ function toastFor(event) {
   } else if (event.type === 'PURCHASE_SUCCESS' && weaponForItem(event.itemId)) {
     message = `¡${weaponForItem(event.itemId).name} comprada! Equípala con ${isTouchDevice() ? 'el botón de armas' : 'las teclas 1-4'}`;
   } else if (event.type === 'PURCHASE_SUCCESS') {
-    message = '¡Compra exitosa! Está en tu inventario (I)';
+    message = '¡Compra exitosa! Está en tu inventario (Tab)';
   } else if (event.type === 'PICKUP_SUCCESS') {
     const name = comidaNavidena(FOOD_ITEMS.find((item) => item.itemId === event.itemId))?.itemName ?? 'Objeto';
     message = `${name} guardado en el inventario (E para abrirlo)`;
@@ -357,6 +357,12 @@ export default function Hud({ onExit }) {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === 'Tab') {
+        // Sin preventDefault el navegador mueve el foco a otro boton.
+        event.preventDefault();
+        if (!isInputLocked()) setInventoryOpen((open) => !open);
+        return;
+      }
+      if (event.key === 'p' || event.key === 'P') {
         event.preventDefault();
         setPanelOpen((open) => !open);
         return;
@@ -384,8 +390,8 @@ export default function Hud({ onExit }) {
         requestDoorToggle(nearDoor.doorId, nearDoor.x, nearDoor.y);
         return;
       }
-      // El inventario va solo con I: con E se abria al intentar abrir una puerta
-      // (o cualquier cosa) si el aviso de cercania todavia no habia llegado.
+      // El inventario va con Tab o I, nunca con E: con E se abria al intentar abrir
+      // una puerta (o cualquier cosa) si el aviso de cercania todavia no habia llegado.
       if (event.key === 'i' || event.key === 'I') {
         event.preventDefault();
         setInventoryOpen((open) => !open);
@@ -542,7 +548,7 @@ export default function Hud({ onExit }) {
           className="hud-inventory hud-inventory--open"
           role="button"
           tabIndex={-1}
-          aria-label="Abrir inventario (I)"
+          aria-label="Abrir inventario (Tab)"
           onClick={() => setInventoryOpen(true)}
         >
           {slots.map((slot, i) => (
@@ -633,7 +639,7 @@ export default function Hud({ onExit }) {
           </div>
         )}
 
-        <div className="hud-hint">Tab: equipo · M: mapa · E: inventario · T: desmontar barricada · Esc: ajustes</div>
+        <div className="hud-hint">Tab: inventario · P: equipo · M: mapa · E: interactuar · T: desmontar barricada · Esc: ajustes</div>
       </div>
 
       {!isTouchDevice() && (
