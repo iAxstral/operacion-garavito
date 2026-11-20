@@ -16,7 +16,7 @@ public class GameSession {
      * Desde los pies del jugador hasta el centro de la casilla de la puerta. Con 90 px
      * desde el centro del sprite, una puerta cerrada solo se alcanzaba por un lado (los
      * pies quedan ~51 px por debajo del centro); 128 px desde los pies alcanza de los
-     * dos lados con margen para el retraso de la red (el cliente avisa desde 96 px).
+     * dos lados con margen para el retraso de la red (el cliente avisa desde 64 px).
      */
     static final double DOOR_INTERACT_RANGE_PX = 128;
 

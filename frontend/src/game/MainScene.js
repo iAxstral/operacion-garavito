@@ -182,9 +182,10 @@ const TILE_TEXTURE_FILES = {
 };
 
 // Desde los pies del jugador (el centro del sprite va ~51 px mas arriba, igual que
-// FOOT_OFFSET_PX en el servidor) hasta el centro de la casilla de la puerta. El
-// servidor acepta hasta 128 px, asi el aviso solo sale cuando la puerta va a responder.
-const DOOR_PROXIMITY_PX = 96;
+// FOOT_OFFSET_PX en el servidor) hasta el centro de la casilla de la puerta. Pegado a
+// la puerta cerrada se queda a ~41-43 px por cualquier lado: con una casilla de alcance
+// el aviso sale solo junto a ella. El servidor acepta hasta 128 px por el retraso de red.
+const DOOR_PROXIMITY_PX = 64;
 const DOOR_FOOT_OFFSET_PX = 51;
 
 const SOLID_GRID_TYPES = new Set(['wall', 'glass']);
