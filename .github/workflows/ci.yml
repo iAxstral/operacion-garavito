@@ -5,7 +5,7 @@
 #
 # Requiere los siguientes secretos en el repositorio:
 #   SONAR_TOKEN   — token generado en SonarQube (Administración → Tokens)
-#   SONAR_HOST_URL — URL del servidor SonarQube (ej. http://mi-servidor:9000)
+#   SONAR_HOST_URL — https://d1nb9719430frc.cloudfront.net (SonarQube en AWS, ver infra/README.md)
 name: CI
 
 on:
