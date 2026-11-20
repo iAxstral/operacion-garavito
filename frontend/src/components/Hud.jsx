@@ -51,6 +51,7 @@ const REJECTION_MESSAGES = {
   on_cooldown: 'Esa misión ya se completó hace poco, espera un poco',
   unknown_mission: 'Esa misión no existe',
   unknown_door: 'Esa puerta no existe',
+  door_blocked: 'Hay alguien en la puerta, no se puede cerrar',
   not_usable: 'Ese objeto no se puede usar',
   downed: 'Estás caído',
   no_ammo: 'Sin munición: cómprala en la máquina de armas (piso 2)',

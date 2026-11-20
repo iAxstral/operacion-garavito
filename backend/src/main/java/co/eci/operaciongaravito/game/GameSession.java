@@ -12,7 +12,13 @@ public class GameSession {
     private static final int FOOD_HEALTH_BONUS = 15;
     private static final double SHOP_RANGE_PX = 110;
     private static final double MISSION_RANGE_PX = 90;
-    private static final double DOOR_INTERACT_RANGE_PX = 90;
+    /**
+     * Desde los pies del jugador hasta el centro de la casilla de la puerta. Con 90 px
+     * desde el centro del sprite, una puerta cerrada solo se alcanzaba por un lado (los
+     * pies quedan ~51 px por debajo del centro); 128 px desde los pies alcanza de los
+     * dos lados con margen para el retraso de la red (el cliente avisa desde 96 px).
+     */
+    static final double DOOR_INTERACT_RANGE_PX = 128;
 
     private static final int GARAVITOS_PER_ZOMBIE = 1;
 
@@ -1530,15 +1536,26 @@ public class GameSession {
         }
         FloorGrid.DoorSpec spec = grid.doors().stream().filter(d -> d.doorId().equals(doorId)).findFirst().orElseThrow();
 
+        int floor = floors.indexOf(grid) + 1;
         double dx = player.getX() - spec.centerX();
-        double dy = player.getY() - spec.centerY();
-        if (floors.indexOf(grid) + 1 != player.getFloor() || Math.sqrt(dx * dx + dy * dy) > DOOR_INTERACT_RANGE_PX) {
+        double dy = player.getY() + FOOT_OFFSET_PX - spec.centerY();
+        if (floor != player.getFloor() || Math.hypot(dx, dy) > DOOR_INTERACT_RANGE_PX) {
             return DoorToggleResult.rejected("too_far");
         }
 
         boolean nowOpen = !grid.isDoorOpen(doorId);
+        // Cerrarla con alguien parado en el marco lo dejaba atrapado en la pared.
+        if (!nowOpen && players.values().stream().anyMatch(other -> other.getFloor() == floor
+                && standsOn(other, spec))) {
+            return DoorToggleResult.rejected("door_blocked");
+        }
         grid.setDoorOpen(doorId, nowOpen);
         return DoorToggleResult.ok(nowOpen);
+    }
+
+    private static boolean standsOn(Player player, FloorGrid.DoorSpec door) {
+        int[] cell = FloorGrid.cellOf(player.getX(), player.getY() + FOOT_OFFSET_PX);
+        return cell[0] == door.col() && cell[1] == door.row();
     }
 
     public List<DoorState> doorStates() {

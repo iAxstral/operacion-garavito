@@ -181,7 +181,11 @@ const TILE_TEXTURE_FILES = {
   v2_banca: 'v2_banca_64x32.png',
 };
 
-const DOOR_PROXIMITY_PX = 90;
+// Desde los pies del jugador (el centro del sprite va ~51 px mas arriba, igual que
+// FOOT_OFFSET_PX en el servidor) hasta el centro de la casilla de la puerta. El
+// servidor acepta hasta 128 px, asi el aviso solo sale cuando la puerta va a responder.
+const DOOR_PROXIMITY_PX = 96;
+const DOOR_FOOT_OFFSET_PX = 51;
 
 const SOLID_GRID_TYPES = new Set(['wall', 'glass']);
 
@@ -816,7 +820,7 @@ export default class MainScene extends Phaser.Scene {
         if (!door || door.open === doorState.open) return;
         door.open = doorState.open;
         door.image.setTexture(doorState.open ? 'v2_door_madera_open' : 'v2_door_madera');
-        door.image.body.enable = !doorState.open;
+        door.blocker.body.enable = !doorState.open;
         const at = { x: door.x, y: door.y, floor: this.floor };
         playSample(doorState.open ? 'doorOpen' : 'doorClose', { channel: 'ambient', at });
         if (doorState.open && Math.random() < 0.6) {
@@ -1804,13 +1808,13 @@ export default class MainScene extends Phaser.Scene {
 
   updateDoorProximity() {
     const px = this.player.x;
-    const py = this.player.y;
+    const py = this.player.y + DOOR_FOOT_OFFSET_PX;
     let closest = null;
     let closestDistSq = Infinity;
 
     this.doors.forEach((door) => {
-      const dx = px - door.x;
-      const dy = py - door.y;
+      const dx = px - door.cellX;
+      const dy = py - door.cellY;
       const distSq = dx * dx + dy * dy;
       if (distSq <= DOOR_PROXIMITY_PX * DOOR_PROXIMITY_PX && distSq < closestDistSq) {
         closest = door;
@@ -2094,9 +2098,18 @@ export default class MainScene extends Phaser.Scene {
             : (deco.y + 1) * TILE - 48;
         const image = this.add.image(cx, cy, 'v2_door_madera_open').setDepth(8);
 
-        this.solids.add(image);
-        image.body.enable = false;
-        this.doors.push({ image, x: cx, y: cy, open: true, doorId: deco.doorId, col: deco.x, row: deco.y });
+        // La imagen mide 64x96 y sobresale media casilla hacia el pasillo; si chocara
+        // entera, al cerrarse empujaba al jugador contra las paredes del pasillo.
+        // Cerrada bloquea solo su casilla, la misma que el servidor (FloorGrid).
+        const cellX = deco.x * TILE + TILE / 2;
+        const cellY = deco.y * TILE + TILE / 2;
+        const blocker = this.add.zone(cellX, cellY, TILE, TILE);
+        this.physics.add.existing(blocker, true);
+        this.solids.add(blocker);
+        blocker.body.enable = false;
+        this.doors.push({
+          image, blocker, x: cx, y: cy, cellX, cellY, open: true, doorId: deco.doorId, col: deco.x, row: deco.y,
+        });
       }
     });
   }
