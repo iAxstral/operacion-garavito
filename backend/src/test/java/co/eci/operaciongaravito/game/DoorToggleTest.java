@@ -42,8 +42,9 @@ class DoorToggleTest {
     @Test
     @DisplayName("la puerta de un salon de arriba se abre y se cierra desde adentro y desde el pasillo")
     void topRoomDoorWorksFromBothSides() {
-        // Pasillo (abajo): los pies justo debajo de la casilla de la puerta.
-        guard.reportPosition(1, DOOR_X, 472);
+        // Pasillo (abajo), a 112 px: hasta ahi avisa el cliente para que la cabeza no
+        // tape la puerta.
+        guard.reportPosition(1, DOOR_X, 480 + 112 - GameSession.FOOT_OFFSET_PX);
         assertTrue(toggle("f1-aula"));
         assertFalse(isOpen("f1-aula"));
 
@@ -71,7 +72,7 @@ class DoorToggleTest {
     @Test
     @DisplayName("lejos de la puerta o en otro piso no se puede usar")
     void tooFarOrOtherFloor() {
-        guard.reportPosition(1, DOOR_X, 300);
+        guard.reportPosition(1, DOOR_X, 280); // pies a 149 px del centro de la casilla
         assertEquals("too_far", session.attemptToggleDoor("SEGURIDAD", "f1-aula", 0, 0).reason());
 
         guard.reportPosition(2, DOOR_X, 472);

@@ -183,9 +183,11 @@ const TILE_TEXTURE_FILES = {
 
 // Desde los pies del jugador (el centro del sprite va ~51 px mas arriba, igual que
 // FOOT_OFFSET_PX en el servidor) hasta el centro de la casilla de la puerta. Pegado a
-// la puerta cerrada se queda a ~41-43 px por cualquier lado: con una casilla de alcance
-// el aviso sale solo junto a ella. El servidor acepta hasta 128 px por el retraso de red.
-const DOOR_PROXIMITY_PX = 64;
+// la puerta cerrada se queda a ~41-43 px por cualquier lado. Desde abajo se alcanza de
+// mas lejos: el sprite sube ~110 px sobre los pies y, pegado, la cabeza tapaba la
+// puerta. El servidor acepta hasta 128 px (tambien por el retraso de la red).
+const DOOR_REACH_FROM_ABOVE_PX = 64;
+const DOOR_REACH_FROM_BELOW_PX = 112;
 const DOOR_FOOT_OFFSET_PX = 51;
 
 const SOLID_GRID_TYPES = new Set(['wall', 'glass']);
@@ -1817,7 +1819,8 @@ export default class MainScene extends Phaser.Scene {
       const dx = px - door.cellX;
       const dy = py - door.cellY;
       const distSq = dx * dx + dy * dy;
-      if (distSq <= DOOR_PROXIMITY_PX * DOOR_PROXIMITY_PX && distSq < closestDistSq) {
+      const reach = dy > 0 ? DOOR_REACH_FROM_BELOW_PX : DOOR_REACH_FROM_ABOVE_PX;
+      if (distSq <= reach * reach && distSq < closestDistSq) {
         closest = door;
         closestDistSq = distSq;
       }
