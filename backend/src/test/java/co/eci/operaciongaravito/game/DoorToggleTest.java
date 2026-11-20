@@ -58,8 +58,8 @@ class DoorToggleTest {
     @Test
     @DisplayName("la puerta de un salon de abajo se abre y se cierra desde el pasillo y desde adentro")
     void bottomRoomDoorWorksFromBothSides() {
-        // Adentro (abajo): los pies justo debajo de la casilla de la puerta.
-        guard.reportPosition(1, DOOR_X, 1048);
+        // Adentro (abajo), justo donde la puerta cerrada lo frena.
+        guard.reportPosition(1, DOOR_X, 1088);
         assertTrue(toggle("f1-terraza"));
         assertFalse(isOpen("f1-terraza"));
 
@@ -83,7 +83,7 @@ class DoorToggleTest {
     @Test
     @DisplayName("no se cierra con alguien parado en el marco, pero se puede abrir")
     void cannotCloseOnSomeone() {
-        guard.reportPosition(1, DOOR_X, 472);
+        guard.reportPosition(1, DOOR_X, 512);
         medic.reportPosition(1, DOOR_X, 429); // pies dentro de la casilla 9,7
         assertEquals("door_blocked", session.attemptToggleDoor("SEGURIDAD", "f1-aula", 0, 0).reason());
         assertTrue(isOpen("f1-aula"));
@@ -93,5 +93,12 @@ class DoorToggleTest {
         medic.reportPosition(1, DOOR_X, 429);
         assertTrue(toggle("f1-aula"), "abrir con alguien al lado siempre se puede");
         assertTrue(isOpen("f1-aula"));
+
+        // La franja de media casilla debajo del marco tambien cuenta (ahi la puerta
+        // cerrada frena en el cliente).
+        medic.reportPosition(1, DOOR_X, 512 + 20 - GameSession.FOOT_OFFSET_PX);
+        assertEquals("door_blocked", session.attemptToggleDoor("SEGURIDAD", "f1-aula", 0, 0).reason());
+        medic.reportPosition(1, DOOR_X, 512 + 40 - GameSession.FOOT_OFFSET_PX);
+        assertTrue(toggle("f1-aula"), "mas abajo de la franja ya no estorba");
     }
 }

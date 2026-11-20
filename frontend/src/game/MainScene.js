@@ -188,6 +188,10 @@ const TILE_TEXTURE_FILES = {
 // puerta. El servidor acepta hasta 128 px (tambien por el retraso de la red).
 const DOOR_REACH_FROM_ABOVE_PX = 64;
 const DOOR_REACH_FROM_BELOW_PX = 112;
+// La puerta cerrada frena media casilla antes a quien viene desde abajo: si no, el
+// jugador llegaba hasta el marco y quedaba dibujado encima de la puerta. Mismo valor
+// que GameSession.DOOR_BLOCK_BELOW_PX (no deja cerrarla con alguien en esa franja).
+const DOOR_BLOCK_BELOW_PX = 32;
 const DOOR_FOOT_OFFSET_PX = 51;
 
 const SOLID_GRID_TYPES = new Set(['wall', 'glass']);
@@ -2102,12 +2106,12 @@ export default class MainScene extends Phaser.Scene {
             : (deco.y + 1) * TILE - 48;
         const image = this.add.image(cx, cy, 'v2_door_madera_open').setDepth(8);
 
-        // La imagen mide 64x96 y sobresale media casilla hacia el pasillo; si chocara
-        // entera, al cerrarse empujaba al jugador contra las paredes del pasillo.
-        // Cerrada bloquea solo su casilla, la misma que el servidor (FloorGrid).
+        // Cerrada bloquea su casilla y media casilla hacia abajo (DOOR_BLOCK_BELOW_PX).
+        // El servidor no deja cerrarla con alguien en esa zona, asi nunca empuja a nadie
+        // contra las paredes del pasillo.
         const cellX = deco.x * TILE + TILE / 2;
         const cellY = deco.y * TILE + TILE / 2;
-        const blocker = this.add.zone(cellX, cellY, TILE, TILE);
+        const blocker = this.add.zone(cellX, cellY + DOOR_BLOCK_BELOW_PX / 2, TILE, TILE + DOOR_BLOCK_BELOW_PX);
         this.physics.add.existing(blocker, true);
         this.solids.add(blocker);
         blocker.body.enable = false;

@@ -20,6 +20,11 @@ public class GameSession {
      * arriba y 112 px por abajo).
      */
     static final double DOOR_INTERACT_RANGE_PX = 144;
+    /**
+     * En el cliente la puerta cerrada frena media casilla antes a quien viene desde abajo
+     * (si no, quedaba dibujado encima de la puerta). Esa franja cuenta como "en la puerta".
+     */
+    static final double DOOR_BLOCK_BELOW_PX = 32;
 
     private static final int GARAVITOS_PER_ZOMBIE = 1;
 
@@ -1555,8 +1560,10 @@ public class GameSession {
     }
 
     private static boolean standsOn(Player player, FloorGrid.DoorSpec door) {
-        int[] cell = FloorGrid.cellOf(player.getX(), player.getY() + FOOT_OFFSET_PX);
-        return cell[0] == door.col() && cell[1] == door.row();
+        double feetY = player.getY() + FOOT_OFFSET_PX;
+        double top = door.row() * (double) FloorGrid.TILE;
+        int col = (int) Math.floor(player.getX() / FloorGrid.TILE);
+        return col == door.col() && feetY >= top && feetY < top + FloorGrid.TILE + DOOR_BLOCK_BELOW_PX;
     }
 
     public List<DoorState> doorStates() {
