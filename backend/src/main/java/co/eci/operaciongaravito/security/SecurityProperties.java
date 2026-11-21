@@ -85,7 +85,7 @@ public class SecurityProperties {
         private int maxPerConnection = 3;
         /** Salas que puede crear una misma IP dentro de {@code ipWindowMs}. */
         private int maxPerIp = 20;
-        private long ipWindowMs = 10 * 60_000;
+        private long ipWindowMs = 10 * 60_000L;
         /** Una sala sin jugadores mas de este tiempo se borra. */
         private long emptyTtlMs = 60_000;
         /** Modo heredado: el cliente elige el codigo al crear (solo para k6 / pruebas de carga). */

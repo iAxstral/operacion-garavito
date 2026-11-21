@@ -33,6 +33,23 @@ public final class FloorGrid {
     /** {@code baseWalkable} se construye una sola vez al cargar el mapa (sin puertas). */
     private record Template(char[][] cells, List<DoorSpec> doors, List<SpawnPoint> spawnPoints,
                             boolean[][] baseWalkable, List<StairsSpec> stairs) {
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Template t && java.util.Arrays.deepEquals(cells, t.cells)
+                    && doors.equals(t.doors) && spawnPoints.equals(t.spawnPoints)
+                    && java.util.Arrays.deepEquals(baseWalkable, t.baseWalkable) && stairs.equals(t.stairs);
+        }
+
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(java.util.Arrays.deepHashCode(cells), doors, spawnPoints,
+                    java.util.Arrays.deepHashCode(baseWalkable), stairs);
+        }
+
+        @Override
+        public String toString() {
+            return "Template[" + cells.length + " filas, " + doors.size() + " puertas]";
+        }
     }
 
     /**

@@ -61,7 +61,6 @@ public class MatchHistoryService {
         });
     }
 
-    @Transactional
     public MatchRecord save(MatchSummary summary) {
         rankingCache.clear();
         MatchRecord record = new MatchRecord(summary.building().name(), summary.victory(),

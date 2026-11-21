@@ -551,6 +551,9 @@ export default function Hud({ onExit }) {
           tabIndex={-1}
           aria-label="Abrir inventario (Tab)"
           onClick={() => setInventoryOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') setInventoryOpen(true);
+          }}
         >
           {slots.map((slot, i) => (
             <div
@@ -667,7 +670,7 @@ export default function Hud({ onExit }) {
 
       {nearDowned && (
         <div className="hud-interact-hint hud-interact-hint--revive">
-          {touch ? 'Mantén' : 'Mantén'} <strong>E</strong> — revivir a {nearDowned.name}
+          Mantén <strong>E</strong> — revivir a {nearDowned.name}
           {me?.reviving === nearDowned.playerId && (
             <div className="hud-revive-bar"><div style={{ width: `${Math.round((me.reviveProgress ?? 0) * 100)}%` }} /></div>
           )}

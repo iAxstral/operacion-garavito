@@ -19,7 +19,7 @@ const PATHS = [
 // Rotacion correcta segun las salidas. Codo: 0 = E+S, 1 = S+W, 2 = W+N, 3 = N+E. Recta: 0 = W+E, 1 = N+S.
 const ELBOW = { ES: 0, SW: 1, NW: 2, EN: 3 };
 function pieceFor(dirs) {
-  const key = [...dirs].sort().join('');
+  const key = [...dirs].sort((a, b) => a.localeCompare(b)).join('');
   if (key === 'EW') return { kind: 'straight', target: 0 };
   if (key === 'NS') return { kind: 'straight', target: 1 };
   const elbowKey = { ES: 'ES', SW: 'SW', NW: 'NW', EN: 'EN' }[key];
