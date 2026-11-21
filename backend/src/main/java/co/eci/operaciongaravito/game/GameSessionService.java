@@ -24,19 +24,22 @@ public class GameSessionService {
     private final Map<String, GameSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, Seat> seatsByConnection = new ConcurrentHashMap<>();
     private final SimpMessagingTemplate messagingTemplate;
-    private final java.util.concurrent.ScheduledThreadPoolExecutor gameLoop =
-            new java.util.concurrent.ScheduledThreadPoolExecutor(4, runnable -> {
-                Thread thread = new Thread(runnable, "game-loop");
-                thread.setDaemon(true);
-                return thread;
-            });
+    private final java.util.concurrent.ScheduledThreadPoolExecutor gameLoop = nuevoGameLoop();
+    private static java.util.concurrent.ScheduledThreadPoolExecutor nuevoGameLoop() {
+        java.util.concurrent.ScheduledThreadPoolExecutor loop =
+                new java.util.concurrent.ScheduledThreadPoolExecutor(4, runnable -> {
+                    Thread thread = new Thread(runnable, "game-loop");
+                    thread.setDaemon(true);
+                    return thread;
+                });
+        // Una tarea cancelada sale de la cola enseguida, no cuando le tocaria correr.
+        loop.setRemoveOnCancelPolicy(true);
+        return loop;
+    }
+
     /** La tarea de tick de cada sala: se cancela al cerrar la sala (no queda programada). */
     private final Map<String, ScheduledFuture<?>> tickers = new ConcurrentHashMap<>();
 
-    {
-        // Una tarea cancelada sale de la cola enseguida, no cuando le tocaria correr.
-        gameLoop.setRemoveOnCancelPolicy(true);
-    }
 
     /** Topes de salas (security.rooms.*). Sin Spring (pruebas armadas a mano), los de por defecto. */
     private co.eci.operaciongaravito.security.SecurityProperties security =
@@ -98,7 +101,8 @@ public class GameSessionService {
     // Sin perfil cluster, un registro en memoria y nunca hay a donde redirigir.
     private co.eci.operaciongaravito.cluster.RoomRegistry roomRegistry =
             new co.eci.operaciongaravito.cluster.InMemoryRoomRegistry();
-    private String nodeUrl = "local";
+    private static final String LOCAL = "local";
+    private String nodeUrl = LOCAL;
     private static final long REGISTRY_REFRESH_MS = 30_000;
 
     @org.springframework.beans.factory.annotation.Autowired(required = false)
@@ -112,11 +116,11 @@ public class GameSessionService {
     }
 
     /** Nombre del nodo que se muestra en la pagina publica (nunca su URL interna). */
-    private String nodeName = "local";
+    private String nodeName = LOCAL;
 
     @org.springframework.beans.factory.annotation.Autowired
     void setNodeName(@Value("${app.node.name:local}") String name) {
-        this.nodeName = name == null || name.isBlank() ? "local" : name;
+        this.nodeName = name == null || name.isBlank() ? LOCAL : name;
     }
 
     /** URL del nodo que tiene la sala si no es este, o null (la sala esta aqui o no existe). */

@@ -35,6 +35,9 @@ public class GameController {
 
     private static final System.Logger LOGGER = System.getLogger(GameController.class.getName());
 
+    private static final String ROOM_CAP_REASON = "room_cap";
+    private static final String BAD_TOKEN_REASON = "bad_token";
+
     private final GameSessionService sessionService;
     private final SecurityProperties security;
     private final LimiteSalas limiteSalas;
@@ -89,14 +92,14 @@ public class GameController {
         String connection = headers.getSessionId();
         if (sessionService.atRoomCap() || !limiteSalas.permitir(connection, ipDe(headers))) {
             contar(Rechazos.ROOM_CAP);
-            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "room_cap"));
+            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), ROOM_CAP_REASON));
             return;
         }
         String code = sessionService.createWithServerCode(Building.parseOrDefault(request.building()),
                 GameMode.parseOrDefault(request.mode()));
         if (code == null) {
             contar(Rechazos.ROOM_CAP);
-            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "room_cap"));
+            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), ROOM_CAP_REASON));
             return;
         }
         sessionService.reply(connection, LastEvent.lobbyCreated(request.clientId(), code));
@@ -104,7 +107,7 @@ public class GameController {
 
     @MessageMapping("/game/{gameId}/lobby")
     public void lobby(@DestinationVariable String gameId, LobbyRequest request, SimpMessageHeaderAccessor headers) {
-        if (invalido(lobbyValido(request))) {
+        if (invalido(request != null && lobbyValido(request))) {
             return;
         }
         String connection = headers.getSessionId();
@@ -114,21 +117,8 @@ public class GameController {
             return;
         }
         if (request.create()) {
-            // El codigo lo genera el servidor (/app/game/create). Elegirlo el cliente solo
-            // queda para las pruebas de carga (perfil carga), con los mismos topes.
-            if (!security.getRooms().isClientCodesAllowed()) {
-                sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "use_create"));
-                return;
-            }
-            if (sessionService.atRoomCap() || !limiteSalas.permitir(connection, ipDe(headers))) {
-                contar(Rechazos.ROOM_CAP);
-                sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "room_cap"));
-                return;
-            }
-            session = sessionService.create(gameId, Building.parseOrDefault(request.building()),
-                    GameMode.parseOrDefault(request.mode()));
+            session = crearConCodigoDelCliente(gameId, request, connection, headers);
             if (session == null) {
-                sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "code_taken"));
                 return;
             }
         } else {
@@ -144,6 +134,30 @@ public class GameController {
         sessionService.broadcast(gameId, session, LastEvent.lobbyOk(request.clientId()));
     }
 
+    /**
+     * El codigo lo genera el servidor (/app/game/create). Elegirlo el cliente solo queda
+     * para las pruebas de carga (perfil carga), con los mismos topes. Devuelve null (ya
+     * respondido el rechazo) si no se pudo crear.
+     */
+    private GameSession crearConCodigoDelCliente(String gameId, LobbyRequest request, String connection,
+            SimpMessageHeaderAccessor headers) {
+        if (!security.getRooms().isClientCodesAllowed()) {
+            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "use_create"));
+            return null;
+        }
+        if (sessionService.atRoomCap() || !limiteSalas.permitir(connection, ipDe(headers))) {
+            contar(Rechazos.ROOM_CAP);
+            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), ROOM_CAP_REASON));
+            return null;
+        }
+        GameSession session = sessionService.create(gameId, Building.parseOrDefault(request.building()),
+                GameMode.parseOrDefault(request.mode()));
+        if (session == null) {
+            sessionService.reply(connection, LastEvent.lobbyRejected(request.clientId(), "code_taken"));
+        }
+        return session;
+    }
+
     private boolean asientoValido(JoinRequest request) {
         return request != null && cumple(CONSTANTE, request.role()) && cumple(CLIENT_ID, request.clientId())
                 && Entrada.nombre(request.name()) && opcional(CONSTANTE, request.costume());
@@ -151,13 +165,13 @@ public class GameController {
 
     @MessageMapping("/game/{gameId}/join")
     public void join(@DestinationVariable String gameId, JoinRequest request, SimpMessageHeaderAccessor headers) {
-        if (invalido(asientoValido(request))) {
+        if (invalido(request != null && asientoValido(request))) {
             return;
         }
         String connection = headers.getSessionId();
         if (!opcional(TOKEN, request.token())) {
             contar(Rechazos.BAD_TOKEN);
-            sessionService.reply(connection, LastEvent.joinRejected(request.clientId(), "bad_token"));
+            sessionService.reply(connection, LastEvent.joinRejected(request.clientId(), BAD_TOKEN_REASON));
             return;
         }
         GameSession session = sessionService.find(gameId);
@@ -186,18 +200,18 @@ public class GameController {
 
     @MessageMapping("/game/{gameId}/rejoin")
     public void rejoin(@DestinationVariable String gameId, JoinRequest request, SimpMessageHeaderAccessor headers) {
-        if (invalido(asientoValido(request))) {
+        if (invalido(request != null && asientoValido(request))) {
             return;
         }
         String connection = headers.getSessionId();
         if (!cumple(TOKEN, request.token())) {
             contar(Rechazos.BAD_TOKEN);
-            sessionService.reply(connection, LastEvent.rejoinRejected(request.clientId(), "bad_token"));
+            sessionService.reply(connection, LastEvent.rejoinRejected(request.clientId(), BAD_TOKEN_REASON));
             return;
         }
         String rejection = sessionService.rejoin(gameId, request.role(), request.token(), connection);
         if (rejection != null) {
-            if ("bad_token".equals(rejection)) {
+            if (BAD_TOKEN_REASON.equals(rejection)) {
                 contar(Rechazos.BAD_TOKEN);
             }
             sessionService.reply(connection, LastEvent.rejoinRejected(request.clientId(), rejection));

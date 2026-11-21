@@ -30,6 +30,8 @@
 		<java.version>21</java.version>
 		<sonar.projectKey>operacion-garavito-backend</sonar.projectKey>
 		<sonar.projectName>Operación Garavito - Backend</sonar.projectName>
+		<!-- Linea base del codigo nuevo para el Quality Gate: Release 2. -->
+		<sonar.projectVersion>2.0</sonar.projectVersion>
 		<sonar.host.url>http://localhost:9000</sonar.host.url>
 		<sonar.coverage.jacoco.xmlReportPaths>${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
 		<!-- Parches de seguridad sobre las versiones de Spring Boot 4.1.1 (Trivy, ver

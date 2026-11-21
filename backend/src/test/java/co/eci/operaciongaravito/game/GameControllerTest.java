@@ -142,7 +142,8 @@ class GameControllerTest {
         // Tampoco en una sala que no existe.
         accionesValidas().forEach(accion -> accion.accept("NOEXI1", connection("conn-infra")));
         assertEquals(x, infra.getX());
-        verify(template, never()).convertAndSend(anyString(), any(Object.class));
+        // El tick de la sala difunde su estado solo; lo que importa es que nada cambio.
+        assertNull(service.seatRole(ROOM, "conn-intrusa"));
     }
 
     @Test
