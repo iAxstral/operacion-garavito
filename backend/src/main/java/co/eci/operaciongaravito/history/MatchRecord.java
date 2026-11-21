@@ -44,7 +44,12 @@ public class MatchRecord {
     @Column(nullable = false, length = 16)
     private String mode = "NORMAL";
 
-    @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, fetch = FetchType.EAGER)
+    /**
+     * Perezosa y en lotes: los jugadores de las 10 partidas del ranking salen en UNA
+     * consulta (WHERE match_id IN ...), no en una por partida (N+1).
+     */
+    @OneToMany(mappedBy = "match", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @org.hibernate.annotations.BatchSize(size = 32)
     private List<MatchPlayerRecord> players = new ArrayList<>();
 
     protected MatchRecord() {

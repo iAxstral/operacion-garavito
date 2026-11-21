@@ -4,6 +4,11 @@
 // Cada 4 VUs comparten sala: el primero que llega la crea, los otros entran, y se
 // inicia cuando estan los 4 (o a los 15 s si falta alguno).
 //
+// El backend tiene que tener el perfil "carga" (ademas de dev o cluster): los VUs eligen
+// el codigo de su sala para encontrarse y salen todos de la misma maquina, cosa que los
+// limites de abuso de produccion no dejan (ver docs/SEGURIDAD.md).
+//   java -jar target/*.jar --spring.profiles.active=dev,carga
+//
 //   k6 run k6/partidas.js
 //   k6 run -e BASE_URL=http://192.168.1.20:8080 -e PERFIL=estres k6/partidas.js
 //   k6 run -e BASE_URL=http://localhost:8080 k6/partidas.js   (balanceador del cluster)
@@ -162,6 +167,8 @@ export function jugador() {
         if (command === 'CONNECTED') {
           conexionStomp.add(Date.now() - inicio);
           socket.send(frame('SUBSCRIBE', { id: 'sub-0', destination: `/topic/game/${codigo}` }));
+          // Los rechazos (code_taken, puesto tomado) llegan solo a quien los causo.
+          socket.send(frame('SUBSCRIBE', { id: 'sub-1', destination: '/user/queue/eventos' }));
           // Spring puede atender el SUBSCRIBE y el primer SEND en hilos distintos: se espera
           // un momento para no perder la respuesta, y se reintenta si igual no llega.
           socket.setTimeout(pedirSala, 500);
@@ -172,6 +179,7 @@ export function jugador() {
         }
         if (command !== 'MESSAGE') return;
 
+        const privado = raw.includes('destination:/user/queue/eventos');
         const estado = JSON.parse(body);
         const evento = estado.lastEvent;
         if (evento) {
@@ -195,7 +203,7 @@ export function jugador() {
             correcciones.add(1);
           }
         }
-        if (!estado.players) return; // rechazo suelto, sin estado
+        if (privado || !estado.players) return; // rechazo suelto, sin estado
 
         // Entro si el servidor lo confirma o si ya aparece en la sala con su nombre.
         if (!entro && ((evento && evento.type === 'JOIN_OK' && evento.itemId === clientId)
