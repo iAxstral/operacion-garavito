@@ -11,6 +11,10 @@ Navegador ──HTTPS──▶ CloudFront (www.operaciongaravito.me)
                         └── /prometheus/*  → EC2 :9090 (Prometheus, con clave)
 EC2 t4g.small: backend (Java 21) + PostgreSQL 16 + Prometheus + Grafana
                (Prometheus lee /actuator/prometheus por localhost)
+
+GitHub Actions ──HTTPS──▶ CloudFront (d1nb9719430frc.cloudfront.net)
+                             └── /*  → EC2 :9000 (SonarQube, stack aparte)
+EC2 t4g.small: SonarQube 10.7 + PostgreSQL 16 (Docker)
 ```
 
 - Region: **us-east-2** (la organizacion de la cuenta solo permite esa).
@@ -34,8 +38,12 @@ cd backend; .\mvnw.cmd -B package; cd ..
 cd frontend; npm ci; npm run lint; npm test; $env:VITE_WS_URL='/ws'; npm run build; cd ..
 
 # 3. Infraestructura: primero ver que cambia, despues desplegar
-cd infra; npm install; npx cdk diff; npx cdk deploy
+cd infra; npm install; npx cdk diff OperacionGaravito; npx cdk deploy OperacionGaravito --exclusively
 ```
+
+Hay dos stacks: `OperacionGaravito` (el juego) y `OperacionGaravitoSonar` (SonarQube,
+ver [SonarQube](#sonarqube)). Nombrar siempre el stack con `--exclusively`, asi
+desplegar uno nunca toca el otro.
 
 Si `cdk diff` dice `There were no differences`, lo desplegado ya es el codigo actual
 y no hace falta `cdk deploy`. Si el juego no responde, puede que la maquina este
@@ -150,6 +158,44 @@ cual el backend usaba 42 % y el resto Prometheus, Grafana y PostgreSQL. No es fa
 creditos: la instancia esta en modo `unlimited`. Con `humo` (4 jugadores) todos los
 umbrales pasan (estado p95 145 ms, movimiento p95 223 ms).
 
+## SonarQube
+
+El analisis de calidad del CI (job `sonar` de `.github/workflows/ci.yml`) se manda a
+un SonarQube propio en **https://d1nb9719430frc.cloudfront.net**, en su propia EC2
+t4g.small y su propia distribucion de CloudFront (`lib/sonar-stack.ts`). Es un stack
+aparte para que desplegarlo, apagarlo o borrarlo nunca recree la maquina del juego.
+
+- Costo aproximado: **US$17/mes** encendido (maquina, IP fija y disco).
+- La maquina instala Docker, levanta SonarQube y PostgreSQL, cambia la clave por
+  defecto `admin/admin` y genera un token para el CI. Todo queda en
+  `/opt/sonar/sonar.env` y cambia si se recrea la maquina.
+- 2 GB alcanzan porque el analisis corre en GitHub Actions; la memoria de cada
+  proceso de SonarQube esta ajustada y hay 2 GB de swap.
+
+```powershell
+cd infra; npx cdk diff OperacionGaravitoSonar; npx cdk deploy OperacionGaravitoSonar --exclusively
+```
+
+Para ver la clave de `admin` y el token del CI (por SSM, sin entrar a la maquina):
+
+```powershell
+$id = aws ssm send-command --region us-east-2 --instance-ids <SonarInstanceId> `
+  --document-name AWS-RunShellScript --parameters 'commands=["cat /opt/sonar/sonar.env"]' `
+  --query Command.CommandId --output text
+aws ssm get-command-invocation --region us-east-2 --instance-id <SonarInstanceId> `
+  --command-id $id --query StandardOutputContent --output text
+```
+
+En GitHub (*Settings → Secrets and variables → Actions*) van dos secretos:
+
+| Secreto | Valor |
+|---|---|
+| `SONAR_HOST_URL` | `https://d1nb9719430frc.cloudfront.net` |
+| `SONAR_TOKEN` | el `SONAR_TOKEN` de `/opt/sonar/sonar.env` |
+
+Los proyectos `operacion-garavito-backend` y `operacion-garavito-frontend` se crean
+solos con el primer analisis.
+
 ## Ahorrar
 
 ```powershell
@@ -160,7 +206,11 @@ aws ec2 start-instances --region us-east-2 --instance-ids <id>
 
 Apagar y encender no borra la base; solo recrear la maquina lo hace.
 
-Para borrar todo: `npx cdk destroy` dentro de `infra/`. El certificado de ACM
+SonarQube se apaga igual con su id (salida `SonarInstanceId`); con la maquina
+apagada solo cuestan la IP y el disco (~US$5/mes), pero el job `sonar` del CI falla
+hasta encenderla. Para quitarlo del todo: `npx cdk destroy OperacionGaravitoSonar`.
+
+Para borrar todo: `npx cdk destroy --all` dentro de `infra/`. El certificado de ACM
 (us-east-1) se creo con la CLI y se borra aparte en la consola de ACM.
 
 ## Dominio

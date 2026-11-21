@@ -63,7 +63,10 @@ cd backend && ./mvnw verify sonar:sonar -Dsonar.token=<TOKEN>
 cd frontend && npx sonar-scanner -Dsonar.token=<TOKEN>
 ```
 
-En CI se usan los secretos del repositorio `SONAR_TOKEN` y `SONAR_HOST_URL` (configúralos en *Settings → Secrets and variables → Actions*).
+En CI el análisis va al SonarQube desplegado en AWS, **https://d1nb9719430frc.cloudfront.net**
+(su propia EC2, stack `OperacionGaravitoSonar`), con los secretos del repositorio
+`SONAR_TOKEN` y `SONAR_HOST_URL` (*Settings → Secrets and variables → Actions*). Cómo
+desplegarlo y sacar el token: [`infra/README.md`](infra/README.md#sonarqube).
 
 ## Monitoreo
 
