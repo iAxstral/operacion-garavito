@@ -36,7 +36,7 @@ jobs:
           fetch-depth: 0   # Sonar usa el historial para saber que codigo es nuevo
 
       - if: inputs.tipo == 'maven'
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: '21'
