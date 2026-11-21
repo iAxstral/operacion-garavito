@@ -46,14 +46,14 @@ jobs:
           PY
       - name: Reporte de cobertura
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: cobertura-${{ inputs.directorio }}
           path: ${{ inputs.directorio }}/target/site/jacoco
           if-no-files-found: ignore
       - name: Reporte de pruebas
         if: failure()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: surefire-${{ inputs.directorio }}
           path: ${{ inputs.directorio }}/target/surefire-reports
