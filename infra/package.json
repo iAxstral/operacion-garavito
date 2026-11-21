@@ -16,6 +16,6 @@
     "aws-cdk": "2.1147.0",
     "ts-node": "10.9.2",
     "typescript": "5.9.3",
-    "@types/node": "24.9.1"
+    "@types/node": "26.6.6"
   }
 }
