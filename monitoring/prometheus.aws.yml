@@ -1,5 +1,5 @@
 # Prometheus del despliegue en AWS (infra/): corre en la misma EC2 que el backend y lo
-# lee por localhost, asi /actuator nunca queda expuesto a internet.
+# lee por localhost:9091 (puerto de management, solo 127.0.0.1), asi /actuator nunca queda expuesto a internet.
 global:
   scrape_interval: 5s
 
@@ -7,6 +7,6 @@ scrape_configs:
   - job_name: garavito
     metrics_path: /actuator/prometheus
     static_configs:
-      - targets: ["localhost:8080"]
+      - targets: ["localhost:9091"]
         labels:
           node: aws
