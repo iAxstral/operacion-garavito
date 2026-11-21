@@ -167,15 +167,49 @@ movimiento supera los 300 ms de p95 desde la carga esperada (80 jugadores) por l
 saturación de CPU del generador; el servidor en sí no mostró degradación (tick, heap y
 errores estables) y se recuperó del pico en segundos.
 
+## 4b. Repetición contra el despliegue distribuido en AWS (generador ≠ servidor)
+
+Para quitar la saturación del generador, se repitieron carga y pico con **k6 en el
+portátil (Bogotá) y el backend en AWS** (2 nodos detrás del ALB, us-east-2), pasando
+por CloudFront. Durante la prueba los nodos usaron temporalmente el perfil `carga`
+(sin los límites por IP, porque los 200 jugadores salen de la misma IP); al terminar
+volvieron a la configuración de producción.
+
+| Medida | Carga (AWS) | Pico (AWS) |
+|---|---|---|
+| VUs máximos | 85 | 205 |
+| **TPS / TPM** | **336,7 / 20 201** | **527,9 / 31 673** |
+| Solicitudes/s | 457,8 | 724,7 |
+| Movimiento confirmado p50 / **p95** / p99 | 132 / **246** / 1 310 ms ✅ | 153 / **1 109** / 1 853 ms ❌ |
+| Intervalo de estado p50 / **p95** / p99 | 87 / **141** / 403 ms ✅ | 61 / **209** / 1 085 ms ✅ |
+| Ranking p95 | 406 ms ❌ | 639 ms ❌ |
+| Errores HTTP | 0 % ✅ | 0 % ✅ |
+| Entrada exitosa | 100 % ✅ | 99,2 % ✅ |
+| Redirecciones entre nodos (`LOBBY_REDIRECT`) | 90 | 171 |
+| Sesiones cortadas | 0 | 0 |
+
+Archivos: `docs/k6/resultados/aws-{carga,pico}.json` y `.txt`, y
+`docs/k6/reporte-aws-{carga,pico}.html`.
+
+- **Con el generador en otra máquina, la operación esperada cumple los umbrales de
+  tiempo real** (movimiento p95 246 ms < 300, estado p95 141 ms < 250), a pesar de que
+  cada mensaje viaja Bogotá → Ohio (el p50 de 132 ms es en su mayoría red).
+- **En el pico** el estado sigue llegando a tiempo (p95 209 ms) y no hay errores; el
+  movimiento p95 sube a 1,1 s durante el salto a 200 jugadores (conexiones nuevas en
+  ráfaga: `ws_connecting` p95 877 ms) y vuelve al bajar la carga.
+- **Las redirecciones** muestran el escalado horizontal funcionando: las salas se
+  reparten entre los dos nodos y los jugadores que piden una sala del otro nodo se
+  reconectan allá sin error.
+- **El ranking** sigue siendo el punto más lento (consulta a RDS t4g.micro detrás de
+  la caché de 8 s): acción de mejora 4.
+
 ## 5. Conclusiones y acciones de mejora
 
 - El servidor soporta 200 jugadores concurrentes con 0 errores y se recupera solo de
   un pico de 10× en 10 s. Su capacidad real es mayor que lo que este generador alcanza
   a medir.
-- **Acción 1 (metodología):** correr k6 en una máquina distinta al servidor. Con el
-  despliegue distribuido en AWS (`infra/lib/distribuido-stack.ts`), k6 corre en el
-  portátil y el backend en sus propias EC2 (`k6 run -e BASE_URL=https://<url>
-  -e PERFIL=pico k6/partidas.js`; ver DISPONIBILIDAD.md).
+- **Acción 1 (metodología), aplicada en §4b:** con k6 en otra máquina, la carga
+  esperada cumple los umbrales de tiempo real.
 - **Acción 2:** escalar horizontalmente (segundo nodo detrás del balanceador) cuando la
   CPU del backend pase de 70 % o el tick p99 de 40 ms (alertas de Grafana).
 - **Acción 3:** reducir el tamaño del estado (más campos en delta, compresión

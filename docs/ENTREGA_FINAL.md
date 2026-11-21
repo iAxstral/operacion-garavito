@@ -11,3 +11,8 @@
 | 2.6 | Observabilidad: Prometheus, Grafana, alertas y correlación con k6 | [grafana/README.md](grafana/README.md), [prometheus/README.md](prometheus/README.md), `monitoring/`, gráficas en `docs/k6/img/*-servidor.png` |
 | 2.7 | Concurrencia y tiempo real | [CONCURRENCIA.md](CONCURRENCIA.md), `ConcurrenciaTest`, `MissionBoardTest`, e2e `partida.spec.js` |
 | 3.1 | Código, README, CI, Azure DevOps | [README.md](../README.md), https://dev.azure.com/OperacionGaravito/OperacionGaravito |
+| 3 | Diagramas UML: contexto, componentes, clases, ER, secuencia, despliegue y actividades | [DIAGRAMAS.md](DIAGRAMAS.md) |
+| 2.8 / 3.1 | Contribuciones individuales y uso de IA | [CONTRIBUCIONES.md](CONTRIBUCIONES.md) |
+
+**Despliegue distribuido en AWS:** https://d207yv243tya3v.cloudfront.net · Grafana:
+https://d207yv243tya3v.cloudfront.net/grafana/ (ver [DISPONIBILIDAD.md](DISPONIBILIDAD.md)).

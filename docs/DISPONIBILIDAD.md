@@ -13,6 +13,10 @@ responde `LOBBY_REDIRECT` y el cliente se reconecta a ese nodo.
 
 ### Despliegue distribuido en AWS (`infra/lib/distribuido-stack.ts`, stack `OperacionGaravitoDistribuido`)
 
+**Desplegado el 20-11-2026:** https://d207yv243tya3v.cloudfront.net (Grafana en `/grafana/`).
+Los dos nodos pasan el chequeo de salud del ALB y las pruebas de k6 contra él están en
+[RENDIMIENTO.md](RENDIMIENTO.md) §4b.
+
 ```
                          ┌──────────────── CloudFront (HTTPS, red global) ────────────────┐
 Navegador ──HTTPS──────▶ │ /*        /ws/*, /api/*           /n1/*  /n2/*      /grafana/* │
