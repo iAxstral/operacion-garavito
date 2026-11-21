@@ -134,6 +134,11 @@
   gap: 6px;
 }
 
+.hud-inventory--open {
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 .hud-inventory--small {
   position: static;
   margin-top: 2px;

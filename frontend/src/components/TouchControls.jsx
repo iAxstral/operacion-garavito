@@ -171,7 +171,7 @@ export default function TouchControls() {
         <button
           type="button"
           className="touch-btn touch-btn--e"
-          aria-label="Interactuar o inventario"
+          aria-label="Interactuar"
           onPointerDown={(event) => {
             event.preventDefault();
             event.currentTarget.setPointerCapture(event.pointerId);
