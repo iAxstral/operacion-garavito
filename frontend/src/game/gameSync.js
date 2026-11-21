@@ -42,7 +42,8 @@ function clearSeat() {
 
 function newToken() {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
-  return Array.from({ length: 4 }, () => Math.random().toString(36).slice(2)).join('');
+  // Sin randomUUID (paginas sin HTTPS): igual con el generador criptografico, nunca Math.random.
+  return Array.from(globalThis.crypto.getRandomValues(new Uint8Array(16)), (b) => b.toString(16).padStart(2, '0')).join('');
 }
 let myRole = 'SEGURIDAD';
 let currentFloor = 1;
