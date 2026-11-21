@@ -38,7 +38,7 @@ jobs:
       - name: Build
         run: npm run build
       - name: Cobertura
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: cobertura-${{ inputs.directorio }}
           path: ${{ inputs.directorio }}/coverage
