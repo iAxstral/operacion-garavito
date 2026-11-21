@@ -3,79 +3,366 @@
   "title": "Operación Garavito",
   "timezone": "browser",
   "refresh": "5s",
-  "time": { "from": "now-15m", "to": "now" },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
   "schemaVersion": 39,
   "panels": [
     {
-      "type": "stat", "title": "Salas activas", "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "targets": [{ "expr": "sum(garavito_rooms)", "refId": "A" }]
+      "type": "stat",
+      "title": "Salas activas",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "sum(garavito_rooms)",
+          "refId": "A"
+        }
+      ]
     },
     {
-      "type": "stat", "title": "Jugadores conectados", "gridPos": { "x": 6, "y": 0, "w": 6, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "type": "stat",
+      "title": "Jugadores conectados",
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "description": "Amarillo desde 150 (dispara la alerta de capacidad) y rojo desde 200, lo maximo que medimos con k6 en una maquina.",
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [
-        { "color": "green", "value": null }, { "color": "yellow", "value": 150 }, { "color": "red", "value": 200 }] } } },
-      "targets": [{ "expr": "sum(garavito_players)", "refId": "A" }]
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 150
+              },
+              {
+                "color": "red",
+                "value": 200
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(garavito_players)",
+          "refId": "A"
+        }
+      ]
     },
     {
-      "type": "stat", "title": "Zombis vivos", "gridPos": { "x": 12, "y": 0, "w": 6, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "thresholds": { "mode": "absolute", "steps": [{ "color": "purple", "value": null }] } } },
-      "targets": [{ "expr": "sum(garavito_zombies)", "refId": "A" }]
+      "type": "stat",
+      "title": "Zombis vivos",
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "purple",
+                "value": null
+              }
+            ]
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum(garavito_zombies)",
+          "refId": "A"
+        }
+      ]
     },
     {
-      "type": "stat", "title": "Mensajes livianos (%)", "gridPos": { "x": 18, "y": 0, "w": 6, "h": 5 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "type": "stat",
+      "title": "Mensajes livianos (%)",
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "description": "Mensajes que van como delta (solo lo que cambio). Mas alto es mejor.",
-      "fieldConfig": { "defaults": { "unit": "percent", "thresholds": { "mode": "absolute", "steps": [
-        { "color": "red", "value": null }, { "color": "yellow", "value": 60 }, { "color": "green", "value": 80 }] } } },
-      "targets": [{
-        "expr": "100 * sum(rate(garavito_messages_total{kind=\"delta\"}[1m])) / sum(rate(garavito_messages_total[1m]))",
-        "refId": "A"
-      }]
-    },
-    {
-      "type": "timeseries", "title": "Duración del tick de una sala", "gridPos": { "x": 0, "y": 5, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
-      "fieldConfig": { "defaults": { "unit": "s" } },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 60
+              },
+              {
+                "color": "green",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
       "targets": [
-        { "expr": "max(garavito_tick_seconds{quantile=\"0.5\"})", "legendFormat": "p50", "refId": "A" },
-        { "expr": "max(garavito_tick_seconds{quantile=\"0.99\"})", "legendFormat": "p99", "refId": "B" }
+        {
+          "expr": "100 * sum(rate(garavito_messages_total{kind=\"delta\"}[1m])) / sum(rate(garavito_messages_total[1m]))",
+          "refId": "A"
+        }
       ]
     },
     {
-      "type": "timeseries", "title": "Mensajes por segundo", "gridPos": { "x": 12, "y": 5, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "type": "timeseries",
+      "title": "Duración del tick de una sala",
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        }
+      },
       "targets": [
-        { "expr": "sum by (kind) (rate(garavito_messages_total[1m]))", "legendFormat": "{{kind}}", "refId": "A" }
+        {
+          "expr": "max(garavito_tick_seconds{quantile=\"0.5\"})",
+          "legendFormat": "p50",
+          "refId": "A"
+        },
+        {
+          "expr": "max(garavito_tick_seconds{quantile=\"0.99\"})",
+          "legendFormat": "p99",
+          "refId": "B"
+        }
       ]
     },
     {
-      "type": "timeseries", "title": "Salas y jugadores por nodo", "gridPos": { "x": 0, "y": 13, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "type": "timeseries",
+      "title": "Mensajes por segundo",
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "expr": "garavito_rooms", "legendFormat": "salas {{node}}", "refId": "A" },
-        { "expr": "garavito_players", "legendFormat": "jugadores {{node}}", "refId": "B" }
+        {
+          "expr": "sum by (kind) (rate(garavito_messages_total[1m]))",
+          "legendFormat": "{{kind}}",
+          "refId": "A"
+        }
       ]
     },
     {
-      "type": "timeseries", "title": "CPU y memoria del JVM", "gridPos": { "x": 12, "y": 13, "w": 12, "h": 8 },
-      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "type": "timeseries",
+      "title": "Salas y jugadores por nodo",
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
       "targets": [
-        { "expr": "process_cpu_usage", "legendFormat": "CPU {{node}}", "refId": "A" },
-        { "expr": "sum by (node) (jvm_memory_used_bytes{area=\"heap\"}) / sum by (node) (jvm_memory_max_bytes{area=\"heap\"})", "legendFormat": "heap {{node}}", "refId": "B" }
+        {
+          "expr": "garavito_rooms",
+          "legendFormat": "salas {{node}}",
+          "refId": "A"
+        },
+        {
+          "expr": "garavito_players",
+          "legendFormat": "jugadores {{node}}",
+          "refId": "B"
+        }
       ]
     },
     {
-      "type": "alertlist", "title": "Alertas", "gridPos": { "x": 0, "y": 21, "w": 24, "h": 12 },
+      "type": "timeseries",
+      "title": "CPU y memoria del JVM",
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "expr": "process_cpu_usage",
+          "legendFormat": "CPU {{node}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (node) (jvm_memory_used_bytes{area=\"heap\"}) / sum by (node) (jvm_memory_max_bytes{area=\"heap\"})",
+          "legendFormat": "heap {{node}}",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "type": "alertlist",
+      "title": "Alertas",
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 24,
+        "h": 12
+      },
       "description": "Reglas de monitoring/grafana/provisioning/alerting/reglas.yml. Rojo: disparada; amarillo: pendiente (se cumple la condicion pero aun no pasa el tiempo minimo).",
       "options": {
-        "viewMode": "list", "groupMode": "default", "showInstances": false, "maxItems": 20, "sortOrder": 3,
-        "stateFilter": { "firing": true, "pending": true, "noData": true, "normal": true, "error": true },
-        "alertInstanceLabelFilter": "", "folder": null, "dashboardAlerts": false
+        "viewMode": "list",
+        "groupMode": "default",
+        "showInstances": false,
+        "maxItems": 20,
+        "sortOrder": 3,
+        "stateFilter": {
+          "firing": true,
+          "pending": true,
+          "noData": true,
+          "normal": true,
+          "error": true
+        },
+        "alertInstanceLabelFilter": "",
+        "folder": null,
+        "dashboardAlerts": false
       }
+    },
+    {
+      "type": "timeseries",
+      "title": "Ataques detectados: rechazos por segundo, por razón",
+      "description": "garavito.rejected{reason}: lo que el servidor descarta por seguridad (ver docs/SEGURIDAD.md). rate_limit = mensajes de más, bad_subscribe = suscripción a una sala ajena o con comodín, bad_destination = publicar fuera de /app/game, bad_payload = cuerpo inválido, bad_token = token de puesto falso, room_cap / seat_cap = acaparar salas o puestos, bad_origin = sin el header de CloudFront, api_rate_limit = REST en bucle, idle = conexión muda.",
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 16,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        }
+      },
+      "targets": [
+        {
+          "expr": "sum by (reason) (rate(garavito_rejected_total[1m]))",
+          "legendFormat": "{{reason}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "stat",
+      "title": "Rechazos en la última hora",
+      "gridPos": {
+        "x": 16,
+        "y": 33,
+        "w": 8,
+        "h": 9
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "orange",
+                "value": 50
+              },
+              {
+                "color": "red",
+                "value": 500
+              }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        },
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "expr": "sum(increase(garavito_rejected_total[1h]))",
+          "legendFormat": "rechazos",
+          "refId": "A"
+        }
+      ]
     }
   ]
 }

@@ -3,16 +3,16 @@ import { touchInput } from './gameSync';
 // Control de consola (Xbox/PlayStation con el mapeo estandar del navegador). Escribe en
 // las mismas entradas que usan los botones tactiles, asi la escena no distingue.
 //   Palanca izquierda: moverse (al tope, corre) · Palanca derecha: apuntar
-//   A / Cruz: atacar · B / Circulo: dash · X / Cuadrado: E · Y / Triangulo: habilidad
+//   A / Cruz: atacar · B / Circulo: dash · X / Cuadrado: E · Y / Triangulo: habilidad · Back / Select: inventario
 //   RB: ataque cargado · LB: cambiar de arma · LT: correr · RT: atacar
 //   Cruceta: avisos (arriba zombis, abajo ayuda, derecha vamos, izquierda municion)
 //   Start: configuracion
 
 const DEADZONE = 0.22;
 const AIM_DEADZONE = 0.35;
-const BUTTONS = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, START: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
+const BUTTONS = { A: 0, B: 1, X: 2, Y: 3, LB: 4, RB: 5, LT: 6, RT: 7, BACK: 8, START: 9, UP: 12, DOWN: 13, LEFT: 14, RIGHT: 15 };
 // Botones que equivalen a una tecla: se simula la pulsacion.
-const KEYS = { X: ['e', 69], START: ['Escape', 27], UP: ['z', 90], DOWN: ['x', 88], RIGHT: ['g', 71], LEFT: ['b', 66] };
+const KEYS = { X: ['e', 69], BACK: ['i', 73], START: ['Escape', 27], UP: ['z', 90], DOWN: ['x', 88], RIGHT: ['g', 71], LEFT: ['b', 66] };
 
 let previous = {};
 let wasActive = false;

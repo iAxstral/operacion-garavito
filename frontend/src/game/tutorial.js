@@ -91,7 +91,7 @@ export const TIPS = [
     id: 'low_health',
     icon: '❤',
     when: (ctx) => ctx.health > 0 && ctx.health <= 40,
-    text: (ctx) => `Te queda poca vida: abre el inventario (${ctx.touch ? 'E' : 'E o I'}) y come algo.`,
+    text: (ctx) => `Te queda poca vida: abre el inventario (${ctx.touch ? 'toca la barra de objetos' : 'Tab'}) y come algo.`,
   },
   {
     id: 'ally_down',

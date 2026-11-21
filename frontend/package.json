@@ -9,6 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "node --test \"src/**/*.test.js\"",
+    "test:coverage": "node -e \"fs.mkdirSync('coverage',{recursive:true})\" && node --test --experimental-test-coverage --test-reporter=spec --test-reporter-destination=stdout --test-reporter=lcov --test-reporter-destination=coverage/lcov.info \"src/**/*.test.js\"",
     "test:e2e": "playwright test"
   },
   "dependencies": {

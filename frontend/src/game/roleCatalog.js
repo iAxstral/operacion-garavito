@@ -1,4 +1,4 @@
-import { missionTypesForRole } from './missionCatalog';
+import { missionTypesForRole } from './missionCatalog.js';
 
 export const ROLE_CATALOG = [
   {

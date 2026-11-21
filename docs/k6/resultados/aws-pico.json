@@ -1,0 +1,37 @@
+{
+  "perfil": "pico",
+  "base_url": "https://d207yv243tya3v.cloudfront.net",
+  "fecha": "2026-11-21T02:19:09.773Z",
+  "duracion_s": 265,
+  "vus_max": 205,
+  "transaccion": "movimiento confirmado (move enviado y visto en el estado del servidor)",
+  "transacciones": 139815,
+  "tps": 527.9,
+  "tpm": 31673,
+  "solicitudes": 191950,
+  "solicitudes_por_s": 724.7,
+  "estados_recibidos": 191249,
+  "ida_y_vuelta_ms": {
+    "p50": 153,
+    "p95": 1109,
+    "p99": 1852.9300000000003
+  },
+  "intervalo_estado_ms": {
+    "p50": 61,
+    "p95": 209,
+    "p99": 1085
+  },
+  "ranking_ms": {
+    "p95": 639.477275
+  },
+  "errores_http": 0,
+  "entrada_exitosa": 0.9923076923076923,
+  "sesiones_cortadas": 0,
+  "umbrales": {
+    "entrada_exitosa": true,
+    "ida_y_vuelta_movimiento_ms": false,
+    "http_req_failed": true,
+    "http_req_duration{endpoint:ranking}": false,
+    "intervalo_estado_ms": true
+  }
+}

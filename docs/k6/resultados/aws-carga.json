@@ -1,0 +1,37 @@
+{
+  "perfil": "carga",
+  "base_url": "https://d207yv243tya3v.cloudfront.net",
+  "fecha": "2026-11-21T02:14:43.532Z",
+  "duracion_s": 259,
+  "vus_max": 85,
+  "transaccion": "movimiento confirmado (move enviado y visto en el estado del servidor)",
+  "transacciones": 87130,
+  "tps": 336.7,
+  "tpm": 20201,
+  "solicitudes": 118470,
+  "solicitudes_por_s": 457.8,
+  "estados_recibidos": 109358,
+  "ida_y_vuelta_ms": {
+    "p50": 132,
+    "p95": 246,
+    "p99": 1310.2200000000012
+  },
+  "intervalo_estado_ms": {
+    "p50": 87,
+    "p95": 141,
+    "p99": 403
+  },
+  "ranking_ms": {
+    "p95": 405.64532499999996
+  },
+  "errores_http": 0,
+  "entrada_exitosa": 1,
+  "sesiones_cortadas": 0,
+  "umbrales": {
+    "http_req_duration{endpoint:ranking}": false,
+    "http_req_failed": true,
+    "entrada_exitosa": true,
+    "ida_y_vuelta_movimiento_ms": true,
+    "intervalo_estado_ms": true
+  }
+}

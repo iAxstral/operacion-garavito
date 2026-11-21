@@ -12,7 +12,19 @@ public class GameSession {
     private static final int FOOD_HEALTH_BONUS = 15;
     private static final double SHOP_RANGE_PX = 110;
     private static final double MISSION_RANGE_PX = 90;
-    private static final double DOOR_INTERACT_RANGE_PX = 90;
+    /**
+     * Desde los pies del jugador hasta el centro de la casilla de la puerta. Con 90 px
+     * desde el centro del sprite, una puerta cerrada solo se alcanzaba por un lado (los
+     * pies quedan ~51 px por debajo del centro); 144 px desde los pies alcanza de los
+     * dos lados con margen para el retraso de la red (el cliente avisa desde 64 px por
+     * arriba y 112 px por abajo).
+     */
+    static final double DOOR_INTERACT_RANGE_PX = 144;
+    /**
+     * En el cliente la puerta cerrada frena media casilla antes a quien viene desde abajo
+     * (si no, quedaba dibujado encima de la puerta). Esa franja cuenta como "en la puerta".
+     */
+    static final double DOOR_BLOCK_BELOW_PX = 32;
 
     private static final int GARAVITOS_PER_ZOMBIE = 1;
 
@@ -283,7 +295,10 @@ public class GameSession {
         if (player == null || expected == null) {
             return "seat_expired";
         }
-        if (!expected.equals(token)) {
+        // Comparacion en tiempo constante: no deja adivinar el token midiendo cuanto tarda.
+        if (token == null || !java.security.MessageDigest.isEqual(
+                expected.getBytes(java.nio.charset.StandardCharsets.UTF_8),
+                token.getBytes(java.nio.charset.StandardCharsets.UTF_8))) {
             return "bad_token";
         }
         player.markConnected();
@@ -372,7 +387,7 @@ public class GameSession {
             return true;
         }
         long now = System.currentTimeMillis();
-        if (!isValidMove(player, floor, x, y, now)) {
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !isValidMove(player, floor, x, y, now)) {
             player.countRejectedMove();
             return false;
         }
@@ -945,6 +960,9 @@ public class GameSession {
      */
     public synchronized PlayerActionResult attemptPlaceBarricade(String playerId, double x, double y, double facing) {
         Player player = players.get(playerId);
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(facing)) {
+            return PlayerActionResult.rejected("bad_position");
+        }
         if (player == null) {
             return PlayerActionResult.rejected("unknown_player");
         }
@@ -1201,6 +1219,11 @@ public class GameSession {
     }
 
     public synchronized AttackResult attemptAttack(String playerId, AttackType type, double x, double y, double facing) {
+        // Con NaN todas las comparaciones de distancia y angulo dan false: el golpe le
+        // pegaria a todos los zombis del piso. El controlador ya lo filtra; esto es por si acaso.
+        if (!Double.isFinite(x) || !Double.isFinite(y) || !Double.isFinite(facing)) {
+            return AttackResult.rejected("bad_position");
+        }
         Player player = players.get(playerId);
         if (player == null) {
             return AttackResult.rejected("unknown_player");
@@ -1530,15 +1553,28 @@ public class GameSession {
         }
         FloorGrid.DoorSpec spec = grid.doors().stream().filter(d -> d.doorId().equals(doorId)).findFirst().orElseThrow();
 
+        int floor = floors.indexOf(grid) + 1;
         double dx = player.getX() - spec.centerX();
-        double dy = player.getY() - spec.centerY();
-        if (floors.indexOf(grid) + 1 != player.getFloor() || Math.sqrt(dx * dx + dy * dy) > DOOR_INTERACT_RANGE_PX) {
+        double dy = player.getY() + FOOT_OFFSET_PX - spec.centerY();
+        if (floor != player.getFloor() || Math.hypot(dx, dy) > DOOR_INTERACT_RANGE_PX) {
             return DoorToggleResult.rejected("too_far");
         }
 
         boolean nowOpen = !grid.isDoorOpen(doorId);
+        // Cerrarla con alguien parado en el marco lo dejaba atrapado en la pared.
+        if (!nowOpen && players.values().stream().anyMatch(other -> other.getFloor() == floor
+                && standsOn(other, spec))) {
+            return DoorToggleResult.rejected("door_blocked");
+        }
         grid.setDoorOpen(doorId, nowOpen);
         return DoorToggleResult.ok(nowOpen);
+    }
+
+    private static boolean standsOn(Player player, FloorGrid.DoorSpec door) {
+        double feetY = player.getY() + FOOT_OFFSET_PX;
+        double top = door.row() * (double) FloorGrid.TILE;
+        int col = (int) Math.floor(player.getX() / FloorGrid.TILE);
+        return col == door.col() && feetY >= top && feetY < top + FloorGrid.TILE + DOOR_BLOCK_BELOW_PX;
     }
 
     public List<DoorState> doorStates() {

@@ -1,11 +1,16 @@
-# Integracion continua: en cada push y PR corre las pruebas del backend, el lint,
-# las pruebas y el build del frontend, las pruebas de punta a punta (Playwright)
-# y el análisis de calidad de código con SonarQube, además de una prueba de carga corta
-# con k6 que falla si el juego se pone lento (umbrales en k6/partidas.js).
+# Integracion continua: en cada push y PR corre las pruebas del backend (incluidas las
+# de ataque de backend/src/test/.../security), el lint, las pruebas y el build del
+# frontend, las pruebas de punta a punta (Playwright), una prueba de carga corta con k6
+# que falla si el juego se pone lento (umbrales en k6/partidas.js, ver docs/k6) y la
+# revision de dependencias con vulnerabilidades conocidas (ver docs/SEGURIDAD.md),
+# y el análisis de calidad de código con SonarQube.
+#
+# Los pasos repetidos viven en reusable workflows (reusable-*.yml) que este archivo
+# llama con distintos parametros.
 #
 # Requiere los siguientes secretos en el repositorio:
 #   SONAR_TOKEN   — token generado en SonarQube (Administración → Tokens)
-#   SONAR_HOST_URL — URL del servidor SonarQube (ej. http://mi-servidor:9000)
+#   SONAR_HOST_URL — https://d1nb9719430frc.cloudfront.net (SonarQube en AWS, ver infra/README.md)
 name: CI
 
 on:
@@ -19,11 +24,21 @@ concurrency:
 
 jobs:
   backend:
-    name: Backend (Java 21)
+    name: Backend
+    uses: ./.github/workflows/reusable-maven.yml
+    with:
+      directorio: backend
+      objetivos: verify
+
+  frontend:
+    name: Frontend
+    uses: ./.github/workflows/reusable-node.yml
+    with:
+      directorio: frontend
+
+  dependencias:
+    name: Dependencias del backend (Trivy)
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: backend
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -31,35 +46,28 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - name: Pruebas
-        run: ./mvnw -B test
-      - name: Reporte de pruebas
-        if: failure()
-        uses: actions/upload-artifact@v5
-        with:
-          name: surefire-reports
-          path: backend/target/surefire-reports
+      # Trivy lee las dependencias (con las transitivas) del repositorio local de Maven:
+      # si las pide el mismo a Maven Central, este responde 429 al runner.
+      - name: Descargar las dependencias al repositorio local
+        working-directory: backend
+        run: ./mvnw -B -q dependency:go-offline
+      # Equivalente a OWASP dependency-check: cruza las dependencias de pom.xml con las
+      # bases de vulnerabilidades. Falla con vulnerabilidades altas o criticas que ya
+      # tengan version arreglada. Imagen oficial de Docker (el runner trae Docker).
+      - name: Vulnerabilidades conocidas en backend/pom.xml
+        run: |
+          docker run --rm -v "$PWD/backend:/src:ro" -v "$HOME/.m2:/root/.m2:ro" aquasec/trivy:latest fs \
+            --offline-scan --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 /src
 
-  frontend:
-    name: Frontend (lint, pruebas, build)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - run: npm ci
-      - name: Lint
-        run: npm run lint
-      - name: Pruebas unitarias
-        run: npm test
-      - name: Build
-        run: npm run build
+  ataques:
+    name: Ataques
+    needs: [backend]
+    uses: ./.github/workflows/reusable-backend-vivo.yml
+    with:
+      nombre: pentest
+      # Sin perfil dev (que acepta cualquier Origin): la configuracion de produccion.
+      origenes: https://www.operaciongaravito.me
+      comando: node frontend/scripts/pentest.mjs http://localhost:8080
 
   e2e:
     name: Punta a punta (Playwright)
@@ -92,104 +100,57 @@ jobs:
           path: frontend/test-results
 
   carga:
-    name: Carga (k6, perfil humo)
-    runs-on: ubuntu-latest
+    name: Carga
     needs: [backend]
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-      - name: Levantar backend (perfil dev)
-        working-directory: backend
-        run: |
-          ./mvnw -B -q package -DskipTests
-          nohup java -jar target/*.jar --spring.profiles.active=dev > ../backend.log 2>&1 &
-          for i in $(seq 1 60); do
-            curl -sf http://localhost:8080/actuator/health && exit 0
-            sleep 2
-          done
-          cat ../backend.log
-          exit 1
-      - name: Instalar k6
-        run: |
-          curl -sSfL https://github.com/grafana/k6/releases/download/v0.54.0/k6-v0.54.0-linux-amd64.tar.gz | tar xz
-          sudo mv k6-v0.54.0-linux-amd64/k6 /usr/local/bin/k6
-          k6 version
+    uses: ./.github/workflows/reusable-backend-vivo.yml
+    with:
+      nombre: k6-humo
+      # Perfil carga: los jugadores falsos de k6 eligen el codigo de su sala y salen todos
+      # de la misma maquina; en produccion los limites de abuso no lo dejarian.
+      perfiles: dev,carga
+      instalar-k6: true
+      archivos: |
+        k6-resumen.json
+        docs/k6/resultados/humo.json
       # Si no se cumple algun umbral (k6/partidas.js), k6 sale con codigo 99 y el job falla.
-      - name: Prueba de carga
-        run: k6 run -e PERFIL=humo -e SESION_S=30 --summary-export=k6-resumen.json k6/partidas.js
-      - name: Resumen en la pagina del job
-        if: always()
-        run: |
-          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
-          import json, os
-          if not os.path.exists('k6-resumen.json'):
-              print('k6 no genero resumen.'); raise SystemExit
-          m = json.load(open('k6-resumen.json'))['metrics']
-          def fila(nombre, clave, valor, umbral):
-              ok = all(not v for v in m.get(clave, {}).get('thresholds', {}).values())
-              print(f"| {nombre} | {valor} | {umbral} | {'✅' if ok else '❌'} |")
-          print('### Prueba de carga (k6, perfil humo)\n')
-          print('| Medida | Valor | Umbral | |\n|---|---|---|---|')
-          e = m['entrada_exitosa']
-          fila('Jugadores que entraron', 'entrada_exitosa', f"{e['value']*100:.0f} % ({e['passes']} de {e['passes']+e['fails']})", '> 95 %')
-          fila('Intervalo de estado p95', 'intervalo_estado_ms', f"{m['intervalo_estado_ms']['p(95)']:.0f} ms", '< 250 ms')
-          fila('Ida y vuelta del movimiento p95', 'ida_y_vuelta_movimiento_ms', f"{m['ida_y_vuelta_movimiento_ms']['p(95)']:.0f} ms", '< 300 ms')
-          fila('Errores HTTP', 'http_req_failed', f"{m['http_req_failed']['value']*100:.1f} %", '< 1 %')
-          PY
-      - name: Reporte y log del backend
-        if: always()
-        uses: actions/upload-artifact@v5
-        with:
-          name: k6-humo
-          path: |
-            k6-resumen.json
-            backend.log
-  sonar:
-    name: Análisis SonarQube
-    runs-on: ubuntu-latest
-    needs: [backend, frontend]
+      comando: |
+        set +e
+        k6 run -e PERFIL=humo -e SESION_S=30 --summary-export=k6-resumen.json k6/partidas.js
+        codigo=$?
+        python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+        import json, os
+        if not os.path.exists('k6-resumen.json'):
+            print('k6 no genero resumen.'); raise SystemExit
+        m = json.load(open('k6-resumen.json'))['metrics']
+        def fila(nombre, clave, valor, umbral):
+            ok = all(not v for v in m.get(clave, {}).get('thresholds', {}).values())
+            print(f"| {nombre} | {valor} | {umbral} | {'✅' if ok else '❌'} |")
+        print('### Prueba de carga (k6, perfil humo)\n')
+        print('| Medida | Valor | Umbral | |\n|---|---|---|---|')
+        e = m['entrada_exitosa']
+        fila('Jugadores que entraron', 'entrada_exitosa', f"{e['value']*100:.0f} % ({e['passes']} de {e['passes']+e['fails']})", '> 95 %')
+        fila('Intervalo de estado p95', 'intervalo_estado_ms', f"{m['intervalo_estado_ms']['p(95)']:.0f} ms", '< 250 ms')
+        fila('Ida y vuelta del movimiento p95', 'ida_y_vuelta_movimiento_ms', f"{m['ida_y_vuelta_movimiento_ms']['p(95)']:.0f} ms", '< 300 ms')
+        fila('Errores HTTP', 'http_req_failed', f"{m['http_req_failed']['value']*100:.1f} %", '< 1 %')
+        PY
+        exit $codigo
+
+  sonar-backend:
+    name: SonarQube backend
+    needs: [backend]
     if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
+    uses: ./.github/workflows/reusable-sonar.yml
+    with:
+      directorio: backend
+      tipo: maven
+    secrets: inherit
 
-      - uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '21'
-          cache: maven
-
-      - name: Análisis backend con cobertura
-        working-directory: backend
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        run: >
-          ./mvnw -B verify sonar:sonar
-          -Dsonar.token=${{ secrets.SONAR_TOKEN }}
-          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Instalar dependencias frontend
-        working-directory: frontend
-        run: npm ci
-
-      - name: Análisis frontend
-        working-directory: frontend
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
-        run: >
-          npx sonar-scanner
-          -Dsonar.token=${{ secrets.SONAR_TOKEN }}
-          -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }}
+  sonar-frontend:
+    name: SonarQube frontend
+    needs: [frontend]
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    uses: ./.github/workflows/reusable-sonar.yml
+    with:
+      directorio: frontend
+      tipo: node
+    secrets: inherit

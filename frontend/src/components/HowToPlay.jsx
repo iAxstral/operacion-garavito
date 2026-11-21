@@ -23,12 +23,14 @@ const KEYBOARD = [
   ['Shift', 'Dash (esquivar)'],
   ['Espacio', 'Correr (gasta energía, se recupera sola)'],
   ['F', 'Habilidad de tu rol'],
-  ['E', 'Interactuar: misiones, tienda, puertas, escaleras, inventario'],
+  ['E', 'Interactuar: misiones, tienda, puertas, escaleras'],
+  ['Tab / I', 'Abrir el inventario (en celular, toca la barra de objetos)'],
   ['T', 'Desmontar barricada cercana (cualquier rol)'],
-  ['M / Tab', 'Mapa y equipo'],
+  ['M', 'Mapa'],
+  ['P', 'Equipo: vida, Garavitos y objetos de los demás'],
   ['Z / X / V / G / B', 'Avisar al equipo: zombis, ayuda, revívanme, vamos, munición'],
   ['Esc', 'Configuración'],
-  ['Control', 'Palancas: moverse y apuntar · A atacar · B dash · X interactuar · Y habilidad · LT correr · cruceta: avisos'],
+  ['Control', 'Palancas: moverse y apuntar · A atacar · B dash · X interactuar · Y habilidad · Back inventario · LT correr · cruceta: avisos'],
 ];
 
 const TOUCH = [

@@ -1,0 +1,1054 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+
+     execution: local
+        script: k6/partidas.js
+ web dashboard: http://127.0.0.1:5665
+        output: -
+
+     scenarios: (100.00%) 2 scenarios, 85 max VUs, 4m30s max duration (incl. graceful stop):
+              * jugadores: Up to 80 looping VUs for 3m20s over 5 stages (gracefulRampDown: 1m10s, exec: jugador, gracefulStop: 1m10s)
+              * ranking: 5.00 iterations/s for 4m0s (maxVUs: 5, exec: ranking, gracefulStop: 30s)
+
+
+running (0m00.8s), 05/85 VUs, 0 complete and 0 interrupted iterations
+jugadores   [   0% ] 01/80 VUs  0m00.8s/3m20.0s
+ranking     [   0% ] 4/5 VUs    0m00.8s/4m0s  5.00 iters/s
+time="2026-11-20T21:10:25-05:00" level=warning msg="Insufficient VUs, reached 5 active VUs and cannot initialize more" executor=constant-arrival-rate scenario=ranking
+
+running (0m01.8s), 02/85 VUs, 5 complete and 0 interrupted iterations
+jugadores   [   1% ] 02/80 VUs  0m01.8s/3m20.0s
+ranking     [   1% ] 0/5 VUs    0m01.8s/4m0s  5.00 iters/s
+
+running (0m02.8s), 04/85 VUs, 9 complete and 0 interrupted iterations
+jugadores   [   1% ] 03/80 VUs  0m02.8s/3m20.0s
+ranking     [   1% ] 1/5 VUs    0m02.8s/4m0s  5.00 iters/s
+
+running (0m03.8s), 05/85 VUs, 15 complete and 0 interrupted iterations
+jugadores   [   2% ] 05/80 VUs  0m03.8s/3m20.0s
+ranking     [   2% ] 0/5 VUs    0m03.8s/4m0s  5.00 iters/s
+
+running (0m04.8s), 07/85 VUs, 19 complete and 0 interrupted iterations
+jugadores   [   2% ] 06/80 VUs  0m04.8s/3m20.0s
+ranking     [   2% ] 1/5 VUs    0m04.8s/4m0s  5.00 iters/s
+
+running (0m05.8s), 08/85 VUs, 24 complete and 0 interrupted iterations
+jugadores   [   3% ] 07/80 VUs  0m05.8s/3m20.0s
+ranking     [   2% ] 1/5 VUs    0m05.8s/4m0s  5.00 iters/s
+
+running (0m06.8s), 09/85 VUs, 30 complete and 0 interrupted iterations
+jugadores   [   3% ] 09/80 VUs  0m06.8s/3m20.0s
+ranking     [   3% ] 0/5 VUs    0m06.8s/4m0s  5.00 iters/s
+
+running (0m07.8s), 10/85 VUs, 35 complete and 0 interrupted iterations
+jugadores   [   4% ] 10/80 VUs  0m07.8s/3m20.0s
+ranking     [   3% ] 0/5 VUs    0m07.8s/4m0s  5.00 iters/s
+
+running (0m08.8s), 11/85 VUs, 41 complete and 0 interrupted iterations
+jugadores   [   4% ] 11/80 VUs  0m08.8s/3m20.0s
+ranking     [   4% ] 0/5 VUs    0m08.8s/4m0s  5.00 iters/s
+
+running (0m09.8s), 13/85 VUs, 46 complete and 0 interrupted iterations
+jugadores   [   5% ] 13/80 VUs  0m09.8s/3m20.0s
+ranking     [   4% ] 0/5 VUs    0m09.8s/4m0s  5.00 iters/s
+
+running (0m10.9s), 15/85 VUs, 51 complete and 0 interrupted iterations
+jugadores   [   5% ] 14/80 VUs  0m10.9s/3m20.0s
+ranking     [   5% ] 1/5 VUs    0m10.9s/4m0s  5.00 iters/s
+
+running (0m11.8s), 16/85 VUs, 56 complete and 0 interrupted iterations
+jugadores   [   6% ] 15/80 VUs  0m11.8s/3m20.0s
+ranking     [   5% ] 1/5 VUs    0m11.8s/4m0s  5.00 iters/s
+
+running (0m12.8s), 17/85 VUs, 62 complete and 0 interrupted iterations
+jugadores   [   6% ] 17/80 VUs  0m12.8s/3m20.0s
+ranking     [   5% ] 0/5 VUs    0m12.8s/4m0s  5.00 iters/s
+
+running (0m13.8s), 18/85 VUs, 67 complete and 0 interrupted iterations
+jugadores   [   7% ] 18/80 VUs  0m13.8s/3m20.0s
+ranking     [   6% ] 0/5 VUs    0m13.8s/4m0s  5.00 iters/s
+
+running (0m14.9s), 20/85 VUs, 72 complete and 0 interrupted iterations
+jugadores   [   7% ] 19/80 VUs  0m14.9s/3m20.0s
+ranking     [   6% ] 1/5 VUs    0m14.9s/4m0s  5.00 iters/s
+
+running (0m15.8s), 21/85 VUs, 77 complete and 0 interrupted iterations
+jugadores   [   8% ] 21/80 VUs  0m15.8s/3m20.0s
+ranking     [   7% ] 0/5 VUs    0m15.8s/4m0s  5.00 iters/s
+
+running (0m16.8s), 22/85 VUs, 82 complete and 0 interrupted iterations
+jugadores   [   8% ] 22/80 VUs  0m16.8s/3m20.0s
+ranking     [   7% ] 0/5 VUs    0m16.8s/4m0s  5.00 iters/s
+
+running (0m17.8s), 24/85 VUs, 87 complete and 0 interrupted iterations
+jugadores   [   9% ] 23/80 VUs  0m17.8s/3m20.0s
+ranking     [   7% ] 1/5 VUs    0m17.8s/4m0s  5.00 iters/s
+
+running (0m18.8s), 25/85 VUs, 93 complete and 0 interrupted iterations
+jugadores   [   9% ] 25/80 VUs  0m18.8s/3m20.0s
+ranking     [   8% ] 0/5 VUs    0m18.8s/4m0s  5.00 iters/s
+
+running (0m19.8s), 26/85 VUs, 99 complete and 0 interrupted iterations
+jugadores   [  10% ] 26/80 VUs  0m19.8s/3m20.0s
+ranking     [   8% ] 0/5 VUs    0m19.8s/4m0s  5.00 iters/s
+
+running (0m20.8s), 27/85 VUs, 104 complete and 0 interrupted iterations
+jugadores   [  10% ] 27/80 VUs  0m20.8s/3m20.0s
+ranking     [   9% ] 0/5 VUs    0m20.8s/4m0s  5.00 iters/s
+
+running (0m21.8s), 29/85 VUs, 110 complete and 0 interrupted iterations
+jugadores   [  11% ] 29/80 VUs  0m21.8s/3m20.0s
+ranking     [   9% ] 0/5 VUs    0m21.8s/4m0s  5.00 iters/s
+
+running (0m22.8s), 30/85 VUs, 116 complete and 0 interrupted iterations
+jugadores   [  11% ] 30/80 VUs  0m22.8s/3m20.0s
+ranking     [   9% ] 0/5 VUs    0m22.8s/4m0s  5.00 iters/s
+
+running (0m23.8s), 31/85 VUs, 121 complete and 0 interrupted iterations
+jugadores   [  12% ] 31/80 VUs  0m23.8s/3m20.0s
+ranking     [  10% ] 0/5 VUs    0m23.8s/4m0s  5.00 iters/s
+
+running (0m24.8s), 33/85 VUs, 126 complete and 0 interrupted iterations
+jugadores   [  12% ] 33/80 VUs  0m24.8s/3m20.0s
+ranking     [  10% ] 0/5 VUs    0m24.8s/4m0s  5.00 iters/s
+
+running (0m25.8s), 34/85 VUs, 132 complete and 0 interrupted iterations
+jugadores   [  13% ] 34/80 VUs  0m25.8s/3m20.0s
+ranking     [  11% ] 0/5 VUs    0m25.8s/4m0s  5.00 iters/s
+
+running (0m26.8s), 35/85 VUs, 137 complete and 0 interrupted iterations
+jugadores   [  13% ] 35/80 VUs  0m26.8s/3m20.0s
+ranking     [  11% ] 0/5 VUs    0m26.8s/4m0s  5.00 iters/s
+
+running (0m27.8s), 37/85 VUs, 142 complete and 0 interrupted iterations
+jugadores   [  14% ] 37/80 VUs  0m27.8s/3m20.0s
+ranking     [  12% ] 0/5 VUs    0m27.8s/4m0s  5.00 iters/s
+
+running (0m28.8s), 41/85 VUs, 145 complete and 0 interrupted iterations
+jugadores   [  14% ] 38/80 VUs  0m28.8s/3m20.0s
+ranking     [  12% ] 3/5 VUs    0m28.8s/4m0s  5.00 iters/s
+
+running (0m29.8s), 42/85 VUs, 149 complete and 0 interrupted iterations
+jugadores   [  15% ] 39/80 VUs  0m29.9s/3m20.0s
+ranking     [  12% ] 2/5 VUs    0m29.9s/4m0s  5.00 iters/s
+
+running (0m30.9s), 43/85 VUs, 155 complete and 0 interrupted iterations
+jugadores   [  15% ] 40/80 VUs  0m30.9s/3m20.0s
+ranking     [  13% ] 3/5 VUs    0m30.9s/4m0s  5.00 iters/s
+
+running (0m31.8s), 43/85 VUs, 160 complete and 0 interrupted iterations
+jugadores   [  16% ] 40/80 VUs  0m31.8s/3m20.0s
+ranking     [  13% ] 3/5 VUs    0m31.8s/4m0s  5.00 iters/s
+
+running (0m32.9s), 45/85 VUs, 160 complete and 0 interrupted iterations
+jugadores   [  16% ] 40/80 VUs  0m32.9s/3m20.0s
+ranking     [  14% ] 5/5 VUs    0m32.9s/4m0s  5.00 iters/s
+
+running (0m34.2s), 45/85 VUs, 162 complete and 0 interrupted iterations
+jugadores   [  18% ] 40/80 VUs  0m35.4s/3m20.0s
+ranking     [  15% ] 5/5 VUs    0m35.4s/4m0s  5.00 iters/s
+
+running (0m35.4s), 45/85 VUs, 162 complete and 0 interrupted iterations
+jugadores   [  18% ] 40/80 VUs  0m35.4s/3m20.0s
+ranking     [  15% ] 5/5 VUs    0m35.4s/4m0s  5.00 iters/s
+
+running (0m35.8s), 42/85 VUs, 166 complete and 0 interrupted iterations
+jugadores   [  18% ] 40/80 VUs  0m35.8s/3m20.0s
+ranking     [  15% ] 2/5 VUs    0m35.8s/4m0s  5.00 iters/s
+
+running (0m36.8s), 42/85 VUs, 171 complete and 0 interrupted iterations
+jugadores   [  18% ] 40/80 VUs  0m36.8s/3m20.0s
+ranking     [  15% ] 2/5 VUs    0m36.8s/4m0s  5.00 iters/s
+
+running (0m37.8s), 40/85 VUs, 180 complete and 0 interrupted iterations
+jugadores   [  19% ] 40/80 VUs  0m37.8s/3m20.0s
+ranking     [  16% ] 0/5 VUs    0m37.8s/4m0s  5.00 iters/s
+
+running (0m38.8s), 40/85 VUs, 185 complete and 0 interrupted iterations
+jugadores   [  19% ] 40/80 VUs  0m38.8s/3m20.0s
+ranking     [  16% ] 0/5 VUs    0m38.8s/4m0s  5.00 iters/s
+
+running (0m39.8s), 40/85 VUs, 191 complete and 0 interrupted iterations
+jugadores   [  20% ] 40/80 VUs  0m39.8s/3m20.0s
+ranking     [  17% ] 0/5 VUs    0m39.8s/4m0s  5.00 iters/s
+
+running (0m40.8s), 40/85 VUs, 196 complete and 0 interrupted iterations
+jugadores   [  20% ] 40/80 VUs  0m40.8s/3m20.0s
+ranking     [  17% ] 0/5 VUs    0m40.8s/4m0s  5.00 iters/s
+
+running (0m41.8s), 40/85 VUs, 201 complete and 0 interrupted iterations
+jugadores   [  21% ] 40/80 VUs  0m41.8s/3m20.0s
+ranking     [  17% ] 0/5 VUs    0m41.8s/4m0s  5.00 iters/s
+
+running (0m42.8s), 40/85 VUs, 206 complete and 0 interrupted iterations
+jugadores   [  21% ] 40/80 VUs  0m42.8s/3m20.0s
+ranking     [  18% ] 0/5 VUs    0m42.8s/4m0s  5.00 iters/s
+
+running (0m43.8s), 40/85 VUs, 211 complete and 0 interrupted iterations
+jugadores   [  22% ] 40/80 VUs  0m43.8s/3m20.0s
+ranking     [  18% ] 0/5 VUs    0m43.8s/4m0s  5.00 iters/s
+
+running (0m44.8s), 40/85 VUs, 216 complete and 0 interrupted iterations
+jugadores   [  22% ] 40/80 VUs  0m44.8s/3m20.0s
+ranking     [  19% ] 0/5 VUs    0m44.8s/4m0s  5.00 iters/s
+
+running (0m45.8s), 40/85 VUs, 221 complete and 0 interrupted iterations
+jugadores   [  23% ] 40/80 VUs  0m45.8s/3m20.0s
+ranking     [  19% ] 0/5 VUs    0m45.8s/4m0s  5.00 iters/s
+
+running (0m46.8s), 40/85 VUs, 226 complete and 0 interrupted iterations
+jugadores   [  23% ] 40/80 VUs  0m46.8s/3m20.0s
+ranking     [  19% ] 0/5 VUs    0m46.8s/4m0s  5.00 iters/s
+
+running (0m47.8s), 40/85 VUs, 231 complete and 0 interrupted iterations
+jugadores   [  24% ] 40/80 VUs  0m47.8s/3m20.0s
+ranking     [  20% ] 0/5 VUs    0m47.8s/4m0s  5.00 iters/s
+
+running (0m48.8s), 40/85 VUs, 236 complete and 0 interrupted iterations
+jugadores   [  24% ] 40/80 VUs  0m48.8s/3m20.0s
+ranking     [  20% ] 0/5 VUs    0m48.8s/4m0s  5.00 iters/s
+
+running (0m49.8s), 40/85 VUs, 241 complete and 0 interrupted iterations
+jugadores   [  25% ] 40/80 VUs  0m49.8s/3m20.0s
+ranking     [  21% ] 0/5 VUs    0m49.8s/4m0s  5.00 iters/s
+
+running (0m50.8s), 40/85 VUs, 246 complete and 0 interrupted iterations
+jugadores   [  25% ] 40/80 VUs  0m50.8s/3m20.0s
+ranking     [  21% ] 0/5 VUs    0m50.8s/4m0s  5.00 iters/s
+
+running (0m51.8s), 40/85 VUs, 251 complete and 0 interrupted iterations
+jugadores   [  26% ] 40/80 VUs  0m51.8s/3m20.0s
+ranking     [  22% ] 0/5 VUs    0m51.8s/4m0s  5.00 iters/s
+
+running (0m52.8s), 40/85 VUs, 256 complete and 0 interrupted iterations
+jugadores   [  26% ] 40/80 VUs  0m52.8s/3m20.0s
+ranking     [  22% ] 0/5 VUs    0m52.8s/4m0s  5.00 iters/s
+
+running (0m53.8s), 40/85 VUs, 261 complete and 0 interrupted iterations
+jugadores   [  27% ] 40/80 VUs  0m53.8s/3m20.0s
+ranking     [  22% ] 0/5 VUs    0m53.8s/4m0s  5.00 iters/s
+
+running (0m58.7s), 45/85 VUs, 274 complete and 0 interrupted iterations
+jugadores   [  31% ] 40/80 VUs  1m01.7s/3m20.0s
+ranking     [  26% ] 5/5 VUs    1m01.7s/4m0s  5.00 iters/s
+
+running (1m01.8s), 45/85 VUs, 274 complete and 0 interrupted iterations
+jugadores   [  31% ] 40/80 VUs  1m01.8s/3m20.0s
+ranking     [  26% ] 5/5 VUs    1m01.8s/4m0s  5.00 iters/s
+
+running (1m01.8s), 45/85 VUs, 274 complete and 0 interrupted iterations
+jugadores   [  31% ] 40/80 VUs  1m01.8s/3m20.0s
+ranking     [  26% ] 5/5 VUs    1m01.8s/4m0s  5.00 iters/s
+
+running (1m02.8s), 41/85 VUs, 286 complete and 0 interrupted iterations
+jugadores   [  32% ] 40/80 VUs  1m03.5s/3m20.0s
+ranking     [  26% ] 1/5 VUs    1m03.5s/4m0s  5.00 iters/s
+
+running (1m03.8s), 42/85 VUs, 287 complete and 0 interrupted iterations
+jugadores   [  32% ] 40/80 VUs  1m03.8s/3m20.0s
+ranking     [  27% ] 2/5 VUs    1m03.8s/4m0s  5.00 iters/s
+
+running (1m04.8s), 40/85 VUs, 296 complete and 0 interrupted iterations
+jugadores   [  32% ] 40/80 VUs  1m04.8s/3m20.0s
+ranking     [  27% ] 0/5 VUs    1m04.8s/4m0s  5.00 iters/s
+
+running (1m05.8s), 40/85 VUs, 302 complete and 0 interrupted iterations
+jugadores   [  33% ] 40/80 VUs  1m05.8s/3m20.0s
+ranking     [  27% ] 0/5 VUs    1m05.8s/4m0s  5.00 iters/s
+
+running (1m06.8s), 40/85 VUs, 309 complete and 0 interrupted iterations
+jugadores   [  33% ] 40/80 VUs  1m06.8s/3m20.0s
+ranking     [  28% ] 0/5 VUs    1m06.8s/4m0s  5.00 iters/s
+
+running (1m07.8s), 40/85 VUs, 316 complete and 0 interrupted iterations
+jugadores   [  34% ] 40/80 VUs  1m07.8s/3m20.0s
+ranking     [  28% ] 0/5 VUs    1m07.8s/4m0s  5.00 iters/s
+
+running (1m08.8s), 40/85 VUs, 321 complete and 0 interrupted iterations
+jugadores   [  34% ] 40/80 VUs  1m08.8s/3m20.0s
+ranking     [  29% ] 0/5 VUs    1m08.8s/4m0s  5.00 iters/s
+
+running (1m09.8s), 40/85 VUs, 328 complete and 0 interrupted iterations
+jugadores   [  35% ] 40/80 VUs  1m09.8s/3m20.0s
+ranking     [  29% ] 0/5 VUs    1m09.8s/4m0s  5.00 iters/s
+
+running (1m10.9s), 43/85 VUs, 334 complete and 0 interrupted iterations
+jugadores   [  36% ] 40/80 VUs  1m11.2s/3m20.0s
+ranking     [  30% ] 3/5 VUs    1m11.2s/4m0s  5.00 iters/s
+
+running (1m13.5s), 45/85 VUs, 336 complete and 0 interrupted iterations
+jugadores   [  39% ] 40/80 VUs  1m18.3s/3m20.0s
+ranking     [  33% ] 4/5 VUs    1m18.7s/4m0s  5.00 iters/s
+
+running (1m18.7s), 44/85 VUs, 340 complete and 0 interrupted iterations
+jugadores   [  39% ] 40/80 VUs  1m18.9s/3m20.0s
+ranking     [  33% ] 4/5 VUs    1m18.9s/4m0s  5.00 iters/s
+
+running (1m18.9s), 44/85 VUs, 340 complete and 0 interrupted iterations
+jugadores   [  39% ] 40/80 VUs  1m18.9s/3m20.0s
+ranking     [  33% ] 4/5 VUs    1m18.9s/4m0s  5.00 iters/s
+
+running (1m19.9s), 42/85 VUs, 347 complete and 0 interrupted iterations
+jugadores   [  40% ] 40/80 VUs  1m19.9s/3m20.0s
+ranking     [  33% ] 2/5 VUs    1m19.9s/4m0s  5.00 iters/s
+
+running (1m20.8s), 42/85 VUs, 356 complete and 0 interrupted iterations
+jugadores   [  40% ] 40/80 VUs  1m20.8s/3m20.0s
+ranking     [  34% ] 2/5 VUs    1m20.8s/4m0s  5.00 iters/s
+
+running (1m21.8s), 40/85 VUs, 369 complete and 0 interrupted iterations
+jugadores   [  41% ] 40/80 VUs  1m21.8s/3m20.0s
+ranking     [  34% ] 0/5 VUs    1m21.8s/4m0s  5.00 iters/s
+
+running (1m22.8s), 40/85 VUs, 381 complete and 0 interrupted iterations
+jugadores   [  41% ] 40/80 VUs  1m22.8s/3m20.0s
+ranking     [  34% ] 0/5 VUs    1m22.8s/4m0s  5.00 iters/s
+
+running (1m23.8s), 40/85 VUs, 389 complete and 0 interrupted iterations
+jugadores   [  42% ] 40/80 VUs  1m23.8s/3m20.0s
+ranking     [  35% ] 0/5 VUs    1m23.8s/4m0s  5.00 iters/s
+
+running (1m24.8s), 40/85 VUs, 398 complete and 0 interrupted iterations
+jugadores   [  42% ] 40/80 VUs  1m24.8s/3m20.0s
+ranking     [  35% ] 0/5 VUs    1m24.8s/4m0s  5.00 iters/s
+
+running (1m26.4s), 40/85 VUs, 404 complete and 0 interrupted iterations
+jugadores   [  43% ] 40/80 VUs  1m26.4s/3m20.0s
+ranking     [  36% ] 0/5 VUs    1m26.4s/4m0s  5.00 iters/s
+
+running (1m29.4s), 42/85 VUs, 413 complete and 0 interrupted iterations
+jugadores   [  45% ] 40/80 VUs  1m29.4s/3m20.0s
+ranking     [  37% ] 2/5 VUs    1m29.4s/4m0s  5.00 iters/s
+
+running (1m29.4s), 42/85 VUs, 413 complete and 0 interrupted iterations
+jugadores   [  45% ] 40/80 VUs  1m29.4s/3m20.0s
+ranking     [  37% ] 2/5 VUs    1m29.4s/4m0s  5.00 iters/s
+
+running (1m29.8s), 43/85 VUs, 417 complete and 0 interrupted iterations
+jugadores   [  45% ] 40/80 VUs  1m30.3s/3m20.0s
+ranking     [  38% ] 3/5 VUs    1m30.3s/4m0s  5.00 iters/s
+
+running (1m30.8s), 41/85 VUs, 423 complete and 0 interrupted iterations
+jugadores   [  45% ] 41/80 VUs  1m30.8s/3m20.0s
+ranking     [  38% ] 0/5 VUs    1m30.8s/4m0s  5.00 iters/s
+
+running (1m31.8s), 42/85 VUs, 430 complete and 0 interrupted iterations
+jugadores   [  46% ] 42/80 VUs  1m31.8s/3m20.0s
+ranking     [  38% ] 0/5 VUs    1m31.8s/4m0s  5.00 iters/s
+
+running (1m32.8s), 43/85 VUs, 438 complete and 0 interrupted iterations
+jugadores   [  46% ] 43/80 VUs  1m32.8s/3m20.0s
+ranking     [  39% ] 0/5 VUs    1m32.8s/4m0s  5.00 iters/s
+
+running (1m33.8s), 45/85 VUs, 443 complete and 0 interrupted iterations
+jugadores   [  47% ] 45/80 VUs  1m33.8s/3m20.0s
+ranking     [  39% ] 0/5 VUs    1m33.8s/4m0s  5.00 iters/s
+
+running (1m34.8s), 47/85 VUs, 447 complete and 0 interrupted iterations
+jugadores   [  47% ] 46/80 VUs  1m34.8s/3m20.0s
+ranking     [  39% ] 1/5 VUs    1m34.8s/4m0s  5.00 iters/s
+
+running (1m35.8s), 47/85 VUs, 454 complete and 0 interrupted iterations
+jugadores   [  48% ] 47/80 VUs  1m35.8s/3m20.0s
+ranking     [  40% ] 0/5 VUs    1m35.8s/4m0s  5.00 iters/s
+
+running (1m36.8s), 49/85 VUs, 460 complete and 0 interrupted iterations
+jugadores   [  48% ] 49/80 VUs  1m36.8s/3m20.0s
+ranking     [  40% ] 0/5 VUs    1m36.8s/4m0s  5.00 iters/s
+
+running (1m37.8s), 50/85 VUs, 466 complete and 0 interrupted iterations
+jugadores   [  49% ] 50/80 VUs  1m37.8s/3m20.0s
+ranking     [  41% ] 0/5 VUs    1m37.8s/4m0s  5.00 iters/s
+
+running (1m38.8s), 51/85 VUs, 472 complete and 0 interrupted iterations
+jugadores   [  49% ] 51/80 VUs  1m38.8s/3m20.0s
+ranking     [  41% ] 0/5 VUs    1m38.8s/4m0s  5.00 iters/s
+
+running (1m39.8s), 54/85 VUs, 478 complete and 0 interrupted iterations
+jugadores   [  50% ] 53/80 VUs  1m39.8s/3m20.0s
+ranking     [  42% ] 1/5 VUs    1m39.8s/4m0s  5.00 iters/s
+
+running (1m40.8s), 54/85 VUs, 485 complete and 0 interrupted iterations
+jugadores   [  50% ] 54/80 VUs  1m40.8s/3m20.0s
+ranking     [  42% ] 0/5 VUs    1m40.8s/4m0s  5.00 iters/s
+
+running (1m42.0s), 59/85 VUs, 488 complete and 0 interrupted iterations
+jugadores   [  51% ] 55/80 VUs  1m42.0s/3m20.0s
+ranking     [  42% ] 4/5 VUs    1m42.0s/4m0s  5.00 iters/s
+
+running (1m43.0s), 62/85 VUs, 499 complete and 0 interrupted iterations
+jugadores   [  52% ] 58/80 VUs  1m43.6s/3m20.0s
+ranking     [  43% ] 4/5 VUs    1m43.6s/4m0s  5.00 iters/s
+
+running (1m43.8s), 58/85 VUs, 503 complete and 0 interrupted iterations
+jugadores   [  52% ] 58/80 VUs  1m43.8s/3m20.0s
+ranking     [  43% ] 0/5 VUs    1m43.8s/4m0s  5.00 iters/s
+
+running (1m44.8s), 59/85 VUs, 508 complete and 0 interrupted iterations
+jugadores   [  52% ] 59/80 VUs  1m44.8s/3m20.0s
+ranking     [  44% ] 0/5 VUs    1m44.8s/4m0s  5.00 iters/s
+
+running (1m45.8s), 61/85 VUs, 513 complete and 0 interrupted iterations
+jugadores   [  53% ] 61/80 VUs  1m45.8s/3m20.0s
+ranking     [  44% ] 0/5 VUs    1m45.8s/4m0s  5.00 iters/s
+
+running (1m46.8s), 62/85 VUs, 518 complete and 0 interrupted iterations
+jugadores   [  53% ] 62/80 VUs  1m46.8s/3m20.0s
+ranking     [  44% ] 0/5 VUs    1m46.8s/4m0s  5.00 iters/s
+
+running (1m47.8s), 63/85 VUs, 524 complete and 0 interrupted iterations
+jugadores   [  54% ] 63/80 VUs  1m47.8s/3m20.0s
+ranking     [  45% ] 0/5 VUs    1m47.8s/4m0s  5.00 iters/s
+
+running (1m48.8s), 65/85 VUs, 531 complete and 0 interrupted iterations
+jugadores   [  54% ] 65/80 VUs  1m48.8s/3m20.0s
+ranking     [  45% ] 0/5 VUs    1m48.8s/4m0s  5.00 iters/s
+
+running (1m49.8s), 66/85 VUs, 536 complete and 0 interrupted iterations
+jugadores   [  55% ] 66/80 VUs  1m49.8s/3m20.0s
+ranking     [  46% ] 0/5 VUs    1m49.8s/4m0s  5.00 iters/s
+
+running (1m50.8s), 67/85 VUs, 543 complete and 0 interrupted iterations
+jugadores   [  55% ] 67/80 VUs  1m50.8s/3m20.0s
+ranking     [  46% ] 0/5 VUs    1m50.8s/4m0s  5.00 iters/s
+
+running (1m51.8s), 69/85 VUs, 549 complete and 0 interrupted iterations
+jugadores   [  56% ] 69/80 VUs  1m51.8s/3m20.0s
+ranking     [  47% ] 0/5 VUs    1m51.8s/4m0s  5.00 iters/s
+
+running (1m52.8s), 71/85 VUs, 554 complete and 0 interrupted iterations
+jugadores   [  56% ] 70/80 VUs  1m52.8s/3m20.0s
+ranking     [  47% ] 1/5 VUs    1m52.8s/4m0s  5.00 iters/s
+
+running (1m53.8s), 71/85 VUs, 561 complete and 0 interrupted iterations
+jugadores   [  57% ] 71/80 VUs  1m53.8s/3m20.0s
+ranking     [  47% ] 0/5 VUs    1m53.8s/4m0s  5.00 iters/s
+
+running (1m54.8s), 73/85 VUs, 567 complete and 0 interrupted iterations
+jugadores   [  57% ] 73/80 VUs  1m54.8s/3m20.0s
+ranking     [  48% ] 0/5 VUs    1m54.8s/4m0s  5.00 iters/s
+
+running (1m55.8s), 74/85 VUs, 573 complete and 0 interrupted iterations
+jugadores   [  58% ] 74/80 VUs  1m55.8s/3m20.0s
+ranking     [  48% ] 0/5 VUs    1m55.8s/4m0s  5.00 iters/s
+
+running (1m56.8s), 75/85 VUs, 579 complete and 0 interrupted iterations
+jugadores   [  58% ] 75/80 VUs  1m56.8s/3m20.0s
+ranking     [  49% ] 0/5 VUs    1m56.8s/4m0s  5.00 iters/s
+
+running (1m57.8s), 77/85 VUs, 585 complete and 0 interrupted iterations
+jugadores   [  59% ] 77/80 VUs  1m57.8s/3m20.0s
+ranking     [  49% ] 0/5 VUs    1m57.8s/4m0s  5.00 iters/s
+
+running (1m58.8s), 78/85 VUs, 590 complete and 0 interrupted iterations
+jugadores   [  59% ] 78/80 VUs  1m58.8s/3m20.0s
+ranking     [  49% ] 0/5 VUs    1m58.8s/4m0s  5.00 iters/s
+
+running (1m59.8s), 79/85 VUs, 597 complete and 0 interrupted iterations
+jugadores   [  60% ] 79/80 VUs  1m59.8s/3m20.0s
+ranking     [  50% ] 0/5 VUs    1m59.8s/4m0s  5.00 iters/s
+
+running (2m00.8s), 80/85 VUs, 602 complete and 0 interrupted iterations
+jugadores   [  60% ] 80/80 VUs  2m00.8s/3m20.0s
+ranking     [  50% ] 0/5 VUs    2m00.8s/4m0s  5.00 iters/s
+
+running (2m01.8s), 80/85 VUs, 608 complete and 0 interrupted iterations
+jugadores   [  61% ] 80/80 VUs  2m01.8s/3m20.0s
+ranking     [  51% ] 0/5 VUs    2m01.8s/4m0s  5.00 iters/s
+
+running (2m02.8s), 80/85 VUs, 613 complete and 0 interrupted iterations
+jugadores   [  61% ] 80/80 VUs  2m02.8s/3m20.0s
+ranking     [  51% ] 0/5 VUs    2m02.8s/4m0s  5.00 iters/s
+
+running (2m03.8s), 80/85 VUs, 618 complete and 0 interrupted iterations
+jugadores   [  62% ] 80/80 VUs  2m03.8s/3m20.0s
+ranking     [  52% ] 0/5 VUs    2m03.8s/4m0s  5.00 iters/s
+
+running (2m04.8s), 80/85 VUs, 623 complete and 0 interrupted iterations
+jugadores   [  62% ] 80/80 VUs  2m04.8s/3m20.0s
+ranking     [  52% ] 0/5 VUs    2m04.8s/4m0s  5.00 iters/s
+
+running (2m05.8s), 80/85 VUs, 628 complete and 0 interrupted iterations
+jugadores   [  63% ] 80/80 VUs  2m05.8s/3m20.0s
+ranking     [  52% ] 0/5 VUs    2m05.8s/4m0s  5.00 iters/s
+
+running (2m06.8s), 80/85 VUs, 634 complete and 0 interrupted iterations
+jugadores   [  63% ] 80/80 VUs  2m06.8s/3m20.0s
+ranking     [  53% ] 0/5 VUs    2m06.8s/4m0s  5.00 iters/s
+
+running (2m07.8s), 80/85 VUs, 641 complete and 0 interrupted iterations
+jugadores   [  64% ] 80/80 VUs  2m07.8s/3m20.0s
+ranking     [  53% ] 0/5 VUs    2m07.8s/4m0s  5.00 iters/s
+
+running (2m08.8s), 80/85 VUs, 649 complete and 0 interrupted iterations
+jugadores   [  64% ] 80/80 VUs  2m08.8s/3m20.0s
+ranking     [  54% ] 0/5 VUs    2m08.8s/4m0s  5.00 iters/s
+
+running (2m09.8s), 80/85 VUs, 654 complete and 0 interrupted iterations
+jugadores   [  65% ] 80/80 VUs  2m09.8s/3m20.0s
+ranking     [  54% ] 0/5 VUs    2m09.8s/4m0s  5.00 iters/s
+
+running (2m10.8s), 80/85 VUs, 659 complete and 0 interrupted iterations
+jugadores   [  65% ] 80/80 VUs  2m10.8s/3m20.0s
+ranking     [  54% ] 0/5 VUs    2m10.8s/4m0s  5.00 iters/s
+
+running (2m11.8s), 80/85 VUs, 666 complete and 0 interrupted iterations
+jugadores   [  66% ] 80/80 VUs  2m11.8s/3m20.0s
+ranking     [  55% ] 0/5 VUs    2m11.8s/4m0s  5.00 iters/s
+
+running (2m12.9s), 83/85 VUs, 667 complete and 0 interrupted iterations
+jugadores   [  66% ] 80/80 VUs  2m12.9s/3m20.0s
+ranking     [  55% ] 3/5 VUs    2m12.9s/4m0s  5.00 iters/s
+
+running (2m13.8s), 80/85 VUs, 676 complete and 0 interrupted iterations
+jugadores   [  67% ] 80/80 VUs  2m13.8s/3m20.0s
+ranking     [  56% ] 0/5 VUs    2m13.8s/4m0s  5.00 iters/s
+
+running (2m14.8s), 80/85 VUs, 681 complete and 0 interrupted iterations
+jugadores   [  67% ] 80/80 VUs  2m14.8s/3m20.0s
+ranking     [  56% ] 0/5 VUs    2m14.8s/4m0s  5.00 iters/s
+
+running (2m15.8s), 80/85 VUs, 686 complete and 0 interrupted iterations
+jugadores   [  68% ] 80/80 VUs  2m15.8s/3m20.0s
+ranking     [  57% ] 0/5 VUs    2m15.8s/4m0s  5.00 iters/s
+
+running (2m16.8s), 80/85 VUs, 691 complete and 0 interrupted iterations
+jugadores   [  68% ] 80/80 VUs  2m16.8s/3m20.0s
+ranking     [  57% ] 0/5 VUs    2m16.8s/4m0s  5.00 iters/s
+
+running (2m17.8s), 80/85 VUs, 696 complete and 0 interrupted iterations
+jugadores   [  69% ] 80/80 VUs  2m17.8s/3m20.0s
+ranking     [  57% ] 0/5 VUs    2m17.8s/4m0s  5.00 iters/s
+
+running (2m18.8s), 80/85 VUs, 701 complete and 0 interrupted iterations
+jugadores   [  69% ] 80/80 VUs  2m18.8s/3m20.0s
+ranking     [  58% ] 0/5 VUs    2m18.8s/4m0s  5.00 iters/s
+
+running (2m19.8s), 80/85 VUs, 706 complete and 0 interrupted iterations
+jugadores   [  70% ] 80/80 VUs  2m19.8s/3m20.0s
+ranking     [  58% ] 0/5 VUs    2m19.8s/4m0s  5.00 iters/s
+
+running (2m20.8s), 80/85 VUs, 712 complete and 0 interrupted iterations
+jugadores   [  70% ] 80/80 VUs  2m20.8s/3m20.0s
+ranking     [  59% ] 0/5 VUs    2m20.8s/4m0s  5.00 iters/s
+
+running (2m21.8s), 80/85 VUs, 718 complete and 0 interrupted iterations
+jugadores   [  71% ] 80/80 VUs  2m21.8s/3m20.0s
+ranking     [  59% ] 0/5 VUs    2m21.8s/4m0s  5.00 iters/s
+
+running (2m22.8s), 80/85 VUs, 724 complete and 0 interrupted iterations
+jugadores   [  71% ] 80/80 VUs  2m22.8s/3m20.0s
+ranking     [  59% ] 0/5 VUs    2m22.8s/4m0s  5.00 iters/s
+
+running (2m23.8s), 80/85 VUs, 733 complete and 0 interrupted iterations
+jugadores   [  72% ] 80/80 VUs  2m23.8s/3m20.0s
+ranking     [  60% ] 0/5 VUs    2m23.8s/4m0s  5.00 iters/s
+
+running (2m24.8s), 80/85 VUs, 745 complete and 0 interrupted iterations
+jugadores   [  72% ] 80/80 VUs  2m24.8s/3m20.0s
+ranking     [  60% ] 0/5 VUs    2m24.8s/4m0s  5.00 iters/s
+
+running (2m25.8s), 81/85 VUs, 754 complete and 0 interrupted iterations
+jugadores   [  73% ] 80/80 VUs  2m25.8s/3m20.0s
+ranking     [  61% ] 1/5 VUs    2m25.8s/4m0s  5.00 iters/s
+
+running (2m26.8s), 80/85 VUs, 764 complete and 0 interrupted iterations
+jugadores   [  73% ] 80/80 VUs  2m26.8s/3m20.0s
+ranking     [  61% ] 0/5 VUs    2m26.8s/4m0s  5.00 iters/s
+
+running (2m27.8s), 85/85 VUs, 767 complete and 0 interrupted iterations
+jugadores   [  74% ] 80/80 VUs  2m27.9s/3m20.0s
+ranking     [  62% ] 5/5 VUs    2m27.9s/4m0s  5.00 iters/s
+
+running (2m28.8s), 82/85 VUs, 774 complete and 0 interrupted iterations
+jugadores   [  74% ] 80/80 VUs  2m28.8s/3m20.0s
+ranking     [  62% ] 2/5 VUs    2m28.8s/4m0s  5.00 iters/s
+
+running (2m29.8s), 80/85 VUs, 785 complete and 0 interrupted iterations
+jugadores   [  75% ] 80/80 VUs  2m29.8s/3m20.0s
+ranking     [  62% ] 0/5 VUs    2m29.8s/4m0s  5.00 iters/s
+
+running (2m30.8s), 80/85 VUs, 791 complete and 0 interrupted iterations
+jugadores   [  75% ] 80/80 VUs  2m30.8s/3m20.0s
+ranking     [  63% ] 0/5 VUs    2m30.8s/4m0s  5.00 iters/s
+
+running (2m31.8s), 80/85 VUs, 797 complete and 0 interrupted iterations
+jugadores   [  76% ] 80/80 VUs  2m31.8s/3m20.0s
+ranking     [  63% ] 0/5 VUs    2m31.8s/4m0s  5.00 iters/s
+
+running (2m32.8s), 80/85 VUs, 805 complete and 0 interrupted iterations
+jugadores   [  76% ] 80/80 VUs  2m32.8s/3m20.0s
+ranking     [  64% ] 0/5 VUs    2m32.8s/4m0s  5.00 iters/s
+
+running (2m33.8s), 80/85 VUs, 813 complete and 0 interrupted iterations
+jugadores   [  77% ] 80/80 VUs  2m33.8s/3m20.0s
+ranking     [  64% ] 0/5 VUs    2m33.8s/4m0s  5.00 iters/s
+
+running (2m34.8s), 80/85 VUs, 823 complete and 0 interrupted iterations
+jugadores   [  77% ] 80/80 VUs  2m34.8s/3m20.0s
+ranking     [  64% ] 0/5 VUs    2m34.8s/4m0s  5.00 iters/s
+
+running (2m35.8s), 80/85 VUs, 831 complete and 0 interrupted iterations
+jugadores   [  78% ] 80/80 VUs  2m35.8s/3m20.0s
+ranking     [  65% ] 0/5 VUs    2m35.8s/4m0s  5.00 iters/s
+
+running (2m36.8s), 80/85 VUs, 838 complete and 0 interrupted iterations
+jugadores   [  78% ] 80/80 VUs  2m36.8s/3m20.0s
+ranking     [  65% ] 0/5 VUs    2m36.8s/4m0s  5.00 iters/s
+
+running (2m37.8s), 80/85 VUs, 845 complete and 0 interrupted iterations
+jugadores   [  79% ] 80/80 VUs  2m37.8s/3m20.0s
+ranking     [  66% ] 0/5 VUs    2m37.8s/4m0s  5.00 iters/s
+
+running (2m38.8s), 80/85 VUs, 852 complete and 0 interrupted iterations
+jugadores   [  79% ] 80/80 VUs  2m38.8s/3m20.0s
+ranking     [  66% ] 0/5 VUs    2m38.8s/4m0s  5.00 iters/s
+
+running (2m39.8s), 80/85 VUs, 860 complete and 0 interrupted iterations
+jugadores   [  80% ] 80/80 VUs  2m39.8s/3m20.0s
+ranking     [  67% ] 0/5 VUs    2m39.8s/4m0s  5.00 iters/s
+
+running (2m40.8s), 80/85 VUs, 867 complete and 0 interrupted iterations
+jugadores   [  80% ] 80/80 VUs  2m40.8s/3m20.0s
+ranking     [  67% ] 0/5 VUs    2m40.8s/4m0s  5.00 iters/s
+
+running (2m41.8s), 80/85 VUs, 875 complete and 0 interrupted iterations
+jugadores   [  81% ] 80/80 VUs  2m41.8s/3m20.0s
+ranking     [  67% ] 0/5 VUs    2m41.8s/4m0s  5.00 iters/s
+
+running (2m43.2s), 83/85 VUs, 882 complete and 0 interrupted iterations
+jugadores   [  82% ] 80/80 VUs  2m43.2s/3m20.0s
+ranking     [  68% ] 3/5 VUs    2m43.2s/4m0s  5.00 iters/s
+
+running (2m43.9s), 81/85 VUs, 889 complete and 0 interrupted iterations
+jugadores   [  82% ] 80/80 VUs  2m43.9s/3m20.0s
+ranking     [  68% ] 1/5 VUs    2m43.9s/4m0s  5.00 iters/s
+
+running (2m44.8s), 82/85 VUs, 894 complete and 0 interrupted iterations
+jugadores   [  82% ] 80/80 VUs  2m44.8s/3m20.0s
+ranking     [  69% ] 2/5 VUs    2m44.8s/4m0s  5.00 iters/s
+
+running (2m45.8s), 80/85 VUs, 905 complete and 0 interrupted iterations
+jugadores   [  83% ] 80/80 VUs  2m45.8s/3m20.0s
+ranking     [  69% ] 0/5 VUs    2m45.8s/4m0s  5.00 iters/s
+
+running (2m46.8s), 80/85 VUs, 914 complete and 0 interrupted iterations
+jugadores   [  83% ] 80/80 VUs  2m46.8s/3m20.0s
+ranking     [  69% ] 0/5 VUs    2m46.8s/4m0s  5.00 iters/s
+
+running (2m47.8s), 80/85 VUs, 922 complete and 0 interrupted iterations
+jugadores   [  84% ] 80/80 VUs  2m47.8s/3m20.0s
+ranking     [  70% ] 0/5 VUs    2m47.8s/4m0s  5.00 iters/s
+
+running (2m48.8s), 80/85 VUs, 928 complete and 0 interrupted iterations
+jugadores   [  84% ] 80/80 VUs  2m48.8s/3m20.0s
+ranking     [  70% ] 0/5 VUs    2m48.8s/4m0s  5.00 iters/s
+
+running (2m49.8s), 80/85 VUs, 936 complete and 0 interrupted iterations
+jugadores   [  85% ] 80/80 VUs  2m49.8s/3m20.0s
+ranking     [  71% ] 0/5 VUs    2m49.8s/4m0s  5.00 iters/s
+
+running (2m50.8s), 80/85 VUs, 942 complete and 0 interrupted iterations
+jugadores   [  85% ] 80/80 VUs  2m50.8s/3m20.0s
+ranking     [  71% ] 0/5 VUs    2m50.8s/4m0s  5.00 iters/s
+
+running (2m51.8s), 80/85 VUs, 951 complete and 0 interrupted iterations
+jugadores   [  86% ] 80/80 VUs  2m51.8s/3m20.0s
+ranking     [  72% ] 0/5 VUs    2m51.8s/4m0s  5.00 iters/s
+
+running (2m52.8s), 80/85 VUs, 958 complete and 0 interrupted iterations
+jugadores   [  86% ] 80/80 VUs  2m52.8s/3m20.0s
+ranking     [  72% ] 0/5 VUs    2m52.8s/4m0s  5.00 iters/s
+
+running (2m53.8s), 80/85 VUs, 965 complete and 0 interrupted iterations
+jugadores   [  87% ] 80/80 VUs  2m53.8s/3m20.0s
+ranking     [  72% ] 0/5 VUs    2m53.8s/4m0s  5.00 iters/s
+
+running (2m54.8s), 80/85 VUs, 972 complete and 0 interrupted iterations
+jugadores   [  87% ] 80/80 VUs  2m54.8s/3m20.0s
+ranking     [  73% ] 0/5 VUs    2m54.8s/4m0s  5.00 iters/s
+
+running (2m55.8s), 80/85 VUs, 979 complete and 0 interrupted iterations
+jugadores   [  88% ] 80/80 VUs  2m55.8s/3m20.0s
+ranking     [  73% ] 0/5 VUs    2m55.8s/4m0s  5.00 iters/s
+
+running (2m56.8s), 80/85 VUs, 987 complete and 0 interrupted iterations
+jugadores   [  88% ] 80/80 VUs  2m56.8s/3m20.0s
+ranking     [  74% ] 0/5 VUs    2m56.8s/4m0s  5.00 iters/s
+
+running (2m57.8s), 80/85 VUs, 994 complete and 0 interrupted iterations
+jugadores   [  89% ] 80/80 VUs  2m57.8s/3m20.0s
+ranking     [  74% ] 0/5 VUs    2m57.8s/4m0s  5.00 iters/s
+
+running (2m59.2s), 85/85 VUs, 998 complete and 0 interrupted iterations
+jugadores   [  90% ] 80/80 VUs  2m59.2s/3m20.0s
+ranking     [  75% ] 5/5 VUs    2m59.3s/4m0s  5.00 iters/s
+
+running (2m59.8s), 80/85 VUs, 1006 complete and 0 interrupted iterations
+jugadores   [  90% ] 80/80 VUs  2m59.8s/3m20.0s
+ranking     [  75% ] 0/5 VUs    2m59.8s/4m0s  5.00 iters/s
+
+running (3m00.8s), 80/85 VUs, 1013 complete and 0 interrupted iterations
+jugadores   [  90% ] 80/80 VUs  3m00.8s/3m20.0s
+ranking     [  75% ] 0/5 VUs    3m00.8s/4m0s  5.00 iters/s
+
+running (3m01.8s), 78/85 VUs, 1021 complete and 0 interrupted iterations
+jugadores   [  91% ] 78/80 VUs  3m01.8s/3m20.0s
+ranking     [  76% ] 0/5 VUs    3m01.8s/4m0s  5.00 iters/s
+
+running (3m02.8s), 76/85 VUs, 1028 complete and 0 interrupted iterations
+jugadores   [  91% ] 76/80 VUs  3m02.8s/3m20.0s
+ranking     [  76% ] 0/5 VUs    3m02.8s/4m0s  5.00 iters/s
+
+running (3m03.8s), 76/85 VUs, 1033 complete and 0 interrupted iterations
+jugadores   [  92% ] 76/80 VUs  3m03.8s/3m20.0s
+ranking     [  77% ] 0/5 VUs    3m03.8s/4m0s  5.00 iters/s
+
+running (3m04.8s), 75/85 VUs, 1039 complete and 0 interrupted iterations
+jugadores   [  92% ] 75/80 VUs  3m04.8s/3m20.0s
+ranking     [  77% ] 0/5 VUs    3m04.8s/4m0s  5.00 iters/s
+
+running (3m05.8s), 75/85 VUs, 1044 complete and 0 interrupted iterations
+jugadores   [  93% ] 75/80 VUs  3m05.8s/3m20.0s
+ranking     [  77% ] 0/5 VUs    3m05.8s/4m0s  5.00 iters/s
+
+running (3m06.8s), 75/85 VUs, 1049 complete and 0 interrupted iterations
+jugadores   [  93% ] 75/80 VUs  3m06.8s/3m20.0s
+ranking     [  78% ] 0/5 VUs    3m06.8s/4m0s  5.00 iters/s
+
+running (3m07.8s), 75/85 VUs, 1054 complete and 0 interrupted iterations
+jugadores   [  94% ] 75/80 VUs  3m07.8s/3m20.0s
+ranking     [  78% ] 0/5 VUs    3m07.8s/4m0s  5.00 iters/s
+
+running (3m08.8s), 75/85 VUs, 1059 complete and 0 interrupted iterations
+jugadores   [  94% ] 75/80 VUs  3m08.8s/3m20.0s
+ranking     [  79% ] 0/5 VUs    3m08.8s/4m0s  5.00 iters/s
+
+running (3m09.8s), 75/85 VUs, 1066 complete and 0 interrupted iterations
+jugadores   [  95% ] 75/80 VUs  3m09.8s/3m20.0s
+ranking     [  79% ] 0/5 VUs    3m09.8s/4m0s  5.00 iters/s
+
+running (3m10.8s), 75/85 VUs, 1071 complete and 0 interrupted iterations
+jugadores   [  95% ] 75/80 VUs  3m10.8s/3m20.0s
+ranking     [  79% ] 0/5 VUs    3m10.8s/4m0s  5.00 iters/s
+
+running (3m11.8s), 75/85 VUs, 1080 complete and 0 interrupted iterations
+jugadores   [  96% ] 75/80 VUs  3m11.8s/3m20.0s
+ranking     [  80% ] 0/5 VUs    3m11.8s/4m0s  5.00 iters/s
+
+running (3m12.8s), 75/85 VUs, 1085 complete and 0 interrupted iterations
+jugadores   [  96% ] 75/80 VUs  3m12.8s/3m20.0s
+ranking     [  80% ] 0/5 VUs    3m12.8s/4m0s  5.00 iters/s
+
+running (3m13.8s), 78/85 VUs, 1090 complete and 0 interrupted iterations
+jugadores   [  97% ] 75/80 VUs  3m13.8s/3m20.0s
+ranking     [  81% ] 3/5 VUs    3m13.8s/4m0s  5.00 iters/s
+
+running (3m14.9s), 76/85 VUs, 1097 complete and 0 interrupted iterations
+jugadores   [  97% ] 75/80 VUs  3m14.9s/3m20.0s
+ranking     [  81% ] 1/5 VUs    3m14.9s/4m0s  5.00 iters/s
+
+running (3m15.8s), 75/85 VUs, 1102 complete and 0 interrupted iterations
+jugadores   [  98% ] 75/80 VUs  3m15.8s/3m20.0s
+ranking     [  82% ] 0/5 VUs    3m15.8s/4m0s  5.00 iters/s
+
+running (3m16.8s), 75/85 VUs, 1109 complete and 0 interrupted iterations
+jugadores   [  98% ] 75/80 VUs  3m16.8s/3m20.0s
+ranking     [  82% ] 0/5 VUs    3m16.8s/4m0s  5.00 iters/s
+
+running (3m17.8s), 75/85 VUs, 1114 complete and 0 interrupted iterations
+jugadores   [  99% ] 75/80 VUs  3m17.8s/3m20.0s
+ranking     [  82% ] 0/5 VUs    3m17.8s/4m0s  5.00 iters/s
+
+running (3m18.8s), 75/85 VUs, 1119 complete and 0 interrupted iterations
+jugadores   [  99% ] 75/80 VUs  3m18.8s/3m20.0s
+ranking     [  83% ] 0/5 VUs    3m18.8s/4m0s  5.00 iters/s
+
+running (3m19.8s), 75/85 VUs, 1124 complete and 0 interrupted iterations
+jugadores   [ 100% ] 75/80 VUs  3m19.8s/3m20.0s
+ranking     [  83% ] 0/5 VUs    3m19.8s/4m0s  5.00 iters/s
+
+running (3m20.8s), 75/85 VUs, 1129 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  84% ] 0/5 VUs    3m20.8s/4m0s  5.00 iters/s
+
+running (3m21.8s), 75/85 VUs, 1134 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  84% ] 0/5 VUs    3m21.8s/4m0s  5.00 iters/s
+
+running (3m22.8s), 74/85 VUs, 1140 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  84% ] 0/5 VUs    3m22.8s/4m0s  5.00 iters/s
+
+running (3m23.8s), 74/85 VUs, 1145 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  85% ] 0/5 VUs    3m23.8s/4m0s  5.00 iters/s
+
+running (3m24.8s), 72/85 VUs, 1152 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  85% ] 0/5 VUs    3m24.8s/4m0s  5.00 iters/s
+
+running (3m25.8s), 72/85 VUs, 1157 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  86% ] 0/5 VUs    3m25.8s/4m0s  5.00 iters/s
+
+running (3m26.8s), 65/85 VUs, 1169 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  86% ] 0/5 VUs    3m26.8s/4m0s  5.00 iters/s
+
+running (3m27.8s), 64/85 VUs, 1175 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  87% ] 0/5 VUs    3m27.8s/4m0s  5.00 iters/s
+
+running (3m28.8s), 60/85 VUs, 1184 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  87% ] 0/5 VUs    3m28.8s/4m0s  5.00 iters/s
+
+running (3m29.8s), 61/85 VUs, 1188 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  87% ] 1/5 VUs    3m29.8s/4m0s  5.00 iters/s
+
+running (3m31.0s), 61/85 VUs, 1192 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  88% ] 1/5 VUs    3m31.3s/4m0s  5.00 iters/s
+
+running (3m31.8s), 57/85 VUs, 1198 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  88% ] 1/5 VUs    3m31.8s/4m0s  5.00 iters/s
+
+running (3m32.8s), 54/85 VUs, 1206 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  89% ] 0/5 VUs    3m32.8s/4m0s  5.00 iters/s
+
+running (3m33.8s), 53/85 VUs, 1212 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  89% ] 0/5 VUs    3m33.8s/4m0s  5.00 iters/s
+
+running (3m34.8s), 51/85 VUs, 1219 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  89% ] 0/5 VUs    3m34.8s/4m0s  5.00 iters/s
+
+running (3m35.8s), 50/85 VUs, 1225 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  90% ] 0/5 VUs    3m35.8s/4m0s  5.00 iters/s
+
+running (3m36.8s), 47/85 VUs, 1233 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  90% ] 0/5 VUs    3m36.8s/4m0s  5.00 iters/s
+
+running (3m37.8s), 43/85 VUs, 1242 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  91% ] 0/5 VUs    3m37.8s/4m0s  5.00 iters/s
+
+running (3m38.8s), 41/85 VUs, 1249 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  91% ] 0/5 VUs    3m38.8s/4m0s  5.00 iters/s
+
+running (3m39.8s), 41/85 VUs, 1254 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  92% ] 0/5 VUs    3m39.8s/4m0s  5.00 iters/s
+
+running (3m40.8s), 39/85 VUs, 1261 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  92% ] 0/5 VUs    3m40.8s/4m0s  5.00 iters/s
+
+running (3m41.8s), 38/85 VUs, 1267 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  92% ] 0/5 VUs    3m41.8s/4m0s  5.00 iters/s
+
+running (3m42.8s), 37/85 VUs, 1273 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  93% ] 0/5 VUs    3m42.8s/4m0s  5.00 iters/s
+
+running (3m43.8s), 34/85 VUs, 1281 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  93% ] 0/5 VUs    3m43.8s/4m0s  5.00 iters/s
+
+running (3m44.8s), 34/85 VUs, 1286 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  94% ] 0/5 VUs    3m44.8s/4m0s  5.00 iters/s
+
+running (3m45.8s), 35/85 VUs, 1291 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  94% ] 1/5 VUs    3m45.8s/4m0s  5.00 iters/s
+
+running (3m46.8s), 32/85 VUs, 1298 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  94% ] 0/5 VUs    3m46.8s/4m0s  5.00 iters/s
+
+running (3m47.9s), 29/85 VUs, 1306 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  95% ] 0/5 VUs    3m47.9s/4m0s  5.00 iters/s
+
+running (3m48.8s), 27/85 VUs, 1313 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  95% ] 0/5 VUs    3m48.8s/4m0s  5.00 iters/s
+
+running (3m49.8s), 24/85 VUs, 1321 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  96% ] 0/5 VUs    3m49.8s/4m0s  5.00 iters/s
+
+running (3m50.8s), 23/85 VUs, 1327 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  96% ] 0/5 VUs    3m50.8s/4m0s  5.00 iters/s
+
+running (3m51.8s), 23/85 VUs, 1332 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  97% ] 0/5 VUs    3m51.8s/4m0s  5.00 iters/s
+
+running (3m52.8s), 23/85 VUs, 1337 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  97% ] 0/5 VUs    3m52.8s/4m0s  5.00 iters/s
+
+running (3m53.8s), 21/85 VUs, 1344 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  97% ] 0/5 VUs    3m53.8s/4m0s  5.00 iters/s
+
+running (3m54.8s), 19/85 VUs, 1351 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  98% ] 0/5 VUs    3m54.8s/4m0s  5.00 iters/s
+
+running (3m55.8s), 17/85 VUs, 1358 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  98% ] 0/5 VUs    3m55.8s/4m0s  5.00 iters/s
+
+running (3m56.8s), 16/85 VUs, 1364 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  99% ] 0/5 VUs    3m56.8s/4m0s  5.00 iters/s
+
+running (3m57.8s), 16/85 VUs, 1369 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  99% ] 0/5 VUs    3m57.8s/4m0s  5.00 iters/s
+
+running (3m58.8s), 13/85 VUs, 1377 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [  99% ] 0/5 VUs    3m58.8s/4m0s  5.00 iters/s
+
+running (3m59.8s), 11/85 VUs, 1384 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s        
+ranking     [ 100% ] 0/5 VUs    3m59.8s/4m0s  5.00 iters/s
+
+running (4m00.8s), 10/85 VUs, 1387 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m01.8s), 08/85 VUs, 1389 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m02.8s), 08/85 VUs, 1389 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m03.8s), 07/85 VUs, 1390 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m04.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m05.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m06.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m07.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m08.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m09.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m10.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m11.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m12.8s), 06/85 VUs, 1391 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m13.8s), 04/85 VUs, 1393 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m14.8s), 02/85 VUs, 1395 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m15.8s), 02/85 VUs, 1395 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m16.8s), 02/85 VUs, 1395 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m17.8s), 02/85 VUs, 1395 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+
+running (4m18.8s), 01/85 VUs, 1396 complete and 0 interrupted iterations
+jugadores ↓ [ 100% ] 75/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+     ✓ ranking 200
+     ✗ WebSocket abierto (101)
+      ↳  69% — ✓ 201 / ✗ 90
+
+     checks.........................: 93.55%  ✓ 1307       ✗ 90  
+     conexion_stomp_ms..............: avg=693.92ms    min=367ms   med=415ms    max=10.05s   p(50)=415ms    p(90)=742ms    p(95)=1.14s    p(99)=7.48s   
+     correcciones_de_posicion.......: 46      0.177751/s
+     data_received..................: 225 MB  869 kB/s
+     data_sent......................: 19 MB   73 kB/s
+     dropped_iterations.............: 95      0.367094/s
+   ✓ entrada_exitosa................: 100.00% ✓ 201        ✗ 0   
+     estados_recibidos..............: 109358  422.574967/s
+     http_req_blocked...............: avg=883.63µs    min=0s      med=0s       max=273.58ms p(50)=0s       p(90)=0s       p(95)=0s       p(99)=0s      
+     http_req_connecting............: avg=316.97µs    min=0s      med=0s       max=74.99ms  p(50)=0s       p(90)=0s       p(95)=0s       p(99)=0s      
+     http_req_duration..............: avg=195.39ms    min=99.1ms  med=113.49ms max=7.09s    p(50)=113.49ms p(90)=195.4ms  p(95)=405.64ms p(99)=1.63s   
+     ✗ { endpoint:ranking }.........: avg=195.39ms    min=99.1ms  med=113.49ms max=7.09s    p(50)=113.49ms p(90)=195.4ms  p(95)=405.64ms p(99)=1.63s   
+       { expected_response:true }...: avg=195.39ms    min=99.1ms  med=113.49ms max=7.09s    p(50)=113.49ms p(90)=195.4ms  p(95)=405.64ms p(99)=1.63s   
+   ✓ http_req_failed................: 0.00%   ✓ 0          ✗ 1106
+     http_req_receiving.............: avg=17.66ms     min=0s      med=0s       max=4.62s    p(50)=0s       p(90)=3.08ms   p(95)=13.65ms  p(99)=195.64ms
+     http_req_sending...............: avg=7.69ms      min=0s      med=0s       max=2.46s    p(50)=0s       p(90)=1ms      p(95)=2.01ms   p(99)=43.2ms  
+     http_req_tls_handshaking.......: avg=452.02µs    min=0s      med=0s       max=174.92ms p(50)=0s       p(90)=0s       p(95)=0s       p(99)=0s      
+     http_req_waiting...............: avg=170.03ms    min=92.62ms med=112.39ms max=7.03s    p(50)=112.39ms p(90)=172.19ms p(95)=305.81ms p(99)=1.36s   
+     http_reqs......................: 1106    4.273742/s
+   ✓ ida_y_vuelta_movimiento_ms.....: avg=175.67ms    min=0s      med=132ms    max=5.03s    p(50)=132ms    p(90)=197ms    p(95)=246ms    p(99)=1.31s   
+   ✓ intervalo_estado_ms............: avg=91.65ms     min=0s      med=87ms     max=9.03s    p(50)=87ms     p(90)=135ms    p(95)=141ms    p(99)=403ms   
+     iteration_duration.............: avg=9.4s        min=99.1ms  med=120.8ms  max=1m10s    p(50)=120.8ms  p(90)=1m2s     p(95)=1m2s     p(99)=1m5s    
+     iterations.....................: 1397    5.398208/s
+     movimientos_confirmados........: 87130   336.682793/s
+     redirecciones_de_nodo..........: 90      0.347773/s
+     solicitudes_stomp..............: 117364  453.511298/s
+     tamano_estado_bytes............: avg=1838.578906 min=920     med=1627     max=6479     p(50)=1627     p(90)=2618     p(95)=3122     p(99)=4337    
+     vus............................: 2       min=2        max=85
+     vus_max........................: 85      min=85       max=85
+     ws_connecting..................: avg=391.92ms    min=0s      med=298.28ms max=9.13s    p(50)=298.28ms p(90)=492.84ms p(95)=754.1ms  p(99)=4.19s   
+     ws_msgs_received...............: 109925  424.765937/s
+     ws_msgs_sent...................: 118237  456.884695/s
+     ws_session_duration............: avg=33.05s      min=0s      med=1m1s     max=1m9s     p(50)=1m1s     p(90)=1m1s     p(95)=1m2s     p(99)=1m7s    
+     ws_sessions....................: 381     1.472239/s
+TPS (movimientos confirmados/s): 336.7 · TPM: 20201 · solicitudes/s: 457.8
+
+running (4m18.8s), 00/85 VUs, 1397 complete and 0 interrupted iterations
+jugadores ✓ [ 100% ] 00/80 VUs  3m20s
+ranking   ✓ [ 100% ] 0/5 VUs    4m0s  5.00 iters/s
+time="2026-11-20T21:14:43-05:00" level=error msg="thresholds on metrics 'http_req_duration{endpoint:ranking}' have been crossed"

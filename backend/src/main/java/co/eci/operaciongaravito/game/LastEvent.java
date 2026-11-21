@@ -57,6 +57,11 @@ public record LastEvent(String type, String playerId, String itemId, String reas
         return new LastEvent("LOBBY_REDIRECT", clientId, null, nodeUrl);
     }
 
+    /** Sala nueva con el codigo que genero el servidor ({@code itemId}); solo lo ve quien la creo. */
+    public static LastEvent lobbyCreated(String clientId, String code) {
+        return new LastEvent("LOBBY_CREATED", clientId, code, null);
+    }
+
     public static LastEvent lobbyRejected(String clientId, String reason) {
         return new LastEvent("LOBBY_REJECTED", clientId, null, reason);
     }

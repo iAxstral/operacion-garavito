@@ -4,6 +4,11 @@
 // Cada 4 VUs comparten sala: el primero que llega la crea, los otros entran, y se
 // inicia cuando estan los 4 (o a los 15 s si falta alguno).
 //
+// El backend tiene que tener el perfil "carga" (ademas de dev o cluster): los VUs eligen
+// el codigo de su sala para encontrarse y salen todos de la misma maquina, cosa que los
+// limites de abuso de produccion no dejan (ver docs/SEGURIDAD.md).
+//   java -jar target/*.jar --spring.profiles.active=dev,carga
+//
 //   k6 run k6/partidas.js
 //   k6 run -e BASE_URL=http://192.168.1.20:8080 -e PERFIL=estres k6/partidas.js
 //   k6 run -e BASE_URL=http://localhost:8080 k6/partidas.js   (balanceador del cluster)
@@ -12,7 +17,18 @@
 //   K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write \
 //   K6_PROMETHEUS_RW_TREND_STATS="p(50),p(95),p(99),avg,max" \
 //   k6 run -o experimental-prometheus-rw --tag testid=partidas k6/partidas.js
+//
+// Perfiles (-e PERFIL=...): humo, carga (operacion esperada), estres (subir hasta el
+// limite) y pico (salto brusco y recuperacion). Al terminar deja un resumen con TPS y
+// TPM en docs/k6/resultados/<perfil>.json (o en -e RESUMEN=<ruta>).
+//
+// Solicitudes vs transacciones: una SOLICITUD es cada mensaje que manda el cliente
+// (STOMP: lobby, join, start, move, attack, leave) o cada GET /api/ranking. Una
+// TRANSACCION DE NEGOCIO es un movimiento confirmado: el jugador manda su posicion y el
+// servidor la aplica y la devuelve en el estado del juego (la accion que define si el
+// juego "responde"). TPS = transacciones / segundos de la prueba; TPM = por minuto.
 import http from 'k6/http';
+import { textSummary } from 'https://jslib.k6.io/k6-summary/0.1.0/index.js';
 import ws from 'k6/ws';
 import { check, sleep } from 'k6';
 import { Counter, Rate, Trend } from 'k6/metrics';
@@ -50,9 +66,23 @@ const PERFILES = {
     { duration: '1m', target: 200 },
     { duration: '30s', target: 0 },
   ],
+  // Pico: 20 jugadores de base, salto a 200 en 10 s, se sostiene 1 min y vuelve a 20
+  // para ver si el servidor se recupera.
+  pico: [
+    { duration: '20s', target: 20 },
+    { duration: '40s', target: 20 },
+    { duration: '10s', target: 200 },
+    { duration: '1m', target: 200 },
+    { duration: '10s', target: 20 },
+    { duration: '1m', target: 20 },
+    { duration: '10s', target: 0 },
+  ],
 };
+const DURACION_RANKING = { humo: '40s', carga: '4m', estres: '4m30s', pico: '3m30s' };
 
 export const options = {
+  // p50/p95/p99 en el resumen (por defecto k6 solo trae p90 y p95).
+  summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(50)', 'p(90)', 'p(95)', 'p(99)'],
   scenarios: {
     jugadores: {
       executor: 'ramping-vus',
@@ -68,7 +98,7 @@ export const options = {
       exec: 'ranking',
       rate: 5,
       timeUnit: '1s',
-      duration: PERFIL === 'humo' ? '40s' : '4m',
+      duration: DURACION_RANKING[PERFIL] || '4m',
       preAllocatedVUs: 5,
     },
   },
@@ -97,6 +127,9 @@ const redirecciones = new Counter('redirecciones_de_nodo');
 const sesionesCortadas = new Counter('sesiones_cortadas');
 const entradaExitosa = new Rate('entrada_exitosa');
 const entradaRechazada = new Counter('entrada_rechazada');
+// Para TPS/TPM (ver arriba): solicitudes STOMP enviadas y movimientos confirmados.
+const solicitudesStomp = new Counter('solicitudes_stomp');
+const movimientosConfirmados = new Counter('movimientos_confirmados');
 
 // --- STOMP minimo sobre el WebSocket crudo (/ws/websocket de SockJS) ---
 const frame = (command, headers, body = '') =>
@@ -139,11 +172,16 @@ export function jugador() {
       let pidioConSalaLlena = false;
       let ultimoEstado = 0;
       let pendiente = null;
+      // Movimientos enviados que todavia no aparecen en el estado (para contar los
+      // confirmados: si el servidor ya muestra uno, los anteriores tambien se aplicaron).
+      let enviados = [];
       let x = 608 + puesto * 40;
       let dir = 1;
 
-      const enviar = (destino, cuerpo) =>
+      const enviar = (destino, cuerpo) => {
+        solicitudesStomp.add(1);
         socket.send(frame('SEND', { destination: `/app/game/${codigo}/${destino}`, 'content-type': 'application/json' }, JSON.stringify(cuerpo)));
+      };
       // Todos piden iniciar; el servidor solo le hace caso al anfitrion (el primero que entro).
       const iniciar = () => {
         if (!empezo) enviar('start', { playerId: rol });
@@ -162,6 +200,8 @@ export function jugador() {
         if (command === 'CONNECTED') {
           conexionStomp.add(Date.now() - inicio);
           socket.send(frame('SUBSCRIBE', { id: 'sub-0', destination: `/topic/game/${codigo}` }));
+          // Los rechazos (code_taken, puesto tomado) llegan solo a quien los causo.
+          socket.send(frame('SUBSCRIBE', { id: 'sub-1', destination: '/user/queue/eventos' }));
           // Spring puede atender el SUBSCRIBE y el primer SEND en hilos distintos: se espera
           // un momento para no perder la respuesta, y se reintenta si igual no llega.
           socket.setTimeout(pedirSala, 500);
@@ -172,6 +212,7 @@ export function jugador() {
         }
         if (command !== 'MESSAGE') return;
 
+        const privado = raw.includes('destination:/user/queue/eventos');
         const estado = JSON.parse(body);
         const evento = estado.lastEvent;
         if (evento) {
@@ -195,7 +236,7 @@ export function jugador() {
             correcciones.add(1);
           }
         }
-        if (!estado.players) return; // rechazo suelto, sin estado
+        if (privado || !estado.players) return; // rechazo suelto, sin estado
 
         // Entro si el servidor lo confirma o si ya aparece en la sala con su nombre.
         if (!entro && ((evento && evento.type === 'JOIN_OK' && evento.itemId === clientId)
@@ -222,6 +263,13 @@ export function jugador() {
         ultimoEstado = ahora;
 
         const yo = estado.players.find((p) => p.playerId === rol);
+        if (yo && enviados.length) {
+          const i = enviados.findIndex((e) => Math.abs(yo.x - e.x) < 2);
+          if (i >= 0) {
+            movimientosConfirmados.add(i + 1);
+            enviados = enviados.slice(i + 1);
+          }
+        }
         if (pendiente && yo && Math.abs(yo.x - pendiente.x) < 2) {
           idaYVuelta.add(ahora - pendiente.enviado);
           pendiente = null;
@@ -235,6 +283,8 @@ export function jugador() {
         x += dir * 14;
         if (x > 1500 || x < 500) dir *= -1;
         if (!pendiente) pendiente = { x, enviado: Date.now() };
+        enviados.push({ x });
+        if (enviados.length > 30) enviados.shift(); // sin respuesta hace rato: se descarta
         enviar('move', { playerId: rol, floor: 1, x, y: 800 });
         if (Math.random() < 0.3) enviar('attack', { playerId: rol, type: 'BASIC', x, y: 800, facing: 0 });
       }, 100);
@@ -266,4 +316,44 @@ export function ranking() {
   const edificio = EDIFICIOS[Math.floor(Math.random() * EDIFICIOS.length)];
   const res = http.get(`${BASE_URL}/api/ranking?building=${edificio}`, { tags: { endpoint: 'ranking' } });
   check(res, { 'ranking 200': (r) => r.status === 200 });
+}
+
+// Resumen de la corrida: el texto de siempre en la consola y un JSON con TPS y TPM.
+export function handleSummary(data) {
+  const segundos = data.state.testRunDurationMs / 1000;
+  const valor = (nombre, campo = 'count') => (data.metrics[nombre] ? data.metrics[nombre].values[campo] : 0);
+  const transacciones = valor('movimientos_confirmados');
+  const solicitudes = valor('solicitudes_stomp') + valor('http_reqs');
+  const p = (nombre, q) => valor(nombre, `p(${q})`);
+  const resumen = {
+    perfil: PERFIL,
+    base_url: BASE_URL,
+    fecha: new Date().toISOString(),
+    duracion_s: Math.round(segundos),
+    vus_max: valor('vus_max', 'max'),
+    transaccion: 'movimiento confirmado (move enviado y visto en el estado del servidor)',
+    transacciones,
+    tps: +(transacciones / segundos).toFixed(1),
+    tpm: Math.round(transacciones / (segundos / 60)),
+    solicitudes,
+    solicitudes_por_s: +(solicitudes / segundos).toFixed(1),
+    estados_recibidos: valor('estados_recibidos'),
+    ida_y_vuelta_ms: { p50: p('ida_y_vuelta_movimiento_ms', 50), p95: p('ida_y_vuelta_movimiento_ms', 95), p99: p('ida_y_vuelta_movimiento_ms', 99) },
+    intervalo_estado_ms: { p50: p('intervalo_estado_ms', 50), p95: p('intervalo_estado_ms', 95), p99: p('intervalo_estado_ms', 99) },
+    ranking_ms: { p95: valor('http_req_duration{endpoint:ranking}', 'p(95)') },
+    errores_http: valor('http_req_failed', 'rate'),
+    entrada_exitosa: valor('entrada_exitosa', 'rate'),
+    sesiones_cortadas: valor('sesiones_cortadas'),
+    umbrales: Object.fromEntries(Object.entries(data.metrics)
+      .filter(([, m]) => m.thresholds)
+      .map(([nombre, m]) => [nombre, Object.values(m.thresholds).every((t) => t.ok)])),
+  };
+  const linea = `
+TPS (movimientos confirmados/s): ${resumen.tps} · TPM: ${resumen.tpm} · `
+    + `solicitudes/s: ${resumen.solicitudes_por_s}
+`;
+  return {
+    stdout: textSummary(data, { indent: ' ', enableColors: false }) + linea,
+    [__ENV.RESUMEN || `docs/k6/resultados/${PERFIL}.json`]: JSON.stringify(resumen, null, 2),
+  };
 }

@@ -1,0 +1,71 @@
+# Reusable workflow: analisis estatico con SonarQube y control del Quality Gate.
+# Corre las pruebas con cobertura en el mismo job (la cobertura que se reporta es la
+# de las pruebas que se acaban de ejecutar) y espera el veredicto del Quality Gate:
+# si queda en rojo, el job falla. Lo llama ci.yml una vez por capa.
+name: SonarQube (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      directorio:
+        type: string
+        required: true
+      tipo:
+        description: maven (backend) o node (frontend)
+        type: string
+        required: true
+    secrets:
+      SONAR_TOKEN:
+        required: true
+      SONAR_HOST_URL:
+        required: true
+
+jobs:
+  sonar:
+    name: SonarQube ${{ inputs.directorio }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.directorio }}
+    env:
+      SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0   # Sonar usa el historial para saber que codigo es nuevo
+
+      - if: inputs.tipo == 'maven'
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Pruebas, cobertura (JaCoCo) y analisis
+        if: inputs.tipo == 'maven'
+        run: >
+          ./mvnw -B verify sonar:sonar
+          -Dsonar.host.url="$SONAR_HOST_URL" -Dsonar.token="$SONAR_TOKEN"
+          -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=600
+
+      - if: inputs.tipo == 'node'
+        uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: ${{ inputs.directorio }}/package-lock.json
+      - name: Pruebas con cobertura (lcov)
+        if: inputs.tipo == 'node'
+        run: npm ci && npm run test:coverage
+      - name: Analisis
+        if: inputs.tipo == 'node'
+        run: >
+          npx --yes @sonar/scan@4.4.0
+          -Dsonar.host.url="$SONAR_HOST_URL" -Dsonar.token="$SONAR_TOKEN"
+          -Dsonar.qualitygate.wait=true -Dsonar.qualitygate.timeout=600
+
+      - name: Enlace al tablero
+        if: always()
+        run: |
+          case "${{ inputs.directorio }}" in backend) KEY=operacion-garavito-backend ;; *) KEY=operacion-garavito-frontend ;; esac
+          echo "### SonarQube: [$KEY]($SONAR_HOST_URL/dashboard?id=$KEY)" >> "$GITHUB_STEP_SUMMARY"

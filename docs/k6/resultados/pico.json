@@ -1,0 +1,37 @@
+{
+  "perfil": "pico",
+  "base_url": "http://localhost:8080",
+  "fecha": "2026-11-21T01:25:48.225Z",
+  "duracion_s": 261,
+  "vus_max": 205,
+  "transaccion": "movimiento confirmado (move enviado y visto en el estado del servidor)",
+  "transacciones": 137837,
+  "tps": 528.9,
+  "tpm": 31735,
+  "solicitudes": 186347,
+  "solicitudes_por_s": 715.1,
+  "estados_recibidos": 230062,
+  "ida_y_vuelta_ms": {
+    "p50": 59,
+    "p95": 1026.3999999999978,
+    "p99": 1934
+  },
+  "intervalo_estado_ms": {
+    "p50": 32,
+    "p95": 314,
+    "p99": 1458
+  },
+  "ranking_ms": {
+    "p95": 865.1372999999996
+  },
+  "errores_http": 0,
+  "entrada_exitosa": 1,
+  "sesiones_cortadas": 0,
+  "umbrales": {
+    "http_req_failed": true,
+    "intervalo_estado_ms": false,
+    "http_req_duration{endpoint:ranking}": false,
+    "ida_y_vuelta_movimiento_ms": false,
+    "entrada_exitosa": true
+  }
+}

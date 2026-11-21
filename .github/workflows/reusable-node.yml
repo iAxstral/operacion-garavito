@@ -1,0 +1,44 @@
+# Reusable workflow: proyecto Node (audit, lint, pruebas con cobertura y build).
+# Lo llama ci.yml; deja coverage/lcov.info como artefacto.
+name: Pruebas Node (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      directorio:
+        description: Carpeta del proyecto Node
+        type: string
+        default: frontend
+      version-node:
+        type: string
+        default: '24'
+
+jobs:
+  node:
+    name: Lint, pruebas con cobertura y build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.directorio }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ inputs.version-node }}
+          cache: npm
+          cache-dependency-path: ${{ inputs.directorio }}/package-lock.json
+      - run: npm ci
+      # Falla con vulnerabilidades altas o criticas en las dependencias de npm.
+      - name: npm audit
+        run: npm audit --audit-level=high
+      - name: Lint
+        run: npm run lint
+      - name: Pruebas unitarias con cobertura
+        run: npm run test:coverage
+      - name: Build
+        run: npm run build
+      - name: Cobertura
+        uses: actions/upload-artifact@v5
+        with:
+          name: cobertura-${{ inputs.directorio }}
+          path: ${{ inputs.directorio }}/coverage

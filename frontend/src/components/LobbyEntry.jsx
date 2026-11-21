@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { generateLobbyCode, openLobby } from '../game/gameSync';
+import { createLobby, openLobby } from '../game/gameSync';
 import { DAILY_RULES, MODES, fetchDailyChallenge } from '../game/gameModes';
 import { buildingLabel } from '../game/mapLayout';
 import { playSfx } from '../game/sfx';
@@ -8,11 +8,10 @@ import RegaloMaldito from './RegaloMaldito';
 
 const ERROR_MESSAGES = {
   lobby_not_found: 'No existe una sala con ese código.',
-  invalid_code: 'El código debe tener 4 letras o números.',
+  invalid_code: 'El código debe tener de 4 a 8 letras o números.',
+  room_cap: 'Hay demasiadas salas abiertas. Espera un momento e intenta de nuevo.',
   timeout: 'El servidor no respondió. ¿Estás en la misma red que el anfitrión?',
 };
-
-const MAX_CREATE_ATTEMPTS = 5;
 
 export default function LobbyEntry({ building, onEntered, onBack }) {
   const [code, setCode] = useState('');
@@ -41,17 +40,9 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
     }
   };
 
+  // El servidor genera el codigo de la sala (ya no lo inventa el navegador).
   const handleCreate = () => run(async () => {
-    for (let attempt = 0; attempt < MAX_CREATE_ATTEMPTS; attempt += 1) {
-      try {
-        const created = await openLobby(generateLobbyCode(), true, building, false, mode);
-        onEntered(created);
-        return;
-      } catch (err) {
-        if (err.message !== 'code_taken') throw err;
-      }
-    }
-    throw new Error('code_taken');
+    onEntered(await createLobby(building, mode));
   });
 
   const handleJoin = (event) => {
@@ -83,12 +74,12 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
           </section>
           <section className="xl-card xl-card--join">
             <h2>Unirse con código</h2>
-            <p>Pídele las 4 letras a quien creó la sala.</p>
+            <p>Pídele el código a quien creó la sala.</p>
             <input
               className="xl-code"
               value={code}
-              maxLength={4}
-              placeholder="ABCD"
+              maxLength={8}
+              placeholder="ABC234"
               aria-label="Código de la sala"
               autoCapitalize="characters"
               autoComplete="off"
@@ -101,7 +92,7 @@ export default function LobbyEntry({ building, onEntered, onBack }) {
               className="xl-btn"
               disabled={busy || code.trim().length < 4}
               aria-label="Entrar"
-              title={code.trim().length < 4 ? 'Escribe el código de 4 letras' : 'Entrar a la sala'}
+              title={code.trim().length < 4 ? 'Escribe el código de la sala' : 'Entrar a la sala'}
             >
               Entrar
             </button>

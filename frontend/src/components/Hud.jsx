@@ -10,9 +10,6 @@ import {
   requestDoorToggle,
   requestUseItem,
   requestEquip,
-  getNearMission,
-  getNearStairs,
-  getNearDowned,
   onNearDownedChange,
   getNearBarricade,
   getBarricades,
@@ -54,6 +51,7 @@ const REJECTION_MESSAGES = {
   on_cooldown: 'Esa misión ya se completó hace poco, espera un poco',
   unknown_mission: 'Esa misión no existe',
   unknown_door: 'Esa puerta no existe',
+  door_blocked: 'Hay alguien en la puerta, no se puede cerrar',
   not_usable: 'Ese objeto no se puede usar',
   downed: 'Estás caído',
   no_ammo: 'Sin munición: cómprala en la máquina de armas (piso 2)',
@@ -204,7 +202,7 @@ function toastFor(event) {
   } else if (event.type === 'PURCHASE_SUCCESS' && weaponForItem(event.itemId)) {
     message = `¡${weaponForItem(event.itemId).name} comprada! Equípala con ${isTouchDevice() ? 'el botón de armas' : 'las teclas 1-4'}`;
   } else if (event.type === 'PURCHASE_SUCCESS') {
-    message = '¡Compra exitosa! Está en tu inventario (E)';
+    message = '¡Compra exitosa! Está en tu inventario (Tab)';
   } else if (event.type === 'PICKUP_SUCCESS') {
     const name = comidaNavidena(FOOD_ITEMS.find((item) => item.itemId === event.itemId))?.itemName ?? 'Objeto';
     message = `${name} guardado en el inventario (E para abrirlo)`;
@@ -360,6 +358,12 @@ export default function Hud({ onExit }) {
   useEffect(() => {
     const onKeyDown = (event) => {
       if (event.key === 'Tab') {
+        // Sin preventDefault el navegador mueve el foco a otro boton.
+        event.preventDefault();
+        if (!isInputLocked()) setInventoryOpen((open) => !open);
+        return;
+      }
+      if (event.key === 'p' || event.key === 'P') {
         event.preventDefault();
         setPanelOpen((open) => !open);
         return;
@@ -387,9 +391,9 @@ export default function Hud({ onExit }) {
         requestDoorToggle(nearDoor.doorId, nearDoor.x, nearDoor.y);
         return;
       }
-      if ((event.key === 'e' || event.key === 'E' || event.key === 'i' || event.key === 'I')
-        && !getNearMission() && !getNearStairs() && !getNearDowned() && !getNearBarricade() && !getNearEvent()
-        && !getNearHide()) {
+      // El inventario va con Tab o I, nunca con E: con E se abria al intentar abrir
+      // una puerta (o cualquier cosa) si el aviso de cercania todavia no habia llegado.
+      if (event.key === 'i' || event.key === 'I') {
         event.preventDefault();
         setInventoryOpen((open) => !open);
         return;
@@ -540,7 +544,14 @@ export default function Hud({ onExit }) {
           <div className="hud-floor">{role.name} — Piso {floor}</div>
         </div>
 
-        <div className="hud-inventory">
+        {/* Tocar la barra abre el inventario (en celular no hay tecla I). */}
+        <div
+          className="hud-inventory hud-inventory--open"
+          role="button"
+          tabIndex={-1}
+          aria-label="Abrir inventario (Tab)"
+          onClick={() => setInventoryOpen(true)}
+        >
           {slots.map((slot, i) => (
             <div
               key={`${slot?.itemId ?? 'empty'}-${i}`}
@@ -629,7 +640,7 @@ export default function Hud({ onExit }) {
           </div>
         )}
 
-        <div className="hud-hint">Tab: equipo · M: mapa · E: inventario · T: desmontar barricada · Esc: ajustes</div>
+        <div className="hud-hint">Tab: inventario · P: equipo · M: mapa · E: interactuar · T: desmontar barricada · Esc: ajustes</div>
       </div>
 
       {!isTouchDevice() && (

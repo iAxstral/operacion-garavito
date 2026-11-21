@@ -22,12 +22,14 @@ cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 
 ```bash
 # Prometheus (:9090) + Grafana (:3000)
+# La clave de admin no tiene valor por defecto: sin la variable, compose no arranca.
+export GRAFANA_ADMIN_PASSWORD=$(openssl rand -hex 12)
 docker compose -f monitoring/docker-compose.yml up -d
 ```
 
 Abrir `http://localhost:3000`. Para mirar no hace falta entrar: el acceso anónimo está
-habilitado en modo lectura. Para editar, el usuario es `admin` y la contraseña
-`garavito`.
+habilitado en modo lectura. Para editar, el usuario es `admin` y la contraseña la
+de `GRAFANA_ADMIN_PASSWORD`.
 
 ## 2. Configuración como código (provisioning)
 
@@ -216,4 +218,4 @@ Discord se agrega uno en Alerting → Contact points; las reglas no cambian.
 | El tablero de k6 está vacío | k6 se corrió sin `-o experimental-prometheus-rw` (ver `docs/k6`). |
 | Cambié un JSON y no se ve | Grafana relee los archivos cada pocos segundos; si no, `docker compose -f monitoring/docker-compose.yml restart grafana`. |
 | Una alerta no aparece | Revisar `docker compose logs grafana`: un error en `reglas.yml` sale como `provisioning.alerting`. |
-| No puedo editar un panel | Entrar como `admin` / `garavito`. Los cambios hechos en la interfaz a un tablero provisionado no se guardan en el archivo: hay que exportar el JSON. |
+| No puedo editar un panel | Entrar como `admin` con la clave de `GRAFANA_ADMIN_PASSWORD`. Los cambios hechos en la interfaz a un tablero provisionado no se guardan en el archivo: hay que exportar el JSON. |

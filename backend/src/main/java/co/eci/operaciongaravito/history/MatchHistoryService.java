@@ -25,6 +25,22 @@ public class MatchHistoryService {
     private static final System.Logger LOGGER = System.getLogger(MatchHistoryService.class.getName());
 
     private final MatchRecordRepository repository;
+
+    /**
+     * Cache corta del ranking por edificio y modo (security.api.ranking-cache-ms): pedirlo
+     * en bucle no llega a la base. Se vacia al guardar una partida, asi el ranking nuevo
+     * se ve enseguida. Las llaves son enums, asi que el mapa no puede crecer sin limite.
+     */
+    private record Cached(Ranking ranking, long expiresAt) {
+    }
+
+    private final java.util.Map<String, Cached> rankingCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private long rankingCacheMs = 8_000;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setSecurity(co.eci.operaciongaravito.security.SecurityProperties security) {
+        this.rankingCacheMs = security.getApi().getRankingCacheMs();
+    }
     private final ExecutorService writer = Executors.newSingleThreadExecutor(runnable -> {
         Thread thread = new Thread(runnable, "match-history-writer");
         thread.setDaemon(true);
@@ -47,6 +63,7 @@ public class MatchHistoryService {
 
     @Transactional
     public MatchRecord save(MatchSummary summary) {
+        rankingCache.clear();
         MatchRecord record = new MatchRecord(summary.building().name(), summary.victory(),
                 summary.kinderReached(), summary.durationSeconds(), Instant.now(),
                 summary.mode() == null ? GameMode.NORMAL.name() : summary.mode().name());
@@ -75,6 +92,20 @@ public class MatchHistoryService {
      */
     @Transactional(readOnly = true)
     public Ranking ranking(Building building, GameMode mode) {
+        String key = building.name() + "/" + mode.name();
+        long now = System.currentTimeMillis();
+        Cached cached = rankingCache.get(key);
+        if (cached != null && cached.expiresAt() > now) {
+            return cached.ranking();
+        }
+        Ranking fresh = load(building, mode);
+        if (rankingCacheMs > 0) {
+            rankingCache.put(key, new Cached(fresh, now + rankingCacheMs));
+        }
+        return fresh;
+    }
+
+    private Ranking load(Building building, GameMode mode) {
         java.time.Instant since = mode == GameMode.DAILY
                 ? java.time.LocalDate.now(Difficulty.ZONE).atStartOfDay(Difficulty.ZONE).toInstant()
                 : Instant.EPOCH;
@@ -99,6 +130,11 @@ public class MatchHistoryService {
         return new RankedMatch(record.getId(), record.isVictory(), record.getKinderReached(), record.getDurationSeconds(),
                 record.getPlayedAt(), record.getPlayerCount(), kills, missions,
                 mvp == null ? null : mvp.getRole(), mvp == null ? null : mvp.getPlayerName());
+    }
+
+    /** Vacia la cache del ranking (pruebas). */
+    public void clearRankingCache() {
+        rankingCache.clear();
     }
 
     @PreDestroy

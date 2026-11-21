@@ -5,8 +5,9 @@ import { getEquippedCostume } from './costumes';
 import { mergeDelta } from './deltaMerge';
 
 const CLIENT_ID = Math.random().toString(36).slice(2, 10);
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 const EVENT_TIMEOUT_MS = 6000;
+// Respuestas que son solo para este jugador (rechazos, codigo de la sala nueva).
+const PRIVATE_QUEUE = '/user/queue/eventos';
 
 let gameId = null;
 // Secreto de este jugador para volver a su puesto si se cae la conexion o recarga.
@@ -157,25 +158,42 @@ function awaitEvent(predicate) {
   });
 }
 
+function dispatchEvent(event) {
+  eventListeners.forEach((callback) => callback(event));
+  eventWaiters.forEach((waiter) => {
+    if (waiter.predicate(event)) {
+      eventWaiters.delete(waiter);
+      waiter.resolve(event);
+    }
+  });
+}
+
+// La cola privada solo trae un evento suelto: no se mezcla con el estado de la sala.
+function handlePrivateMessage(body) {
+  if (body?.lastEvent) dispatchEvent(body.lastEvent);
+}
+
 function handleMessage(body) {
   latestState = {
     ...mergeDelta(body, latestState),
     lastEvent: body.lastEvent ?? latestState.lastEvent,
   };
-  if (body.lastEvent) {
-    eventListeners.forEach((callback) => callback(body.lastEvent));
-    eventWaiters.forEach((waiter) => {
-      if (waiter.predicate(body.lastEvent)) {
-        eventWaiters.delete(waiter);
-        waiter.resolve(body.lastEvent);
-      }
-    });
-  }
+  if (body.lastEvent) dispatchEvent(body.lastEvent);
   notify();
 }
 
-export function generateLobbyCode() {
-  return Array.from({ length: 4 }, () => CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]).join('');
+/**
+ * Pide una sala nueva. El codigo lo genera el servidor (al azar, 6 caracteres) y se lo
+ * responde solo a este jugador; despues se entra a ella como a cualquier otra.
+ */
+export async function createLobby(building, mode = 'NORMAL') {
+  await socketService.whenConnected();
+  const reply = awaitEvent((event) => event.playerId === CLIENT_ID
+    && (event.type === 'LOBBY_CREATED' || event.type === 'LOBBY_REJECTED'));
+  socketService.publish('/app/game/create', { clientId: CLIENT_ID, building, mode });
+  const event = await reply;
+  if (event.type === 'LOBBY_REJECTED') throw new Error(event.reason);
+  return openLobby(event.itemId, false, building);
 }
 
 export async function openLobby(code, create, building, redirected = false, mode = 'NORMAL') {
@@ -234,8 +252,10 @@ function sendRejoin() {
 }
 
 // Al reconectarse el socket (corte de Wi-Fi, celular que se bloqueo) la suscripcion
-// anterior ya no existe: se vuelve a suscribir y a reclamar el puesto.
+// anterior ya no existe: se vuelve a suscribir y a reclamar el puesto. La cola privada
+// se abre en cada conexion, antes que nada (ahi llegan los rechazos y el codigo nuevo).
 function handleReconnect() {
+  socketService.subscribe(PRIVATE_QUEUE, handlePrivateMessage);
   if (!joined || !gameId || !seatToken) return;
   topicSubscription = socketService.subscribe(`/topic/game/${gameId}`, handleMessage);
   sendRejoin();

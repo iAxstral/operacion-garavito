@@ -1,0 +1,59 @@
+# Reusable workflow: pruebas de un proyecto Maven (Java 21) con cobertura JaCoCo.
+# Lo llama ci.yml; deja el reporte de cobertura como artefacto.
+name: Pruebas Maven (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      directorio:
+        description: Carpeta del proyecto Maven
+        type: string
+        default: backend
+      objetivos:
+        description: Fases de Maven a correr (verify corre pruebas y genera jacoco.xml)
+        type: string
+        default: verify
+
+jobs:
+  maven:
+    name: Maven ${{ inputs.objetivos }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ${{ inputs.directorio }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - name: Pruebas y cobertura
+        run: ./mvnw -B ${{ inputs.objetivos }}
+      - name: Cobertura en la pagina del job
+        if: always()
+        run: |
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import csv, os
+          ruta = 'target/site/jacoco/jacoco.csv'
+          if not os.path.exists(ruta):
+              print('Sin reporte de JaCoCo.'); raise SystemExit
+          filas = list(csv.DictReader(open(ruta)))
+          print('### Cobertura del backend (JaCoCo)\n\n| Medida | Cobertura |\n|---|---|')
+          for k in ['LINE', 'BRANCH', 'INSTRUCTION']:
+              m = sum(int(f[k + '_MISSED']) for f in filas); c = sum(int(f[k + '_COVERED']) for f in filas)
+              print(f'| {k.lower()} | {100 * c / (m + c):.1f} % |')
+          PY
+      - name: Reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: cobertura-${{ inputs.directorio }}
+          path: ${{ inputs.directorio }}/target/site/jacoco
+          if-no-files-found: ignore
+      - name: Reporte de pruebas
+        if: failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: surefire-${{ inputs.directorio }}
+          path: ${{ inputs.directorio }}/target/surefire-reports

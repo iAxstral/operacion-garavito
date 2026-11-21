@@ -1,5 +1,12 @@
 # k6 — pruebas de carga
 
+> **Entrega final (20-11-2026):** se agregó la prueba de **picos** (`-e PERFIL=pico`),
+> el cálculo de **TPS/TPM** y el registro de métricas del servidor antes, durante y
+> después de cada prueba. El informe comparativo de carga, estrés y picos está en
+> [`docs/RENDIMIENTO.md`](../RENDIMIENTO.md). Los archivos de `resultados/` son ahora
+> los de esa corrida; los de la corrida del 29-10-2026 que se citan abajo están en el
+> historial de git (`git show e0fa126:docs/k6/resultados/carga.txt`).
+
 [k6](https://k6.io) simula muchos jugadores al tiempo y mide si el juego sigue
 respondiendo bien. El script está en [`k6/partidas.js`](../../k6/partidas.js).
 
@@ -79,9 +86,13 @@ de <https://github.com/grafana/k6/releases>. También sirve Docker con
 `grafana/k6`.
 
 ```bash
-# 1. Backend
-cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
+# 1. Backend (el perfil carga apaga los limites de abuso: los VUs eligen el codigo de su
+#    sala y salen todos de esta maquina; ver docs/SEGURIDAD.md)
+cd backend && ./mvnw spring-boot:run -Dspring-boot.run.profiles=dev,carga
 ```
+
+Contra el clúster (`docker-compose.cluster.yml`), los nodos se levantan con
+`PERFILES_NODO=cluster,carga docker compose -f docker-compose.cluster.yml up --build`.
 
 ```bash
 # 2. Prometheus + Grafana (opcional, para ver la prueba en vivo)

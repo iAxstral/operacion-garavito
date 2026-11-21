@@ -11,6 +11,10 @@ Navegador ──HTTPS──▶ CloudFront (www.operaciongaravito.me)
                         └── /prometheus/*  → EC2 :9090 (Prometheus, con clave)
 EC2 t4g.small: backend (Java 21) + PostgreSQL 16 + Prometheus + Grafana
                (Prometheus lee /actuator/prometheus por localhost)
+
+GitHub Actions ──HTTPS──▶ CloudFront (d1nb9719430frc.cloudfront.net)
+                             └── /*  → EC2 :9000 (SonarQube, stack aparte)
+EC2 t4g.small: SonarQube 10.7 + PostgreSQL 16 (Docker)
 ```
 
 - Region: **us-east-2** (la organizacion de la cuenta solo permite esa).
@@ -33,9 +37,33 @@ cd backend; .\mvnw.cmd -B package; cd ..
 # 2. Frontend (el WebSocket va por el mismo dominio)
 cd frontend; npm ci; npm run lint; npm test; $env:VITE_WS_URL='/ws'; npm run build; cd ..
 
-# 3. Infraestructura: primero ver que cambia, despues desplegar
-cd infra; npm install; npx cdk diff; npx cdk deploy
+# 3. Infraestructura: primero ver que cambia, despues desplegar (con el secreto de origen)
+cd infra; npm install; npx ts-node test/verificar-stack.ts
+$env:GARAVITO_ORIGIN_SECRET = Get-Content $HOME\.garavito-origin-secret
+npx cdk diff OperacionGaravito; npx cdk deploy OperacionGaravito --exclusively
 ```
+
+Hay dos stacks: `OperacionGaravito` (el juego) y `OperacionGaravitoSonar` (SonarQube,
+ver [SonarQube](#sonarqube)). Nombrar siempre el stack con `--exclusively`, asi
+desplegar uno nunca toca el otro.
+
+### Secreto de origen (obligatorio)
+
+CloudFront le agrega al backend el header `X-Origin-Verify` y el backend responde 403 a
+todo lo que no lo trae (ver `docs/SEGURIDAD.md`). Sin ese secreto, `cdk diff` y
+`cdk deploy` se niegan a correr. **Nunca va en el repositorio.** Se genera una sola vez
+y se guarda fuera del proyecto; hay que usar el mismo en cada despliegue (si cambia,
+cambia la maquina y se pierde la base, ver abajo):
+
+```bash
+openssl rand -hex 32 > ~/.garavito-origin-secret      # una sola vez
+chmod 600 ~/.garavito-origin-secret
+export GARAVITO_ORIGIN_SECRET=$(cat ~/.garavito-origin-secret)
+```
+
+Queda guardado en la plantilla de CloudFormation (lo ve quien tenga acceso de lectura
+a la cuenta de AWS) y en `infra/cdk.out/` (ignorada por git). Ver los riesgos que quedan
+en `docs/SEGURIDAD.md`.
 
 Si `cdk diff` dice `There were no differences`, lo desplegado ya es el codigo actual
 y no hace falta `cdk deploy`. Si el juego no responde, puede que la maquina este
@@ -82,6 +110,9 @@ aws ssm send-command --region us-east-2 --instance-ids $ID --document-name AWS-R
 El respaldo viaja por la salida de SSM, que admite unos 24 KB. Si la base crece mas
 que eso, hay que mover el respaldo por S3.
 
+La migracion `V4__indice_jugadores_por_partida.sql` solo agrega un indice: no cambia
+las tablas, asi que este respaldo de datos se restaura igual en la maquina nueva.
+
 ### Comprobar que quedo bien
 
 ```bash
@@ -93,6 +124,39 @@ curl -i https://www.operaciongaravito.me/ws/info                   # 200 (WebSoc
 
 Un 504 en `/api/*` casi siempre es la maquina apagada o el backend aun arrancando
 (tarda uno o dos minutos despues de encenderla o desplegar).
+
+Comprobar los encabezados de seguridad y que el backend exige el secreto:
+
+```bash
+curl -sI https://www.operaciongaravito.me/ | grep -iE "strict-transport|content-security|x-frame|x-content-type|referrer"
+# Dentro de la maquina (por SSM): sin el header el backend responde 403,
+# y el actuator solo esta en 127.0.0.1:9091.
+aws ssm send-command --region us-east-2 --instance-ids $ID --document-name AWS-RunShellScript \
+  --parameters 'commands=["curl -s -o /dev/null -w %{http_code} localhost:8080/api/ping; echo; curl -s localhost:9091/actuator/health"]'
+```
+
+Y antes de la entrega, correr los ataques contra el sitio desplegado (no carga la
+maquina; ver `docs/SEGURIDAD.md`):
+
+```bash
+cd frontend && node scripts/pentest.mjs https://www.operaciongaravito.me
+```
+
+## Propuestas que no estan aplicadas
+
+- **AWS WAF con una regla rate-based** en CloudFront: cortaria inundaciones desde una
+  IP antes de llegar al EC2. Para CloudFront el WebACL se crea en `us-east-1`, y la
+  organizacion de esta cuenta no permite CloudFormation alli (por eso el certificado se
+  creo con la CLI). Se podria crear con la CLI (`aws wafv2 create-web-acl --scope
+  CLOUDFRONT --region us-east-1`) y asociarlo con `webAclId` en la `Distribution`.
+  Cuesta unos USD 5/mes mas USD 1 por regla. El backend ya limita por conexion y por
+  IP, asi que es una capa extra, no la unica.
+- **TLS entre CloudFront y el EC2** (hoy `HTTP_ONLY`): el trafico va por la red de AWS,
+  pero sin cifrar. Para usar `HTTPS_ONLY`, CloudFront exige un certificado publico
+  valido en el origen: un subdominio (p. ej. `origen.operaciongaravito.me`) apuntando a
+  la IP elastica con un certificado de Let's Encrypt en la maquina, o un ALB con ACM
+  delante del EC2 (~USD 16/mes). Con el header secreto, un tercero no puede usar el
+  origen aunque vaya por HTTP.
 
 ## Monitoreo (Prometheus y Grafana)
 
@@ -150,6 +214,44 @@ cual el backend usaba 42 % y el resto Prometheus, Grafana y PostgreSQL. No es fa
 creditos: la instancia esta en modo `unlimited`. Con `humo` (4 jugadores) todos los
 umbrales pasan (estado p95 145 ms, movimiento p95 223 ms).
 
+## SonarQube
+
+El analisis de calidad del CI (job `sonar` de `.github/workflows/ci.yml`) se manda a
+un SonarQube propio en **https://d1nb9719430frc.cloudfront.net**, en su propia EC2
+t4g.small y su propia distribucion de CloudFront (`lib/sonar-stack.ts`). Es un stack
+aparte para que desplegarlo, apagarlo o borrarlo nunca recree la maquina del juego.
+
+- Costo aproximado: **US$17/mes** encendido (maquina, IP fija y disco).
+- La maquina instala Docker, levanta SonarQube y PostgreSQL, cambia la clave por
+  defecto `admin/admin` y genera un token para el CI. Todo queda en
+  `/opt/sonar/sonar.env` y cambia si se recrea la maquina.
+- 2 GB alcanzan porque el analisis corre en GitHub Actions; la memoria de cada
+  proceso de SonarQube esta ajustada y hay 2 GB de swap.
+
+```powershell
+cd infra; npx cdk diff OperacionGaravitoSonar; npx cdk deploy OperacionGaravitoSonar --exclusively
+```
+
+Para ver la clave de `admin` y el token del CI (por SSM, sin entrar a la maquina):
+
+```powershell
+$id = aws ssm send-command --region us-east-2 --instance-ids <SonarInstanceId> `
+  --document-name AWS-RunShellScript --parameters 'commands=["cat /opt/sonar/sonar.env"]' `
+  --query Command.CommandId --output text
+aws ssm get-command-invocation --region us-east-2 --instance-id <SonarInstanceId> `
+  --command-id $id --query StandardOutputContent --output text
+```
+
+En GitHub (*Settings → Secrets and variables → Actions*) van dos secretos:
+
+| Secreto | Valor |
+|---|---|
+| `SONAR_HOST_URL` | `https://d1nb9719430frc.cloudfront.net` |
+| `SONAR_TOKEN` | el `SONAR_TOKEN` de `/opt/sonar/sonar.env` |
+
+Los proyectos `operacion-garavito-backend` y `operacion-garavito-frontend` se crean
+solos con el primer analisis.
+
 ## Ahorrar
 
 ```powershell
@@ -160,7 +262,11 @@ aws ec2 start-instances --region us-east-2 --instance-ids <id>
 
 Apagar y encender no borra la base; solo recrear la maquina lo hace.
 
-Para borrar todo: `npx cdk destroy` dentro de `infra/`. El certificado de ACM
+SonarQube se apaga igual con su id (salida `SonarInstanceId`); con la maquina
+apagada solo cuestan la IP y el disco (~US$5/mes), pero el job `sonar` del CI falla
+hasta encenderla. Para quitarlo del todo: `npx cdk destroy OperacionGaravitoSonar`.
+
+Para borrar todo: `npx cdk destroy --all` dentro de `infra/`. El certificado de ACM
 (us-east-1) se creo con la CLI y se borra aparte en la consola de ACM.
 
 ## Dominio

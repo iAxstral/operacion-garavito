@@ -9,6 +9,8 @@ Juego cooperativo de decisión bajo presión, ambientado en la ECI — Proyecto 
 **Squad:** Tribu Transmilenio Bogotá
 **Integrantes:** Tomás Olaya Díaz · Isaac Burgos · Javier Romero
 
+**Entrega final (Release 2):** índice de requisitos y evidencias en [`docs/ENTREGA_FINAL.md`](docs/ENTREGA_FINAL.md).
+
 ## Estructura
 
 - backend/ — Spring Boot · Java 21 · WebSocket/STOMP
@@ -40,7 +42,8 @@ O en Windows: `./dev.ps1` abre los dos.
 | De punta a punta (Playwright: levanta backend y frontend solos) | `cd frontend && npm run test:e2e` |
 | Costo del tick (benchmark, sin red) | `cd backend && ./mvnw test -Dtest=TickCostBenchmarkTest -Dbenchmark=true` |
 | Carga por la red (bots STOMP) | `cd frontend && node scripts/load-test.mjs --url ws://localhost:8080/ws/websocket --rooms 25` |
-| Carga con k6 (umbrales, ver `docs/k6`) | `k6 run k6/partidas.js` (o `-e PERFIL=humo` / `estres`) |
+| Carga con k6 (umbrales, ver `docs/k6`) | `k6 run k6/partidas.js` (o `-e PERFIL=humo` / `estres`); backend con `dev,carga` |
+| Ataques contra un servidor (ver `docs/SEGURIDAD.md`) | `cd frontend && node scripts/pentest.mjs https://www.operaciongaravito.me` |
 
 GitHub Actions corre backend, frontend, e2e, carga con k6 y análisis SonarQube en cada push y PR (`.github/workflows/ci.yml`).
 
@@ -63,12 +66,15 @@ cd backend && ./mvnw verify sonar:sonar -Dsonar.token=<TOKEN>
 cd frontend && npx sonar-scanner -Dsonar.token=<TOKEN>
 ```
 
-En CI se usan los secretos del repositorio `SONAR_TOKEN` y `SONAR_HOST_URL` (configúralos en *Settings → Secrets and variables → Actions*).
+En CI el análisis va al SonarQube desplegado en AWS, **https://d1nb9719430frc.cloudfront.net**
+(su propia EC2, stack `OperacionGaravitoSonar`), con los secretos del repositorio
+`SONAR_TOKEN` y `SONAR_HOST_URL` (*Settings → Secrets and variables → Actions*). Cómo
+desplegarlo y sacar el token: [`infra/README.md`](infra/README.md#sonarqube).
 
 ## Monitoreo
 
-`docker compose -f monitoring/docker-compose.yml up -d` levanta Prometheus (`:9090`) y
-Grafana (`:3000`, admin / garavito) con dos tableros: el servidor en vivo y la prueba
+`GRAFANA_ADMIN_PASSWORD=<clave> docker compose -f monitoring/docker-compose.yml up -d`
+levanta Prometheus (`:9090`) y Grafana (`:3000`, usuario `admin` con esa clave) con dos tableros: el servidor en vivo y la prueba
 de carga de k6. Detalles en [`docs/prometheus`](docs/prometheus/README.md),
 [`docs/grafana`](docs/grafana/README.md) y [`docs/k6`](docs/k6/README.md).
 
