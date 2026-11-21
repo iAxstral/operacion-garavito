@@ -9,6 +9,8 @@ Juego cooperativo de decisión bajo presión, ambientado en la ECI — Proyecto 
 **Squad:** Tribu Transmilenio Bogotá
 **Integrantes:** Tomás Olaya Díaz · Isaac Burgos · Javier Romero
 
+**Entrega final (Release 2):** índice de requisitos y evidencias en [`docs/ENTREGA_FINAL.md`](docs/ENTREGA_FINAL.md).
+
 ## Estructura
 
 - backend/ — Spring Boot · Java 21 · WebSocket/STOMP

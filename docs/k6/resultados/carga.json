@@ -1,0 +1,37 @@
+{
+  "perfil": "carga",
+  "base_url": "http://localhost:8080",
+  "fecha": "2026-11-21T01:13:04.950Z",
+  "duracion_s": 259,
+  "vus_max": 85,
+  "transaccion": "movimiento confirmado (move enviado y visto en el estado del servidor)",
+  "transacciones": 91064,
+  "tps": 351.9,
+  "tpm": 21116,
+  "solicitudes": 123543,
+  "solicitudes_por_s": 477.4,
+  "estados_recibidos": 133039,
+  "ida_y_vuelta_ms": {
+    "p50": 41,
+    "p95": 431,
+    "p99": 1702.7299999999996
+  },
+  "intervalo_estado_ms": {
+    "p50": 50,
+    "p95": 196,
+    "p99": 931.0899999999965
+  },
+  "ranking_ms": {
+    "p95": 942.3502
+  },
+  "errores_http": 0,
+  "entrada_exitosa": 1,
+  "sesiones_cortadas": 0,
+  "umbrales": {
+    "intervalo_estado_ms": true,
+    "http_req_duration{endpoint:ranking}": false,
+    "http_req_failed": true,
+    "ida_y_vuelta_movimiento_ms": false,
+    "entrada_exitosa": true
+  }
+}

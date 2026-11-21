@@ -1,4 +1,4 @@
-import { roleInfo } from './roleCatalog';
+import { roleInfo } from './roleCatalog.js';
 
 // Apodo del jugador: se guarda en este navegador y viaja al servidor al unirse a una
 // sala. Las mismas reglas que Player.setName en el servidor (16 caracteres, sin

@@ -1,11 +1,14 @@
-# Dos nodos del backend detras de un balanceador, que comparten Redis (registro
-# sala -> nodo) y PostgreSQL (historial y ranking), con Prometheus y Grafana.
+# El sistema completo en contenedores (entorno on-premise, ver docs/PORTABILIDAD.md):
+# frontend (nginx), dos nodos del backend detras de un balanceador, que comparten Redis
+# (registro sala -> nodo) y PostgreSQL (historial y ranking), con Prometheus y Grafana.
 # Cada sala vive en un nodo; si un jugador pide una sala del otro nodo, el servidor le
 # responde LOBBY_REDIRECT y el cliente se reconecta alla. Ver docs/escalado.
 #
+#   $env:GRAFANA_ADMIN_PASSWORD='<clave>'   (bash: export GRAFANA_ADMIN_PASSWORD=<clave>)
 #   docker compose -f docker-compose.cluster.yml up --build
 #
-#   Balanceador: http://localhost:8080   (frontend: VITE_WS_URL=http://localhost:8080/ws)
+#   Juego: http://localhost:8000          (frontend; reenvia /ws y /api al balanceador)
+#   Balanceador: http://localhost:8080
 #   Nodo 1: http://localhost:8081        Nodo 2: http://localhost:8082
 #   Prometheus: http://localhost:9090    Grafana: http://localhost:3000 (admin / la clave de GRAFANA_ADMIN_PASSWORD)
 #
@@ -64,6 +67,15 @@ services:
     depends_on:
       - node1
       - node2
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "8000:80"
+    environment:
+      BACKEND_UPSTREAM: lb:8080
+    depends_on:
+      - lb
 
   prometheus:
     image: prom/prometheus:v2.54.1

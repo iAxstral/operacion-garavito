@@ -1,0 +1,84 @@
+# Reusable workflow: levanta el backend (jar de Spring Boot) con los perfiles pedidos y
+# corre un comando contra http://localhost:8080. Lo usan las pruebas de ataque
+# (pentest.mjs, configuracion de produccion) y la prueba de carga con k6.
+name: Backend en vivo (reusable)
+
+on:
+  workflow_call:
+    inputs:
+      nombre:
+        description: Nombre corto para los artefactos
+        type: string
+        required: true
+      perfiles:
+        description: Perfiles de Spring (vacio = configuracion de produccion con H2)
+        type: string
+        default: ''
+      origenes:
+        description: WS_ALLOWED_ORIGINS del backend
+        type: string
+        default: ''
+      instalar-k6:
+        type: boolean
+        default: false
+      comando:
+        description: Comando a correr desde la raiz del repositorio
+        type: string
+        required: true
+      archivos:
+        description: Archivos a guardar como artefacto (ademas del log del backend)
+        type: string
+        default: ''
+
+jobs:
+  vivo:
+    name: ${{ inputs.nombre }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+      - name: Levantar backend
+        working-directory: backend
+        env:
+          PERFILES: ${{ inputs.perfiles }}
+          WS_ALLOWED_ORIGINS: ${{ inputs.origenes }}
+        run: |
+          ./mvnw -B -q package -DskipTests
+          if [ -n "$PERFILES" ]; then
+            ARGS="--spring.profiles.active=$PERFILES"
+          else
+            # Configuracion de produccion (sin perfil dev), con H2 en vez de PostgreSQL.
+            ARGS="--spring.datasource.url=jdbc:h2:mem:ci --spring.datasource.driver-class-name=org.h2.Driver --spring.datasource.username=sa --spring.datasource.password="
+          fi
+          [ -z "$WS_ALLOWED_ORIGINS" ] && unset WS_ALLOWED_ORIGINS
+          nohup java -jar target/*.jar $ARGS > ../backend.log 2>&1 &
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8080/api/ping > /dev/null && exit 0
+            sleep 2
+          done
+          cat ../backend.log
+          exit 1
+      - name: Instalar k6
+        if: inputs.instalar-k6
+        run: |
+          curl -sSfL https://github.com/grafana/k6/releases/download/v0.54.0/k6-v0.54.0-linux-amd64.tar.gz | tar xz
+          sudo mv k6-v0.54.0-linux-amd64/k6 /usr/local/bin/k6
+          k6 version
+      - name: ${{ inputs.nombre }}
+        run: ${{ inputs.comando }}
+      - name: Artefactos
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: ${{ inputs.nombre }}
+          path: |
+            backend.log
+            ${{ inputs.archivos }}
+          if-no-files-found: ignore

@@ -9,7 +9,6 @@ import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
-import { Duration } from 'aws-cdk-lib';
 import encabezados from './encabezados.json';
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -269,7 +268,7 @@ export class GaravitoStack extends Stack {
  * falla, el juego ya quedo arriba. Las claves se generan en la maquina y quedan en
  * /opt/garavito/monitoring.env (se leen por SSM, ver infra/README.md).
  */
-function monitoringCommands(config: s3assets.Asset, publicUrl: string): string[] {
+export function monitoringCommands(config: s3assets.Asset, publicUrl: string): string[] {
   const prom = `prometheus-${PROMETHEUS_VERSION}.linux-arm64`;
   return [
     `aws s3 cp s3://${config.s3BucketName}/${config.s3ObjectKey} /tmp/monitoring.zip`,

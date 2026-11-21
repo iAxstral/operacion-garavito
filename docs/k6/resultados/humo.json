@@ -1,0 +1,33 @@
+{
+  "perfil": "humo",
+  "base_url": "http://localhost:8080",
+  "fecha": "2026-11-21T01:07:04.946Z",
+  "duracion_s": 72,
+  "vus_max": 9,
+  "transaccion": "movimiento confirmado (move enviado y visto en el estado del servidor)",
+  "transacciones": 1822,
+  "tps": 25.3,
+  "tpm": 1518,
+  "solicitudes": 2638,
+  "solicitudes_por_s": 36.6,
+  "estados_recibidos": 2198,
+  "ida_y_vuelta_ms": {
+    "p95": 107.5
+  },
+  "intervalo_estado_ms": {
+    "p95": 193
+  },
+  "ranking_ms": {
+    "p95": 206.72371999999973
+  },
+  "errores_http": 0,
+  "entrada_exitosa": 1,
+  "sesiones_cortadas": 0,
+  "umbrales": {
+    "http_req_duration{endpoint:ranking}": true,
+    "intervalo_estado_ms": true,
+    "ida_y_vuelta_movimiento_ms": true,
+    "entrada_exitosa": true,
+    "http_req_failed": true
+  }
+}
